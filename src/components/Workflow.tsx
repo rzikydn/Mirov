@@ -1,29 +1,34 @@
 import { PenLine, CheckSquare, Users2, TrendingUp } from 'lucide-react';
+import NoteIcon from '../assets/Note1.svg';
+import CollaborateIcon from '../assets/Collaborate1.svg'
+import TaskIcon from '../assets/Task1.svg'
+import ProgressIcon from '../assets/Progress2.svg'
+
 
 const steps = [
   {
     icon: PenLine,
     title: 'Capture ideas in notes',
     description: 'Start by jotting down thoughts, brainstorming with your team, and organizing ideas in flexible pages.',
-    image: '📝',
+    image: <img src={NoteIcon} alt="Note" className="w-50 h-50" />,
   },
   {
     icon: CheckSquare,
     title: 'Turn notes into tasks',
     description: 'Transform ideas into actionable tasks with one click. Set priorities, deadlines, and assignees.',
-    image: '✅',
+    image: <img src={TaskIcon} alt="Note" className="w-50 h-50" />,
   },
   {
     icon: Users2,
     title: 'Collaborate in real-time',
     description: 'Work together seamlessly. See who\'s online, comment on tasks, and stay aligned with your team.',
-    image: '👥',
+    image: <img src={CollaborateIcon} alt="Note" className="w-50 h-50" />,
   },
   {
     icon: TrendingUp,
-    title: 'Visualize progress',
-    description: 'Track team progress with beautiful boards and dashboards. Celebrate wins and identify bottlenecks.',
-    image: '📈',
+    title: 'Progress Overview',
+    description: 'Keep your team aligned by reviewing task updates, seeing what’s done, and understanding what’s next. Ensure smooth workflow without missing anything.',
+    image: <img src={ProgressIcon} alt="Note" className="w-50 h-50" />,
   },
 ];
 
