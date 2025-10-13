@@ -4,8 +4,6 @@ import Hero from './components/Hero';
 import WorkspacePreview from './components/WorkspacePreview';
 import Features from './components/Features';
 import Workflow from './components/Workflow';
-import Integrations from './components/Integrations';
-import FinalCTA from './components/FinalCTA';
 import Footer from './components/Footer';
 import AuthPage from './components/Authpage.tsx';
 
@@ -23,8 +21,6 @@ function App() {
               <WorkspacePreview />
               <Features />
               <Workflow />
-              <Integrations />
-              <FinalCTA />
               <Footer />
             </div>
           }
