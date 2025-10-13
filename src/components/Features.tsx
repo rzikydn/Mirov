@@ -35,7 +35,7 @@ export default function Features() {
           <div className="inline-block px-4 py-2 bg-blue-50 rounded-full mb-4">
             <span className="text-sm font-semibold text-blue-600">FEATURES</span>
           </div>
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 bbh-sans-hegarty-regular">
             Everything you need to collaborate
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
