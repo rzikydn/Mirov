@@ -1,8 +1,16 @@
+import { useEffect, useState } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 
 export default function Hero() {
+  const [animate, setAnimate] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAnimate(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
-    <section className="relative pt-32 pb-20 px-6 lg:px-8 overflow-hidden bg-gradient-to-br from-white via-blue-50/30 to-white">
+    <section className="relative min-h-screen pt-40 pb-48 px-6 lg:px-8 overflow-hidden bg-gradient-to-br from-white via-blue-50/30 to-white">
       {/* Background grids */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#2563eb08_1px,transparent_1px),linear-gradient(to_bottom,#2563eb08_1px,transparent_1px)] bg-[size:4rem_4rem]" />
       <div className="absolute top-20 left-10 w-72 h-72 bg-blue-400/10 rounded-full blur-3xl" />
@@ -10,7 +18,7 @@ export default function Hero() {
 
       <div className="relative max-w-7xl mx-auto text-center">
         {/* Badge */}
-        <div className="inline-flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-full mb-8">
+        <div className={`inline-flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-full mb-10 transition-all duration-700 ${animate ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
           <Sparkles className="w-4 h-4 text-blue-600" />
           <span className="text-sm font-medium text-blue-600">
             Introducing Mirov — Your Unified Workspace
@@ -18,19 +26,18 @@ export default function Hero() {
         </div>
 
         {/* Hero Heading */}
-        <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-          Think. Plan. Build.
-          <br />
-          <span className="text-blue-600">Together.</span>
+        <h1 className={`text-5xl md:text-7xl font-extrabold text-gray-900 mb-8 leading-snug transition-all duration-700 delay-200 ${animate ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-6'}`}>
+          <span className="bbh-sans-bogle-regular">Plan Build Achieve</span>
+          <span className="text-blue-600 playwrite-de-sas-light"> Together</span>
         </h1>
 
         {/* Subtext */}
-        <p className="text-xl md:text-2xl text-gray-600 mb-10 leading-relaxed max-w-3xl mx-auto">
-          Mirov helps your team bring ideas to life — in one connected workspace.
+        <p className={`text-lg md:text-xl text-gray-600 mb-16 leading-relaxed max-w-3xl mx-auto transition-all duration-700 delay-400 ${animate ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+          Mirov empowers your team to turn ideas into reality seamlessly — all in one connected workspace.
         </p>
 
         {/* Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className={`flex flex-col sm:flex-row items-center justify-center gap-4 transition-all duration-700 delay-600 ${animate ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           <button className="group px-8 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 flex items-center space-x-2">
             <span>Start for Free</span>
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
