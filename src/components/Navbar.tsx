@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const navigate = useNavigate(); // Hook untuk navigate
 
   useEffect(() => {
     const handleScroll = () => {
@@ -12,6 +14,11 @@ export default function Navbar() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleAuthClick = () => {
+    navigate('/auth'); // Navigasi ke AuthPage
+    setIsMobileMenuOpen(false); // Tutup mobile menu jika terbuka
+  };
 
   return (
     <nav
@@ -69,10 +76,16 @@ export default function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
-            <button className="px-4 py-2 text-gray-700 hover:text-blue-600 font-medium transition-colors">
+            <button
+              onClick={handleAuthClick}
+              className="px-4 py-2 text-gray-700 hover:text-blue-600 font-medium transition-colors"
+            >
               Sign In
             </button>
-            <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium shadow-sm hover:shadow-md">
+            <button
+              onClick={handleAuthClick}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium shadow-sm hover:shadow-md"
+            >
               Get Started
             </button>
           </div>
@@ -105,10 +118,16 @@ export default function Navbar() {
               Contact
             </a>
             <div className="pt-4 space-y-2">
-              <button className="w-full px-4 py-2 text-gray-700 hover:text-blue-600 font-medium transition-colors">
+              <button
+                onClick={handleAuthClick}
+                className="w-full px-4 py-2 text-gray-700 hover:text-blue-600 font-medium transition-colors"
+              >
                 Sign In
               </button>
-              <button className="w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium">
+              <button
+                onClick={handleAuthClick}
+                className="w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium"
+              >
                 Get Started
               </button>
             </div>
