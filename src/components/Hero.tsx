@@ -14,7 +14,7 @@ export default function Hero() {
       {/* Background grids */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#2563eb08_1px,transparent_1px),linear-gradient(to_bottom,#2563eb08_1px,transparent_1px)] bg-[size:4rem_4rem]" />
       <div className="absolute top-20 left-10 w-72 h-72 bg-blue-400/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-300/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-300/10 rounded-3xl blur-3xl" />
 
       <div className="relative max-w-7xl mx-auto text-center">
         {/* Badge */}
@@ -26,9 +26,19 @@ export default function Hero() {
         </div>
 
         {/* Hero Heading */}
-        <h1 className={`text-5xl md:text-7xl font-extrabold text-gray-900 mb-8 leading-snug transition-all duration-700 delay-200 ${animate ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-6'}`}>
-          <span className="bbh-sans-bogle-regular">Plan Build Achieve</span>
-          <span className="text-blue-600 playwrite-de-sas-light"> Together</span>
+        <h1 className={`relative text-5xl md:text-7xl font-extrabold mb-8 leading-snug transition-all duration-700 delay-200 ${animate ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-6'}`}>
+          {/* Expanded Background Gradient Behind Text */}
+          <span className="absolute inset-0 -z-10 flex justify-center items-center">
+            {/* Layer 1 */}
+            <div className="absolute w-[120%] h-[120%] bg-gradient-to-r from-blue-400 via-blue-300 to-cyan-400 opacity-30 rounded-3xl blur-3xl" />
+            {/* Layer 2 */}
+            <div className="absolute w-[100%] h-[100%] bg-gradient-to-tr from-blue-500 via-blue-400/60 to-cyan-500/40 opacity-20 rounded-3xl blur-2xl" />
+            {/* Layer 3 */}
+            <div className="absolute w-[140%] h-[140%] bg-gradient-to-bl from-blue-300/40 via-cyan-300/20 to-blue-400/30 opacity-15 rounded-3xl blur-3xl" />
+          </span>
+
+          <span className="relative bbh-sans-bogle-regular">Plan Build Achieve</span>
+          <span className="relative text-blue-600 playwrite-de-sas-light"> Together</span>
         </h1>
 
         {/* Subtext */}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom'; // <-- import useNavigate
-import { User, Mail, Lock, Eye, EyeOff, Sparkles, Shield, Zap, Home } from 'lucide-react'; // <-- import Home icon
+import { useNavigate } from 'react-router-dom';
+import { User, Mail, Lock, Eye, EyeOff, Shield, Zap, Home } from 'lucide-react';
 
 type AuthMode = 'login' | 'register';
 
@@ -18,7 +18,7 @@ interface FormErrors {
 }
 
 export default function AuthPage() {
-  const navigate = useNavigate(); // <-- hook untuk navigasi
+  const navigate = useNavigate();
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -84,8 +84,34 @@ export default function AuthPage() {
   };
 
   const handleBackToHome = () => {
-    navigate('/'); // <-- navigasi ke landing page
+    navigate('/');
   };
+
+  const LogoSVG = (
+    <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 2L2 7L12 12L22 7L12 2Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M2 17L12 22L22 17"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M2 12L12 17L22 12"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center p-4 overflow-hidden">
@@ -99,17 +125,17 @@ export default function AuthPage() {
           className="hidden lg:block relative"
         >
           <div className="relative z-10">
-            {/* Logo */}
+            {/* Logo Desktop */}
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, duration: 0.6 }}
               className="flex items-center gap-3 mb-8"
             >
-              <div className="w-14 h-14 bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                <Sparkles className="w-8 h-8 text-white" />
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
+                {LogoSVG}
               </div>
-              <span className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+              <span className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent">
                 Mirov
               </span>
             </motion.div>
@@ -146,7 +172,7 @@ export default function AuthPage() {
             >
               {[{ icon: Shield, text: 'Bank-level security & encryption' },
                 { icon: Zap, text: 'Lightning-fast performance' },
-                { icon: Sparkles, text: 'Intuitive & modern interface' }].map((feature, index) => (
+                { icon: User, text: 'Intuitive & modern interface' }].map((feature, index) => (
                 <motion.div
                   key={index}
                   initial={{ opacity: 0, x: -20 }}
@@ -196,10 +222,10 @@ export default function AuthPage() {
               transition={{ delay: 0.2, duration: 0.6 }}
               className="flex lg:hidden items-center justify-center gap-3 mb-8"
             >
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                <Sparkles className="w-7 h-7 text-white" />
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
+                {LogoSVG}
               </div>
-              <span className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+              <span className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent">
                 Mirov
               </span>
             </motion.div>

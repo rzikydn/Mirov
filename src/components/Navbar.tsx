@@ -54,7 +54,7 @@ export default function Navbar() {
                 />
               </svg>
             </div>
-            <span className="text-xl font-bold text-gray-900">Mirov</span>
+            <span className="text-xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent">Mirov</span>
           </div>
 
           <div className="hidden md:flex items-center space-x-8">

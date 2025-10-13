@@ -3,7 +3,7 @@ export default function WorkspacePreview() {
     <section className="py-24 px-6 lg:px-8 bg-gray-50">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <h2 className="text-4xl md:text-5xl text-gray-900 mb-4 relative bbh-sans-bogle-regular">
             See how Mirov simplifies your workflow
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
