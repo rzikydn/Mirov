@@ -7,7 +7,7 @@ import Workflow from './components/Workflow';
 import Integrations from './components/Integrations';
 import FinalCTA from './components/FinalCTA';
 import Footer from './components/Footer';
-import AuthPage from './components/AuthPage';
+import AuthPage from './components/Authpage.tsx';
 
 function App() {
   return (
