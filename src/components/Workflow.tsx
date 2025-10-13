@@ -2,7 +2,7 @@ import { PenLine, CheckSquare, Users2, TrendingUp } from 'lucide-react';
 import NoteIcon from '../assets/Note1.svg';
 import CollaborateIcon from '../assets/Collaborate1.svg'
 import TaskIcon from '../assets/Task1.svg'
-import ProgressIcon from '../assets/Progress2.svg'
+import ProgressIcon from '../assets/Progress1.svg'
 
 
 const steps = [
