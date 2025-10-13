@@ -18,23 +18,28 @@ export default function Hero() {
 
       <div className="relative max-w-7xl mx-auto text-center">
         {/* Badge */}
-        <div className={`inline-flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-full mb-10 transition-all duration-700 ${animate ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+        <div
+          className={`inline-flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-full mb-10 transition-all duration-700 whitespace-nowrap ${
+    animate ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
+          }`}
+        >
           <Sparkles className="w-4 h-4 text-blue-600" />
-          <span className="text-sm font-medium text-blue-600">
+          <span className="text-xs sm:text-sm md:text-base font-medium text-blue-600">
             Introducing Mirov — Your Unified Workspace
           </span>
         </div>
 
         {/* Hero Heading */}
-        <h1 className={`relative text-5xl md:text-7xl font-extrabold mb-8 leading-snug transition-all duration-700 delay-200 ${animate ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-6'}`}>
-          {/* Expanded Background Gradient Behind Text */}
+        <h1
+          className={`relative text-5xl md:text-7xl font-extrabold mb-8 leading-snug transition-all duration-700 delay-200 ${
+            animate ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-6'
+          }`}
+        >
+          {/* Responsive Background Gradient */}
           <span className="absolute inset-0 -z-10 flex justify-center items-center">
-            {/* Layer 1 */}
-            <div className="absolute w-[120%] h-[120%] bg-gradient-to-r from-blue-400 via-blue-300 to-cyan-400 opacity-30 rounded-3xl blur-3xl" />
-            {/* Layer 2 */}
-            <div className="absolute w-[100%] h-[100%] bg-gradient-to-tr from-blue-500 via-blue-400/60 to-cyan-500/40 opacity-20 rounded-3xl blur-2xl" />
-            {/* Layer 3 */}
-            <div className="absolute w-[140%] h-[140%] bg-gradient-to-bl from-blue-300/40 via-cyan-300/20 to-blue-400/30 opacity-15 rounded-3xl blur-3xl" />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-blue-300 to-cyan-400 opacity-30 rounded-3xl blur-3xl scale-110" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-blue-500 via-blue-400/60 to-cyan-500/40 opacity-20 rounded-3xl blur-2xl scale-105" />
+            <div className="absolute inset-0 bg-gradient-to-bl from-blue-300/40 via-cyan-300/20 to-blue-400/30 opacity-15 rounded-3xl blur-3xl scale-125" />
           </span>
 
           <span className="relative bbh-sans-bogle-regular">Plan Build Achieve</span>
@@ -42,12 +47,20 @@ export default function Hero() {
         </h1>
 
         {/* Subtext */}
-        <p className={`text-lg md:text-xl text-gray-600 mb-16 leading-relaxed max-w-3xl mx-auto transition-all duration-700 delay-400 ${animate ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+        <p
+          className={`text-lg md:text-xl text-gray-600 mb-16 leading-relaxed max-w-3xl mx-auto transition-all duration-700 delay-400 ${
+            animate ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
+          }`}
+        >
           Mirov empowers your team to turn ideas into reality seamlessly — all in one connected workspace.
         </p>
 
         {/* Buttons */}
-        <div className={`flex flex-col sm:flex-row items-center justify-center gap-4 transition-all duration-700 delay-600 ${animate ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <div
+          className={`flex flex-col sm:flex-row items-center justify-center gap-4 transition-all duration-700 delay-600 ${
+            animate ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+          }`}
+        >
           <button className="group px-8 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 flex items-center space-x-2">
             <span>Start for Free</span>
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
