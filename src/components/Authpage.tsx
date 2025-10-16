@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Eye, EyeOff, Shield, Zap, Home } from 'lucide-react';
 
 type AuthMode = 'login' | 'register';
@@ -18,7 +17,6 @@ interface FormErrors {
 }
 
 export default function AuthPage() {
-  const navigate = useNavigate();
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -84,7 +82,8 @@ export default function AuthPage() {
   };
 
   const handleBackToHome = () => {
-    navigate('/');
+    // navigate('/');
+    alert('Navigate to home');
   };
 
   const LogoSVG = (
@@ -114,8 +113,11 @@ export default function AuthPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center p-4 overflow-hidden">
-      <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-8 items-center">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center p-4 overflow-hidden relative">
+      {/* Background tetap - tidak akan hilang */}
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 -z-10" />
+      
+      <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-8 items-center relative z-10">
 
         {/* Left Side - Branding */}
         <motion.div
@@ -145,11 +147,11 @@ export default function AuthPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.6 }}
-              className="text-5xl font-bold text-slate-800 mb-4 leading-tight"
+              className="text-5xl font-bold text-slate-800 mb-4 leading-tight "
             >
               Transform Your
               <br />
-              <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent playwrite-de-sas-light">
                 Digital Experience
               </span>
             </motion.h1>
@@ -158,7 +160,7 @@ export default function AuthPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6, duration: 0.6 }}
-              className="text-lg text-slate-600 mb-12 font-playwrite leading-relaxed"
+              className="text-lg text-slate-600 mb-12 leading-relaxed"
             >
               Join thousands of users who trust Mirov for secure, innovative, and seamless solutions
             </motion.p>
@@ -191,9 +193,9 @@ export default function AuthPage() {
 
           {/* Background Decorations */}
           <div className="absolute inset-0 -z-10">
-            <div className="absolute top-1/4 -left-20 w-80 h-80 bg-gradient-to-br from-blue-400/30 via-cyan-400/20 to-blue-500/30 rounded-full blur-3xl" />
-            <div className="absolute bottom-1/4 left-10 w-64 h-64 bg-gradient-to-tl from-cyan-400/20 via-blue-400/30 to-blue-500/20 rounded-full blur-3xl" />
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:40px_40px]" />
+            <div className="absolute top-1/4 -left-20 w-[500px] h-[500px] bg-gradient-to-br from-blue-400/30 via-cyan-400/20 to-blue-500/30 rounded-full blur-3xl" />
+            <div className="absolute bottom-1/4 left-10 w-[900px] h-[900px] bg-gradient-to-tl from-cyan-400/20 via-blue-400/30 to-blue-500/20 rounded-full blur-3xl" />
+            <div className="absolute inset-0 bg-[linear-radient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:40px_40px]" />
           </div>
         </motion.div>
 
@@ -206,14 +208,7 @@ export default function AuthPage() {
         >
           <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl shadow-blue-500/10 p-8 md:p-12 border border-white/60">
 
-            {/* Tombol Kembali ke Landing Page */}
-            <button
-              onClick={handleBackToHome}
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium mb-6"
-            >
-              <Home className="w-5 h-5" />
-              Back to Home
-            </button>
+
 
             {/* Mobile Logo */}
             <motion.div
@@ -267,7 +262,7 @@ export default function AuthPage() {
                 <h2 className="text-3xl font-bold text-slate-800 mb-2">
                   {authMode === 'login' ? 'Welcome Back' : 'Create Your Account'}
                 </h2>
-                <p className="text-slate-600 font-playwrite">
+                <p className="text-slate-600">
                   {authMode === 'login'
                     ? 'Enter your credentials to access your account'
                     : 'Join us today and start your journey'}

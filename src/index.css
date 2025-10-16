@@ -13,3 +13,19 @@
 html {
   scroll-behavior: smooth;
 }
+
+/* 👇 Tambahkan bagian ini */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 6s ease-in-out infinite;
+}
