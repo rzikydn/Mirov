@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Lock, Eye, EyeOff, Shield, Zap, Home } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, Shield, Zap, } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
 
 type AuthMode = 'login' | 'register';
+
 
 interface FormData {
   name: string;
@@ -28,6 +31,9 @@ export default function AuthPage() {
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  const navigate = useNavigate();
+
+
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
@@ -52,21 +58,31 @@ export default function AuthPage() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMessage(null);
+  e.preventDefault();
+  setMessage(null);
 
-    if (!validateForm()) return;
+  if (!validateForm()) return;
 
-    setIsLoading(true);
+  setIsLoading(true);
 
-    setTimeout(() => {
-      setMessage({
-        type: 'success',
-        text: authMode === 'login' ? 'Login successful!' : 'Account created successfully!'
-      });
-      setIsLoading(false);
-    }, 1500);
-  };
+  setTimeout(() => {
+    setMessage({
+      type: 'success',
+      text: authMode === 'login'
+        ? 'Login successful!'
+        : 'Account created successfully!'
+    });
+    setIsLoading(false);
+
+    // ✅ Arahkan ke dashboard setelah login sukses
+    if (authMode === 'login') {
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 800);
+    }
+  }, 1500);
+};
+
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -79,11 +95,6 @@ export default function AuthPage() {
     setAuthMode(mode);
     setErrors({});
     setMessage(null);
-  };
-
-  const handleBackToHome = () => {
-    // navigate('/');
-    alert('Navigate to home');
   };
 
   const LogoSVG = (
