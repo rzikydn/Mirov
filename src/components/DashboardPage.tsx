@@ -172,6 +172,9 @@ const DatabaseTable = ({ database, setDatabases }: { database: Database; setData
   const [newPropertyName, setNewPropertyName] = useState('');
   const [newPropertyType, setNewPropertyType] = useState('text');
 
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'row' | 'column'; id: string } | null>(null);
+
   const allPropertyKeys = Array.from(
     new Set(database.rows.flatMap((r) => Object.keys(r.properties)))
   );
@@ -191,6 +194,53 @@ const DatabaseTable = ({ database, setDatabases }: { database: Database; setData
     setNewPropertyName('');
     setNewPropertyType('text');
     setShowAddProperty(false);
+  };
+
+  const handleDeleteProperty = (propertyKey: string) => {
+    setDeleteTarget({ type: 'column', id: propertyKey });
+    setShowConfirmDelete(true);
+  };
+
+  const handleDeleteRow = (rowId: string) => {
+    setDeleteTarget({ type: 'row', id: rowId });
+    setShowConfirmDelete(true);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+
+    if (deleteTarget.type === 'column') {
+      const updatedRows = database.rows.map((row) => {
+        const newProps = { ...row.properties };
+        delete newProps[deleteTarget.id];
+        return { ...row, properties: newProps };
+      });
+      setDatabases((prev: Database[]) =>
+        prev.map((db) => (db.id === database.id ? { ...db, rows: updatedRows } : db))
+      );
+    } else if (deleteTarget.type === 'row') {
+      const updatedRows = database.rows.filter((r) => r.id !== deleteTarget.id);
+      setDatabases((prev: Database[]) =>
+        prev.map((db) => (db.id === database.id ? { ...db, rows: updatedRows } : db))
+      );
+    }
+
+    setShowConfirmDelete(false);
+    setDeleteTarget(null);
+  };
+
+  const handleAddRow = () => {
+    const newRow: DatabaseRow = {
+      id: `row-${Date.now()}`,
+      name: 'New page',
+      properties: Object.fromEntries(
+        allPropertyKeys.map((key) => [key, { value: '', type: database.rows[0]?.properties[key]?.type || 'text' }])
+      ),
+    };
+    const updatedRows = [...database.rows, newRow];
+    setDatabases((prev: Database[]) =>
+      prev.map((db) => (db.id === database.id ? { ...db, rows: updatedRows } : db))
+    );
   };
 
   const handleValueChange = (rowId: string, key: string, value: any) => {
@@ -231,15 +281,25 @@ const DatabaseTable = ({ database, setDatabases }: { database: Database; setData
                   Name
                 </th>
                 {allPropertyKeys.map((key) => (
-                  <th
-                    key={key}
-                    className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                  >
-                    {key}
+                  <th key={key} className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex items-center gap-2">
+                      {key}
+                      <button
+                        onClick={() => handleDeleteProperty(key)}
+                        className="text-gray-400 hover:text-red-500"
+                        title="Delete column"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </th>
                 ))}
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
+
             <tbody className="bg-white divide-y divide-gray-200">
               {database.rows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50 transition-colors cursor-pointer">
@@ -265,6 +325,7 @@ const DatabaseTable = ({ database, setDatabases }: { database: Database; setData
                       className="w-full bg-transparent border-none outline-none text-gray-900 focus:ring-0"
                     />
                   </td>
+
                   {allPropertyKeys.map((key) => {
                     const prop = row.properties[key];
                     if (!prop) return <td key={key}></td>;
@@ -331,13 +392,32 @@ const DatabaseTable = ({ database, setDatabases }: { database: Database; setData
                         return <td key={key}></td>;
                     }
                   })}
+
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <button
+                      onClick={() => handleDeleteRow(row.id)}
+                      className="text-sm text-red-500 hover:text-red-700"
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          <div className="p-4 flex justify-center">
+            <button
+              onClick={handleAddRow}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            >
+              + Add Row
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* Popup Tambah Property */}
       <AnimatePresence>
         {showAddProperty && (
           <motion.div
@@ -391,9 +471,48 @@ const DatabaseTable = ({ database, setDatabases }: { database: Database; setData
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Popup Konfirmasi Delete */}
+      <AnimatePresence>
+        {showConfirmDelete && (
+          <motion.div
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-white rounded-xl p-6 w-80"
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.8 }}
+            >
+              <h3 className="text-lg font-semibold mb-4 text-gray-900">Confirm Delete</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete this {deleteTarget?.type === 'row' ? 'row' : 'column'}?
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
+                  onClick={() => setShowConfirmDelete(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600"
+                  onClick={confirmDelete}
+                >
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
+
 
 const DashboardPage = () => {
   const [databases, setDatabases] = useState<Database[]>([]);
