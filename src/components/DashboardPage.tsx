@@ -32,15 +32,12 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { id: '1', name: 'Product Ideas' },
-  { id: '2', name: 'Sprint Planning' },
-  { id: '3', name: 'Team Notes' },
 ];
 
 const propertyTypes = [
   { value: 'text', label: 'Text' },
   { value: 'number', label: 'Number' },
   { value: 'date', label: 'Date' },
-  { value: 'select', label: 'Select' },
   { value: 'checkbox', label: 'Checkbox' },
 ];
 
@@ -49,6 +46,7 @@ const Sidebar = ({
   selectedDatabase,
   onSelectDatabase,
   onCreateDatabase,
+  onDeleteDatabase,
   selectedMenu,
   onSelectMenu,
 }: {
@@ -56,9 +54,27 @@ const Sidebar = ({
   selectedDatabase: string | null;
   onSelectDatabase: (id: string | null) => void;
   onCreateDatabase: () => void;
+  onDeleteDatabase: (id: string) => void;
   selectedMenu: string | null;
   onSelectMenu: (id: string) => void;
 }) => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteDbId, setDeleteDbId] = useState<string | null>(null);
+
+  const handleDeleteClick = (e: React.MouseEvent, dbId: string) => {
+    e.stopPropagation();
+    setDeleteDbId(dbId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    if (deleteDbId) {
+      onDeleteDatabase(deleteDbId);
+      setShowDeleteConfirm(false);
+      setDeleteDbId(null);
+    }
+  };
+
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-screen flex flex-col">
       <div className="p-6 flex flex-col flex-1 overflow-y-auto">
@@ -90,7 +106,7 @@ const Sidebar = ({
           ))}
         </nav>
 
-        <div className="mt-auto">
+        <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-semibold text-gray-600">Databases</span>
             <button
@@ -107,18 +123,62 @@ const Sidebar = ({
               <button
                 key={db.id}
                 onClick={() => onSelectDatabase(db.id)}
-                className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 ${
+                className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 group ${
                   selectedDatabase === db.id
                     ? 'bg-blue-50 text-[#2563eb]'
                     : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
                 }`}
               >
                 <ChevronRight className="w-3 h-3" />
-                <span className="truncate">{db.name}</span>
+                <span className="truncate flex-1">{db.name}</span>
+                <button
+                  onClick={(e) => handleDeleteClick(e, db.id)}
+                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-all"
+                  title="Delete database"
+                >
+                  <span className="text-red-500">🗑</span>
+                </button>
               </button>
             ))}
           </div>
         </div>
+
+        <AnimatePresence>
+          {showDeleteConfirm && (
+            <motion.div
+              className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDeleteConfirm(false)}
+            >
+              <motion.div
+                className="bg-white rounded-xl p-6 w-96"
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.8 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-semibold mb-4">Delete Database</h3>
+                <p className="text-gray-600 mb-6">Are you sure you want to delete this database? This action cannot be undone.</p>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="px-4 py-2 border rounded hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDelete}
+                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -534,14 +594,14 @@ const DatabaseTable = ({ database, setDatabases }: { database: Database; setData
 export default function DashboardPage() {
   const [databases, setDatabases] = useState<Database[]>([]);
   const [selectedDatabase, setSelectedDatabase] = useState<string | null>(null);
-  const [dbCounter, setDbCounter] = useState(1);
   const [selectedMenu, setSelectedMenu] = useState<string | null>(menuItems[0].id);
 
   const handleCreateDatabase = () => {
     const colKey = `title-${Date.now()}`;
+    const nextNumber = databases.length + 1;
     const newDb: Database = {
       id: `db-${Date.now()}`,
-      name: `New database ${dbCounter}`,
+      name: `New database ${nextNumber}`,
       columns: [{ key: colKey, label: 'Name', type: 'text' }],
       rows: [
         { id: `row-1-${Date.now()}`, properties: { [colKey]: { value: '', type: 'text' } } },
@@ -549,8 +609,14 @@ export default function DashboardPage() {
       ],
     };
     setDatabases([...databases, newDb]);
-    setDbCounter(dbCounter + 1);
     setSelectedDatabase(newDb.id);
+  };
+
+  const handleDeleteDatabase = (id: string) => {
+    setDatabases(databases.filter((db) => db.id !== id));
+    if (selectedDatabase === id) {
+      setSelectedDatabase(null);
+    }
   };
 
   return (
@@ -560,6 +626,7 @@ export default function DashboardPage() {
         selectedDatabase={selectedDatabase}
         onSelectDatabase={setSelectedDatabase}
         onCreateDatabase={handleCreateDatabase}
+        onDeleteDatabase={handleDeleteDatabase}
         selectedMenu={selectedMenu}
         onSelectMenu={setSelectedMenu}
       />
