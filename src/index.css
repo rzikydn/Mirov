@@ -29,3 +29,14 @@ html {
 .animate-pulse-slow {
   animation: pulse-slow 6s ease-in-out infinite;
 }
+
+/* 🌙 Ubah warna ikon kalender saat dark mode aktif */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0);
+  transition: filter 0.3s ease;
+}
+
+/* Saat elemen root memiliki class "dark" */
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}

@@ -10,6 +10,8 @@ import {
   X,
   Trash2,
   Edit3,
+  Moon,
+  Sun,
 } from 'lucide-react';
 
 /* ---------------- Types ---------------- */
@@ -42,7 +44,7 @@ interface MenuItem {
 }
 
 /* ---------------- Constants ---------------- */
-const menuItems: MenuItem[] = [{ id: '1', name: 'Product Ideas' }];
+const menuItems: MenuItem[] = [{ id: '1', name: 'Team Notes' }];
 
 const propertyTypes = [
   { value: 'text', label: 'Text' },
@@ -63,6 +65,8 @@ const Sidebar = ({
   onLogout,
   isOpen,
   setIsOpen,
+  darkMode,
+  toggleDarkMode,
 }: {
   databases: Database[];
   selectedDatabase: string | null;
@@ -74,6 +78,8 @@ const Sidebar = ({
   onLogout: () => void;
   isOpen: boolean;
   setIsOpen: (v: boolean) => void;
+  darkMode: boolean;
+  toggleDarkMode: () => void;
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteDbId, setDeleteDbId] = useState<string | null>(null);
@@ -107,9 +113,9 @@ const Sidebar = ({
             animate={{ x: 0 }}
             exit={{ x: -320 }}
             transition={{ duration: 0.25 }}
-            className={`fixed lg:static z-40 top-0 left-0 w-64 bg-white border-r border-gray-200 h-full flex flex-col ${
-              isOpen ? 'shadow-xl' : ''
-            }`}
+            className={`fixed lg:static z-40 top-0 left-0 w-64 ${
+              darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            } border-r h-full flex flex-col ${isOpen ? 'shadow-xl' : ''}`}
           >
             <div className="p-5 flex flex-col flex-1 overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
@@ -118,15 +124,17 @@ const Sidebar = ({
                     M
                   </div>
                   <div>
-                    <div className="font-semibold text-gray-900">My Workspace</div>
+                    <div className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      My Workspace
+                    </div>
                   </div>
                 </div>
                 <button
-                  className="lg:hidden p-1 rounded hover:bg-gray-100"
+                  className={`lg:hidden p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
                   onClick={() => setIsOpen(false)}
                   aria-label="Close menu"
                 >
-                  <X className="w-5 h-5 text-gray-600" />
+                  <X className={`w-5 h-5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} />
                 </button>
               </div>
 
@@ -141,7 +149,11 @@ const Sidebar = ({
                     }}
                     className={`w-full text-left px-3 py-2 rounded-lg transition-colors duration-150 ${
                       selectedMenu === item.id && !selectedDatabase
-                        ? 'bg-blue-50 text-[#2563eb]'
+                        ? darkMode
+                          ? 'bg-blue-900 text-blue-300'
+                          : 'bg-blue-50 text-[#2563eb]'
+                        : darkMode
+                        ? 'text-gray-300 hover:bg-gray-700 hover:text-blue-300'
                         : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
                     }`}
                   >
@@ -152,14 +164,18 @@ const Sidebar = ({
 
               <div className="mb-4 flex-1">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-semibold text-gray-600">Databases</span>
+                  <span className={`text-sm font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Databases
+                  </span>
                   <button
                     onClick={onCreateDatabase}
-                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    className={`p-1 rounded transition-colors ${
+                      darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                    }`}
                     title="New Database"
                     aria-label="Create database"
                   >
-                    <Plus className="w-4 h-4 text-gray-600" />
+                    <Plus className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
                   </button>
                 </div>
 
@@ -173,7 +189,11 @@ const Sidebar = ({
                       }}
                       className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-150 flex items-center gap-2 group ${
                         selectedDatabase === db.id
-                          ? 'bg-blue-50 text-[#2563eb]'
+                          ? darkMode
+                            ? 'bg-blue-900 text-blue-300'
+                            : 'bg-blue-50 text-[#2563eb]'
+                          : darkMode
+                          ? 'text-gray-300 hover:bg-gray-700 hover:text-blue-300'
                           : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
                       }`}
                     >
@@ -192,10 +212,47 @@ const Sidebar = ({
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 pt-3">
+              <div className={`border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} pt-3 space-y-2`}>
+                {/* Dark Mode Toggle */}
+                <button
+                  onClick={toggleDarkMode}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
+                    darkMode
+                      ? 'text-gray-300 hover:bg-gray-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {darkMode ? (
+                      <Sun className="w-5 h-5" />
+                    ) : (
+                      <Moon className="w-5 h-5" />
+                    )}
+                    <span className="font-medium">
+                      {darkMode ? 'Light Mode' : 'Dark Mode'}
+                    </span>
+                  </div>
+                  <div
+                    className={`w-10 h-6 rounded-full transition-colors ${
+                      darkMode ? 'bg-blue-600' : 'bg-gray-300'
+                    } relative`}
+                  >
+                    <div
+                      className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                        darkMode ? 'translate-x-5' : 'translate-x-1'
+                      }`}
+                    />
+                  </div>
+                </button>
+
+                {/* Logout Button */}
                 <button
                   onClick={() => setShowLogoutConfirm(true)}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                    darkMode
+                      ? 'text-gray-300 hover:bg-red-900 hover:text-red-300'
+                      : 'text-gray-700 hover:bg-red-50 hover:text-red-600'
+                  }`}
                 >
                   <Home className="w-5 h-5" />
                   <span className="font-medium">Logout</span>
@@ -217,20 +274,22 @@ const Sidebar = ({
             onClick={() => setShowDeleteConfirm(false)}
           >
             <motion.div
-              className="bg-white rounded-xl p-6 w-11/12 sm:w-96"
+              className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl p-6 w-11/12 sm:w-96`}
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-lg font-semibold mb-3">Delete Database</h3>
-              <p className="text-gray-600 mb-6">
+              <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-6`}>
                 Are you sure you want to delete this database? This action cannot be undone.
               </p>
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="px-4 py-2 border rounded"
+                  className={`px-4 py-2 border rounded ${
+                    darkMode ? 'border-gray-600 hover:bg-gray-700' : 'hover:bg-gray-100'
+                  }`}
                 >
                   Cancel
                 </button>
@@ -257,18 +316,22 @@ const Sidebar = ({
             onClick={() => setShowLogoutConfirm(false)}
           >
             <motion.div
-              className="bg-white rounded-xl p-6 w-11/12 sm:w-96"
+              className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl p-6 w-11/12 sm:w-96`}
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-lg font-semibold mb-3">Logout Confirmation</h3>
-              <p className="text-gray-600 mb-6">Are you sure you want to logout?</p>
+              <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-6`}>
+                Are you sure you want to logout?
+              </p>
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => setShowLogoutConfirm(false)}
-                  className="px-4 py-2 border rounded"
+                  className={`px-4 py-2 border rounded ${
+                    darkMode ? 'border-gray-600 hover:bg-gray-700' : 'hover:bg-gray-100'
+                  }`}
                 >
                   Cancel
                 </button>
@@ -288,25 +351,31 @@ const Sidebar = ({
 };
 
 /* ---------------- Header ---------------- */
-const Header = ({ onMenuClick }: { onMenuClick: () => void }) => (
+const Header = ({ onMenuClick, darkMode }: { onMenuClick: () => void; darkMode: boolean }) => (
   <motion.header
     initial={{ opacity: 0, y: -8 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.3 }}
-    className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-12 py-4 flex-shrink-0"
+    className={`${
+      darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+    } border-b px-4 sm:px-6 lg:px-12 py-4 flex-shrink-0`}
   >
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-3">
         <button
-          className="lg:hidden p-2 rounded hover:bg-gray-100"
+          className={`lg:hidden p-2 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
           onClick={onMenuClick}
           aria-label="Open menu"
         >
-          <Menu className="w-6 h-6 text-gray-600" />
+          <Menu className={`w-6 h-6 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} />
         </button>
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-0">Morning Team!</h1>
-          <p className="text-xs sm:text-sm text-gray-500">Last edited 2 hours ago</p>
+          <h1 className={`text-2xl sm:text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mb-0`}>
+            Morning Team!
+          </h1>
+          <p className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            Last edited 2 hours ago
+          </p>
         </div>
       </div>
 
@@ -314,9 +383,9 @@ const Header = ({ onMenuClick }: { onMenuClick: () => void }) => (
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className={`w-8 sm:w-10 h-8 sm:h-10 rounded-full bg-gradient-to-br from-[#2563eb] to-[#3b82f6] border-2 border-white shadow-sm ${
-              i !== 1 ? '-ml-3' : ''
-            }`}
+            className={`w-8 sm:w-10 h-8 sm:h-10 rounded-full bg-gradient-to-br from-[#2563eb] to-[#3b82f6] border-2 ${
+              darkMode ? 'border-gray-700' : 'border-white'
+            } shadow-sm ${i !== 1 ? '-ml-3' : ''}`}
             aria-hidden
           />
         ))}
@@ -329,9 +398,11 @@ const Header = ({ onMenuClick }: { onMenuClick: () => void }) => (
 const DatabaseTable = ({
   database,
   setDatabases,
+  darkMode,
 }: {
   database: Database;
   setDatabases: React.Dispatch<React.SetStateAction<Database[]>>;
+  darkMode: boolean;
 }) => {
   const [showAddProperty, setShowAddProperty] = useState(false);
   const [newPropertyName, setNewPropertyName] = useState('');
@@ -341,7 +412,6 @@ const DatabaseTable = ({
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(database.name);
 
-  // update database within parent state
   const updateThisDb = (mutator: (db: Database) => Database) =>
     setDatabases((prev) => prev.map((d) => (d.id === database.id ? mutator(d) : d)));
 
@@ -440,8 +510,8 @@ const DatabaseTable = ({
       transition={{ duration: 0.2 }}
       className="absolute inset-0 p-4 sm:p-6 lg:p-12 overflow-auto"
     >
-      <div className="bg-white rounded-xl shadow-sm h-full flex flex-col">
-        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-sm h-full flex flex-col`}>
+        <div className={`px-4 py-3 ${darkMode ? 'border-gray-700' : 'border-gray-200'} border-b flex items-center justify-between`}>
           <div className="flex items-center gap-2">
             {isEditingName ? (
               <input
@@ -450,17 +520,21 @@ const DatabaseTable = ({
                 onBlur={handleDatabaseNameChange}
                 onKeyDown={handleNameKeyPress}
                 autoFocus
-                className="text-lg sm:text-xl font-semibold text-gray-900 border-b border-blue-400 focus:outline-none px-1"
+                className={`text-lg sm:text-xl font-semibold ${
+                  darkMode ? 'bg-gray-800 text-white' : 'text-gray-900'
+                } border-b border-blue-400 focus:outline-none px-1`}
               />
             ) : (
               <>
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">{database.name}</h2>
+                <h2 className={`text-lg sm:text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {database.name}
+                </h2>
                 <button
                   onClick={() => setIsEditingName(true)}
-                  className="p-1 rounded hover:bg-gray-100 ml-2"
+                  className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ml-2`}
                   title="Rename"
                 >
-                  <Pencil className="w-4 h-4 text-gray-500" />
+                  <Pencil className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
                 </button>
               </>
             )}
@@ -469,7 +543,9 @@ const DatabaseTable = ({
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowAddProperty(true)}
-              className="px-3 py-1 rounded text-sm bg-blue-50 text-[#2563eb] hover:bg-blue-100"
+              className={`px-3 py-1 rounded text-sm ${
+                darkMode ? 'bg-blue-900 text-blue-300 hover:bg-blue-800' : 'bg-blue-50 text-[#2563eb] hover:bg-blue-100'
+              }`}
             >
               <Plus className="inline w-3 h-3 mr-1" /> Add Property
             </button>
@@ -485,20 +561,24 @@ const DatabaseTable = ({
         <div className="flex-1 overflow-auto min-h-0">
           <div className="p-4 overflow-x-auto">
             <table className="w-full table-auto min-w-[700px]">
-              <thead className="bg-gray-50 sticky top-0 z-10">
-                <tr className="border-b">
+              <thead className="sticky top-0 z-10">
+                <tr className={`${darkMode ? 'bg-gray-0 border-gray-600' : 'bg-gray-0 border-gray-200'} border-b`}>
                   {database.columns.map((col) => (
                     <th key={col.key} className="px-4 py-3 text-left">
                       <div className="flex items-center gap-2">
                         <input
                           value={col.label}
                           onChange={(e) => handleColumnLabelChange(col.key, e.target.value)}
-                          className="border-b border-gray-300 text-sm sm:text-base focus:outline-none"
+                          className={`${
+                            darkMode ? 'text-white' : 'text-gray-900'
+                          } bg-transparent text-sm sm:text-base focus:outline-none border-0`}
                         />
                         <select
                           value={col.type}
                           onChange={(e) => handleColumnTypeChange(col.key, e.target.value)}
-                          className="text-xs sm:text-sm border rounded px-1 py-0.5"
+                          className={`text-xs sm:text-sm border rounded px-1 py-0.5 ${
+                            darkMode ? 'bg-gray-600 text-white border-gray-600' : ''
+                          }`}
                         >
                           {propertyTypes.map((t) => (
                             <option key={t.value} value={t.value}>
@@ -508,7 +588,7 @@ const DatabaseTable = ({
                         </select>
                         <button
                           onClick={() => handleDeleteProperty(col.key)}
-                          className="text-gray-400 hover:text-red-500"
+                          className={`${darkMode ? 'text-gray-400 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`}
                           title="Delete column"
                         >
                           🗑
@@ -516,13 +596,20 @@ const DatabaseTable = ({
                       </div>
                     </th>
                   ))}
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th
+  className={`px-4 py-3 text-right ${
+    darkMode ? 'text-white' : 'text-gray-900'
+  }`}
+>
+  Actions
+</th>
+
                 </tr>
               </thead>
 
-              <tbody className="bg-white divide-y divide-gray-100">
+              <tbody className={`${darkMode ? 'bg-gray-800 divide-gray-700' : 'bg-white divide-gray-100'} divide-y`}>
                 {database.rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-gray-50">
+                  <tr key={row.id} className={darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
                     {database.columns.map((col) => {
                       const prop = row.properties[col.key];
                       if (!prop) return <td key={col.key} className="px-4 py-3"></td>;
@@ -535,7 +622,9 @@ const DatabaseTable = ({
                                 type="text"
                                 value={prop.value}
                                 onChange={(e) => handleValueChange(row.id, col.key, e.target.value)}
-                                className="w-full bg-transparent border border-gray-200 rounded px-2 py-1 focus:outline-none text-sm"
+                                className={`w-full bg-transparent border rounded px-2 py-1 focus:outline-none text-sm ${
+                                  darkMode ? 'border-gray-600 text-white' : 'border-gray-200'
+                                }`}
                               />
                             </td>
                           );
@@ -546,7 +635,9 @@ const DatabaseTable = ({
                                 type="number"
                                 value={prop.value}
                                 onChange={(e) => handleValueChange(row.id, col.key, e.target.valueAsNumber)}
-                                className="w-full bg-transparent border border-gray-200 rounded px-2 py-1 focus:outline-none text-sm"
+                                className={`w-full bg-transparent border rounded px-2 py-1 focus:outline-none text-sm ${
+                                  darkMode ? 'border-gray-600 text-white' : 'border-gray-200'
+                                }`}
                               />
                             </td>
                           );
@@ -557,7 +648,9 @@ const DatabaseTable = ({
                                 type="date"
                                 value={prop.value}
                                 onChange={(e) => handleValueChange(row.id, col.key, e.target.value)}
-                                className="w-full bg-transparent border border-gray-200 rounded px-2 py-1 focus:outline-none text-sm"
+                                className={`w-full bg-transparent border rounded px-2 py-1 focus:outline-none text-sm ${
+                                  darkMode ? 'border-gray-600 text-white' : 'border-gray-200'
+                                }`}
                               />
                             </td>
                           );
@@ -591,13 +684,11 @@ const DatabaseTable = ({
           </div>
         </div>
 
-        {/* Footer area */}
-        <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-          <div className="text-sm text-gray-600">Rows: {database.rows.length}</div>
+        <div className={`px-4 py-3 ${darkMode ? 'border-gray-700' : 'border-gray-200'} border-t flex items-center justify-between`}>
+          <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Rows: {database.rows.length}</div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                // export JSON simple example
                 const dataStr = JSON.stringify(database, null, 2);
                 const blob = new Blob([dataStr], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -607,7 +698,9 @@ const DatabaseTable = ({
                 a.click();
                 URL.revokeObjectURL(url);
               }}
-              className="px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200"
+              className={`px-3 py-1 text-sm rounded ${
+                darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'
+              }`}
             >
               Export JSON
             </button>
@@ -626,7 +719,7 @@ const DatabaseTable = ({
             onClick={() => setShowAddProperty(false)}
           >
             <motion.div
-              className="bg-white rounded-xl p-6 w-11/12 sm:w-96"
+              className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl p-6 w-11/12 sm:w-96`}
               initial={{ scale: 0.95 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.95 }}
@@ -636,12 +729,16 @@ const DatabaseTable = ({
               <input
                 type="text"
                 placeholder="Property name"
-                className="w-full mb-3 border rounded px-3 py-2"
+                className={`w-full mb-3 border rounded px-3 py-2 ${
+                  darkMode ? 'bg-gray-700 border-gray-600 text-white' : ''
+                }`}
                 value={newPropertyName}
                 onChange={(e) => setNewPropertyName(e.target.value)}
               />
               <select
-                className="w-full mb-3 border rounded px-3 py-2"
+                className={`w-full mb-3 border rounded px-3 py-2 ${
+                  darkMode ? 'bg-gray-700 border-gray-600 text-white' : ''
+                }`}
                 value={newPropertyType}
                 onChange={(e) => setNewPropertyType(e.target.value)}
               >
@@ -652,7 +749,12 @@ const DatabaseTable = ({
                 ))}
               </select>
               <div className="flex justify-end gap-2">
-                <button onClick={() => setShowAddProperty(false)} className="px-4 py-2 border rounded">
+                <button
+                  onClick={() => setShowAddProperty(false)}
+                  className={`px-4 py-2 border rounded ${
+                    darkMode ? 'border-gray-600 hover:bg-gray-700' : 'hover:bg-gray-100'
+                  }`}
+                >
                   Cancel
                 </button>
                 <button onClick={handleAddProperty} className="px-4 py-2 bg-blue-500 text-white rounded">
@@ -664,7 +766,7 @@ const DatabaseTable = ({
         )}
       </AnimatePresence>
 
-      {/* Confirm Delete Modal (for column / row) */}
+      {/* Confirm Delete Modal */}
       <AnimatePresence>
         {showConfirmDelete && deleteTarget && (
           <motion.div
@@ -674,7 +776,7 @@ const DatabaseTable = ({
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white rounded-xl p-6 w-11/12 sm:w-96"
+              className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl p-6 w-11/12 sm:w-96`}
               initial={{ scale: 0.95 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.95 }}
@@ -683,7 +785,12 @@ const DatabaseTable = ({
                 Delete {deleteTarget.type === 'column' ? 'column' : 'row'}?
               </h3>
               <div className="flex justify-end gap-2">
-                <button onClick={() => setShowConfirmDelete(false)} className="px-4 py-2 border rounded">
+                <button
+                  onClick={() => setShowConfirmDelete(false)}
+                  className={`px-4 py-2 border rounded ${
+                    darkMode ? 'border-gray-600 hover:bg-gray-700' : 'hover:bg-gray-100'
+                  }`}
+                >
                   Cancel
                 </button>
                 <button onClick={confirmDelete} className="px-4 py-2 bg-red-500 text-white rounded">
@@ -698,9 +805,10 @@ const DatabaseTable = ({
   );
 };
 
-/* ---------------- Team Notes (Kanban with add note) ---------------- */
-const TeamNotes = () => {
+/* ---------------- Team Notes ---------------- */
+const TeamNotes = ({ darkMode }: { darkMode: boolean }) => {
   type Note = { id: string; text: string };
+
   const [todo, setTodo] = useState<Note[]>([
     { id: 't1', text: 'Design hero section' },
     { id: 't2', text: 'Write README' },
@@ -709,6 +817,10 @@ const TeamNotes = () => {
   const [done, setDone] = useState<Note[]>([{ id: 'd1', text: 'Init repo' }]);
   const [newNote, setNewNote] = useState('');
   const [selectedColumn, setSelectedColumn] = useState<'todo' | 'inProgress' | 'done'>('todo');
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingColumn, setEditingColumn] = useState<'todo' | 'inProgress' | 'done' | null>(null);
+  const [editingText, setEditingText] = useState('');
 
   const addNote = () => {
     if (!newNote.trim()) return;
@@ -719,54 +831,201 @@ const TeamNotes = () => {
     setNewNote('');
   };
 
+  const startEdit = (col: 'todo' | 'inProgress' | 'done', id: string, currentText: string) => {
+    setEditingId(id);
+    setEditingColumn(col);
+    setEditingText(currentText);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingColumn(null);
+    setEditingText('');
+  };
+
+  const saveEdit = () => {
+    if (!editingId || !editingColumn) return;
+    const apply = (arr: Note[]) => arr.map((n) => (n.id === editingId ? { ...n, text: editingText.trim() } : n));
+    if (editingColumn === 'todo') setTodo((s) => apply(s));
+    if (editingColumn === 'inProgress') setInProgress((s) => apply(s));
+    if (editingColumn === 'done') setDone((s) => apply(s));
+    cancelEdit();
+  };
+
+  const handleKeyEdit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') saveEdit();
+    if (e.key === 'Escape') cancelEdit();
+  };
+
+  const deleteNote = (col: 'todo' | 'inProgress' | 'done', id: string) => {
+    const confirmed = window.confirm('Delete this note?');
+    if (!confirmed) return;
+    if (col === 'todo') setTodo((s) => s.filter((n) => n.id !== id));
+    if (col === 'inProgress') setInProgress((s) => s.filter((n) => n.id !== id));
+    if (col === 'done') setDone((s) => s.filter((n) => n.id !== id));
+    if (editingId === id) cancelEdit();
+  };
+
+  const renderNote = (col: 'todo' | 'inProgress' | 'done', n: Note) => {
+    const isEditing = editingId === n.id && editingColumn === col;
+    return (
+      <div key={n.id} className="group relative p-0">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            {isEditing ? (
+              <div className="flex items-center gap-2">
+                <input
+                  value={editingText}
+                  onChange={(e) => setEditingText(e.target.value)}
+                  onKeyDown={handleKeyEdit}
+                  autoFocus
+                  className={`w-full border px-2 py-1 rounded text-sm focus:outline-none ${
+                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : ''
+                  }`}
+                />
+                <button
+                  onClick={saveEdit}
+                  className="text-sm px-2 py-1 bg-blue-500 text-white rounded"
+                  aria-label="Save note"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={cancelEdit}
+                  className={`text-sm px-2 py-1 border rounded ${
+                    darkMode ? 'border-gray-600 hover:bg-gray-700' : ''
+                  }`}
+                  aria-label="Cancel edit"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className={`p-3 rounded text-sm break-words ${
+                darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-50'
+              }`}>
+                {n.text}
+              </div>
+            )}
+          </div>
+
+          {!isEditing && (
+            <div className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+              <button
+                onClick={() => startEdit(col, n.id, n.text)}
+                title="Edit note"
+                className={`p-1 rounded ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-100'}`}
+                aria-label="Edit note"
+              >
+                <Edit3 className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+              </button>
+              <button
+                onClick={() => deleteNote(col, n.id)}
+                title="Delete note"
+                className="p-1 rounded hover:bg-red-100"
+                aria-label="Delete note"
+              >
+                <Trash2 className="w-4 h-4 text-red-500" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {!isEditing && (
+          <div className={`absolute right-0 -top-5 opacity-0 group-hover:opacity-100 transition-opacity text-xs ${
+            darkMode ? 'text-gray-400' : 'text-gray-500'
+          }`}>
+            Edit Notes
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <motion.div className="p-4 sm:p-6 lg:p-12 overflow-auto flex-1">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Team Notes</h3>
+        <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : ''}`}>Team Notes</h3>
         <div className="flex items-center gap-2">
-          <select value={selectedColumn} onChange={(e) => setSelectedColumn(e.target.value as any)} className="border rounded px-2 py-1 text-sm">
+          <select
+            value={selectedColumn}
+            onChange={(e) => setSelectedColumn(e.target.value as any)}
+            className={`border rounded px-2 py-1 text-sm ${
+              darkMode ? 'bg-gray-700 border-gray-600 text-white' : ''
+            }`}
+          >
             <option value="todo">To Do</option>
             <option value="inProgress">In Progress</option>
             <option value="done">Done</option>
           </select>
-          <input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Add note..." className="border rounded px-2 py-1 text-sm" />
-          <button onClick={addNote} className="px-3 py-1 bg-blue-500 text-white rounded text-sm">Add</button>
+          <input
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            placeholder="Add note..."
+            className={`border rounded px-2 py-1 text-sm ${
+              darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : ''
+            }`}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') addNote();
+            }}
+          />
+          <button onClick={addNote} className="px-3 py-1 bg-blue-500 text-white rounded text-sm">
+            Add
+          </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl p-4 shadow-sm min-h-[120px]">
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-4 shadow-sm min-h-[120px]`}>
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold">To Do</h4>
-            <span className="text-xs text-gray-600 px-2 py-0.5 rounded bg-gray-100">{todo.length}</span>
+            <h4 className={`font-semibold ${darkMode ? 'text-white' : ''}`}>To Do</h4>
+            <span className={`text-xs px-2 py-0.5 rounded ${
+              darkMode ? 'text-gray-300 bg-gray-700' : 'text-gray-600 bg-gray-100'
+            }`}>
+              {todo.length}
+            </span>
           </div>
           <div className="space-y-3">
             {todo.map((n) => (
-              <div key={n.id} className="p-3 bg-gray-50 rounded">{n.text}</div>
+              <div key={n.id} className="group">
+                {renderNote('todo', n)}
+              </div>
             ))}
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-4 shadow-sm min-h-[120px]">
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-4 shadow-sm min-h-[120px]`}>
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold">In Progress</h4>
-            <span className="text-xs text-gray-600 px-2 py-0.5 rounded bg-gray-100">{inProgress.length}</span>
+            <h4 className={`font-semibold ${darkMode ? 'text-white' : ''}`}>In Progress</h4>
+            <span className={`text-xs px-2 py-0.5 rounded ${
+              darkMode ? 'text-gray-300 bg-gray-700' : 'text-gray-600 bg-gray-100'
+            }`}>
+              {inProgress.length}
+            </span>
           </div>
           <div className="space-y-3">
             {inProgress.map((n) => (
-              <div key={n.id} className="p-3 bg-gray-50 rounded">{n.text}</div>
+              <div key={n.id} className="group">
+                {renderNote('inProgress', n)}
+              </div>
             ))}
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-4 shadow-sm min-h-[120px]">
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-4 shadow-sm min-h-[120px]`}>
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold">Done</h4>
-            <span className="text-xs text-gray-600 px-2 py-0.5 rounded bg-gray-100">{done.length}</span>
+            <h4 className={`font-semibold ${darkMode ? 'text-white' : ''}`}>Done</h4>
+            <span className={`text-xs px-2 py-0.5 rounded ${
+              darkMode ? 'text-gray-300 bg-gray-700' : 'text-gray-600 bg-gray-100'
+            }`}>
+              {done.length}
+            </span>
           </div>
           <div className="space-y-3">
             {done.map((n) => (
-              <div key={n.id} className="p-3 bg-gray-50 rounded">{n.text}</div>
+              <div key={n.id} className="group">
+                {renderNote('done', n)}
+              </div>
             ))}
           </div>
         </div>
@@ -782,15 +1041,15 @@ export default function DashboardPage() {
   const [selectedDatabase, setSelectedDatabase] = useState<string | null>(null);
   const [selectedMenu, setSelectedMenu] = useState<string | null>(menuItems[0].id);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
 
-  // create default sample DB for first run (optional)
   React.useEffect(() => {
     if (databases.length === 0) {
       const k = `title-${Date.now()}`;
       setDatabases([
         {
           id: `db-${Date.now()}`,
-          name: 'My Tasks',
+          name: 'New database 1',
           columns: [{ key: k, label: 'Name', type: 'text' }],
           rows: [
             { id: `row-1-${Date.now()}`, properties: { [k]: { value: 'Example row 1', type: 'text' } } },
@@ -799,7 +1058,6 @@ export default function DashboardPage() {
         },
       ]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCreateDatabase = () => {
@@ -825,10 +1083,12 @@ export default function DashboardPage() {
 
   const handleLogout = () => navigate('/auth');
 
+  const toggleDarkMode = () => setDarkMode((prev) => !prev);
+
   const currentDb = databases.find((d) => d.id === selectedDatabase) || null;
 
   return (
-    <div className="flex h-screen relative overflow-hidden">
+    <div className={`flex h-screen relative overflow-hidden ${darkMode ? 'bg-gray-900' : ''}`}>
       <Sidebar
         databases={databases}
         selectedDatabase={selectedDatabase}
@@ -840,21 +1100,24 @@ export default function DashboardPage() {
         onLogout={handleLogout}
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
+        darkMode={darkMode}
+        toggleDarkMode={toggleDarkMode}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <Header onMenuClick={() => setSidebarOpen(true)} />
+        <Header onMenuClick={() => setSidebarOpen(true)} darkMode={darkMode} />
 
-        <main className="flex-1 relative overflow-hidden bg-gray-50">
+        <main className={`flex-1 relative overflow-hidden ${darkMode ? 'bg-gray-900' : 'bg-slate-100'}`}>
           <AnimatePresence mode="wait">
             {!selectedDatabase ? (
-              // show Team Notes (kanban) by default when no DB selected
-              <TeamNotes key="notes" />
+              <TeamNotes key="notes" darkMode={darkMode} />
             ) : currentDb ? (
-              <DatabaseTable key={currentDb.id} database={currentDb} setDatabases={setDatabases} />
+              <DatabaseTable key={currentDb.id} database={currentDb} setDatabases={setDatabases} darkMode={darkMode} />
             ) : (
               <motion.div key="empty" className="p-6">
-                <div className="text-gray-500">Selected database not found.</div>
+                <div className={darkMode ? 'text-gray-400' : 'text-gray-500'}>
+                  Selected database not found.
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -862,11 +1125,4 @@ export default function DashboardPage() {
       </div>
     </div>
   );
-}
-
-/* ---------------- Helpers ---------------- */
-function handleLogout() {
-  // placeholder for Sidebar logout modal usage - actual navigation handled in DashboardPage
-  // kept so Sidebar's internal calls to handleLogout compile if moved around
-  // This function intentionally left empty.
 }
