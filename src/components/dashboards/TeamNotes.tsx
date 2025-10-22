@@ -2,239 +2,320 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Edit3, Trash2 } from 'lucide-react';
+import { Edit3, Trash2, Star, Plus, Search } from 'lucide-react';
 import { Note } from '../../types/database';
 
 interface TeamNotesProps {
   darkMode: boolean;
 }
 
-const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
-  const [todo, setTodo] = useState<Note[]>([
-    { id: 't1', text: 'Design hero section' },
-    { id: 't2', text: 'Write README' },
-  ]);
-  const [inProgress, setInProgress] = useState<Note[]>([
-    { id: 'p1', text: 'Implement auth' }
-  ]);
-  const [done, setDone] = useState<Note[]>([
-    { id: 'd1', text: 'Init repo' }
-  ]);
-  const [newNote, setNewNote] = useState('');
-  const [selectedColumn, setSelectedColumn] = useState<'todo' | 'inProgress' | 'done'>('todo');
+// Extended Note type with color
+interface ColoredNote extends Note {
+  color: string;
+  favorite?: boolean;
+  date: string;
+}
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingColumn, setEditingColumn] = useState<'todo' | 'inProgress' | 'done' | null>(null);
-  const [editingText, setEditingText] = useState('');
+// Pastel colors like in the image
+const noteColors = [
+  '#FFD89B', // Yellow/Orange
+  '#FFA896', // Coral/Salmon
+  '#C4F5A4', // Light Green
+  '#B5A4F5', // Light Purple
+  '#A4E5F5', // Light Blue
+  '#FFB8D1', // Light Pink
+];
+
+const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
+  const [notes, setNotes] = useState<ColoredNote[]>([
+    { 
+      id: '1', 
+      text: 'The beginning of screenless design: UI jobs to be taken over by Solution Architect',
+      color: '#FFD89B',
+      date: 'May 21, 2020',
+      favorite: false
+    },
+    { 
+      id: '2', 
+      text: '13 Things You Should Give Up If You Want To Be a Successful UX Designer',
+      color: '#FFA896',
+      date: 'May 25, 2020',
+      favorite: true
+    },
+    { 
+      id: '3', 
+      text: 'The Psychology Principles Every UI/UX Designer Needs to Know',
+      color: '#C4F5A4',
+      date: 'June 5, 2020',
+      favorite: false
+    },
+    { 
+      id: '4', 
+      text: '10 UI & UX Lessons from Designing My Own Product',
+      color: '#B5A4F5',
+      date: 'June 12, 2020',
+      favorite: true
+    },
+    { 
+      id: '5', 
+      text: '52 Research Terms you need to know as a UX Designer',
+      color: '#C4F5A4',
+      date: 'June 18, 2020',
+      favorite: false
+    },
+    { 
+      id: '6', 
+      text: 'Text fields & Forms design – UI components series',
+      color: '#A4E5F5',
+      date: 'June 22, 2020',
+      favorite: false
+    },
+  ]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newNoteText, setNewNoteText] = useState('');
+  const [selectedColor, setSelectedColor] = useState(noteColors[0]);
+  const [editingNote, setEditingNote] = useState<ColoredNote | null>(null);
 
   const addNote = () => {
-    if (!newNote.trim()) return;
-    const note = { id: `n-${Date.now()}`, text: newNote.trim() };
-    if (selectedColumn === 'todo') setTodo((s) => [note, ...s]);
-    if (selectedColumn === 'inProgress') setInProgress((s) => [note, ...s]);
-    if (selectedColumn === 'done') setDone((s) => [note, ...s]);
-    setNewNote('');
+    if (!newNoteText.trim()) return;
+    
+    const newNote: ColoredNote = {
+      id: `note-${Date.now()}`,
+      text: newNoteText.trim(),
+      color: selectedColor,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      favorite: false
+    };
+    
+    setNotes([newNote, ...notes]);
+    setNewNoteText('');
+    setShowAddModal(false);
+    setSelectedColor(noteColors[0]);
   };
 
-  const startEdit = (col: 'todo' | 'inProgress' | 'done', id: string, currentText: string) => {
-    setEditingId(id);
-    setEditingColumn(col);
-    setEditingText(currentText);
+  const deleteNote = (id: string) => {
+    const confirmed = window.confirm('Delete this note?');
+    if (!confirmed) return;
+    setNotes(notes.filter(n => n.id !== id));
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditingColumn(null);
-    setEditingText('');
+  const toggleFavorite = (id: string) => {
+    setNotes(notes.map(n => 
+      n.id === id ? { ...n, favorite: !n.favorite } : n
+    ));
+  };
+
+  const startEdit = (note: ColoredNote) => {
+    setEditingNote(note);
+    setNewNoteText(note.text);
+    setSelectedColor(note.color);
+    setShowAddModal(true);
   };
 
   const saveEdit = () => {
-    if (!editingId || !editingColumn) return;
-    const apply = (arr: Note[]) => arr.map((n) => (n.id === editingId ? { ...n, text: editingText.trim() } : n));
-    if (editingColumn === 'todo') setTodo((s) => apply(s));
-    if (editingColumn === 'inProgress') setInProgress((s) => apply(s));
-    if (editingColumn === 'done') setDone((s) => apply(s));
-    cancelEdit();
+    if (!editingNote || !newNoteText.trim()) return;
+    
+    setNotes(notes.map(n => 
+      n.id === editingNote.id 
+        ? { ...n, text: newNoteText.trim(), color: selectedColor }
+        : n
+    ));
+    
+    setEditingNote(null);
+    setNewNoteText('');
+    setShowAddModal(false);
+    setSelectedColor(noteColors[0]);
   };
 
-  const handleKeyEdit = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') saveEdit();
-    if (e.key === 'Escape') cancelEdit();
+  const cancelModal = () => {
+    setShowAddModal(false);
+    setEditingNote(null);
+    setNewNoteText('');
+    setSelectedColor(noteColors[0]);
   };
 
-  const deleteNote = (col: 'todo' | 'inProgress' | 'done', id: string) => {
-    const confirmed = window.confirm('Delete this note?');
-    if (!confirmed) return;
-    if (col === 'todo') setTodo((s) => s.filter((n) => n.id !== id));
-    if (col === 'inProgress') setInProgress((s) => s.filter((n) => n.id !== id));
-    if (col === 'done') setDone((s) => s.filter((n) => n.id !== id));
-    if (editingId === id) cancelEdit();
-  };
+  const filteredNotes = notes.filter(note => 
+    note.text.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const renderNote = (col: 'todo' | 'inProgress' | 'done', n: Note) => {
-    const isEditing = editingId === n.id && editingColumn === col;
-    return (
-      <div key={n.id} className="group relative p-0">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            {isEditing ? (
-              <div className="flex items-center gap-2">
-                <input
-                  value={editingText}
-                  onChange={(e) => setEditingText(e.target.value)}
-                  onKeyDown={handleKeyEdit}
-                  autoFocus
-                  className={`w-full border px-2 py-1 rounded text-sm focus:outline-none ${
-                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : ''
-                  }`}
-                />
-                <button
-                  onClick={saveEdit}
-                  className="text-sm px-2 py-1 bg-blue-500 text-white rounded"
-                  aria-label="Save note"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={cancelEdit}
-                  className={`text-sm px-2 py-1 border rounded ${
-                    darkMode ? 'border-gray-600 hover:bg-gray-700' : ''
-                  }`}
-                  aria-label="Cancel edit"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <div className={`p-3 rounded text-sm break-words ${
-                darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-50'
-              }`}>
-                {n.text}
-              </div>
-            )}
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className={`h-full overflow-auto ${darkMode ? 'bg-[#191919]' : 'bg-gray-50'}`}
+    >
+      <div className="px-8 sm:px-12 lg:px-24 py-12">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className={`text-5xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Notes
+            </h1>
+            
+            {/* Add Button */}
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="w-14 h-14 rounded-full bg-gray-900 hover:bg-gray-800 text-white flex items-center justify-center shadow-lg transition-all hover:scale-105"
+              title="Add new note"
+            >
+              <Plus className="w-6 h-6" />
+            </button>
           </div>
 
-          {!isEditing && (
-            <div className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-              <button
-                onClick={() => startEdit(col, n.id, n.text)}
-                title="Edit note"
-                className={`p-1 rounded ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-100'}`}
-                aria-label="Edit note"
-              >
-                <Edit3 className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-              </button>
-              <button
-                onClick={() => deleteNote(col, n.id)}
-                title="Delete note"
-                className="p-1 rounded hover:bg-red-100"
-                aria-label="Delete note"
-              >
-                <Trash2 className="w-4 h-4 text-red-500" />
-              </button>
-            </div>
-          )}
+          {/* Search Bar */}
+          <div className={`relative max-w-md ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-sm`}>
+            <Search className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search"
+              className={`w-full pl-12 pr-4 py-3 rounded-lg ${
+                darkMode 
+                  ? 'bg-gray-800 text-white placeholder-gray-500' 
+                  : 'bg-white text-gray-900 placeholder-gray-400'
+              } border-0 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            />
+          </div>
         </div>
 
-        {!isEditing && (
-          <div className={`absolute right-0 -top-5 opacity-0 group-hover:opacity-100 transition-opacity text-xs ${
-            darkMode ? 'text-gray-400' : 'text-gray-500'
-          }`}>
-            Edit Notes
+        {/* Notes Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredNotes.map((note) => (
+            <motion.div
+              key={note.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="group relative rounded-3xl p-6 shadow-md hover:shadow-xl transition-all duration-300 min-h-[280px] flex flex-col"
+              style={{ backgroundColor: note.color }}
+            >
+              {/* Favorite Star */}
+              <button
+                onClick={() => toggleFavorite(note.id)}
+                className={`absolute top-4 right-4 w-10 h-10 rounded-full bg-black/80 flex items-center justify-center transition-all ${
+                  note.favorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                }`}
+              >
+                <Star 
+                  className={`w-5 h-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-white'}`}
+                />
+              </button>
+
+              {/* Note Text */}
+              <p className="text-gray-900 text-lg leading-relaxed flex-1 pr-8">
+                {note.text}
+              </p>
+
+              {/* Bottom Section */}
+              <div className="flex items-center justify-between mt-6">
+                <span className="text-gray-700 text-sm">
+                  {note.date}
+                </span>
+
+                {/* Edit Button */}
+                <button
+                  onClick={() => startEdit(note)}
+                  className="w-10 h-10 rounded-full bg-black/80 hover:bg-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+                >
+                  <Edit3 className="w-4 h-4 text-white" />
+                </button>
+              </div>
+
+              {/* Delete Button - Top Left on Hover */}
+              <button
+                onClick={() => deleteNote(note.id)}
+                className="absolute top-4 left-4 w-10 h-10 rounded-full bg-red-500/90 hover:bg-red-600 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+              >
+                <Trash2 className="w-4 h-4 text-white" />
+              </button>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Empty State */}
+        {filteredNotes.length === 0 && (
+          <div className="text-center py-12">
+            <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              {searchQuery ? 'No notes found' : 'No notes yet. Click the + button to add one!'}
+            </p>
           </div>
         )}
       </div>
-    );
-  };
 
-  return (
-    <motion.div className="p-4 sm:p-6 lg:p-12 overflow-auto flex-1">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : ''}`}>Team Notes</h3>
-        <div className="flex items-center gap-2">
-          <select
-            value={selectedColumn}
-            onChange={(e) => setSelectedColumn(e.target.value as any)}
-            className={`border rounded px-2 py-1 text-sm ${
-              darkMode ? 'bg-gray-700 border-gray-600 text-white' : ''
-            }`}
+      {/* Add/Edit Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={`${
+              darkMode ? 'bg-gray-800' : 'bg-white'
+            } rounded-2xl p-6 w-full max-w-lg shadow-2xl`}
           >
-            <option value="todo">To Do</option>
-            <option value="inProgress">In Progress</option>
-            <option value="done">Done</option>
-          </select>
-          <input
-            value={newNote}
-            onChange={(e) => setNewNote(e.target.value)}
-            placeholder="Add note..."
-            className={`border rounded px-2 py-1 text-sm ${
-              darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : ''
-            }`}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') addNote();
-            }}
-          />
-          <button onClick={addNote} className="px-3 py-1 bg-blue-500 text-white rounded text-sm">
-            Add
-          </button>
-        </div>
-      </div>
+            <h3 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              {editingNote ? 'Edit Note' : 'Add New Note'}
+            </h3>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-4 shadow-sm min-h-[120px]`}>
-          <div className="flex items-center justify-between mb-3">
-            <h4 className={`font-semibold ${darkMode ? 'text-white' : ''}`}>To Do</h4>
-            <span className={`text-xs px-2 py-0.5 rounded ${
-              darkMode ? 'text-gray-300 bg-gray-700' : 'text-gray-600 bg-gray-100'
-            }`}>
-              {todo.length}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {todo.map((n) => (
-              <div key={n.id} className="group">
-                {renderNote('todo', n)}
-              </div>
-            ))}
-          </div>
-        </div>
+            {/* Note Text Input */}
+            <textarea
+              value={newNoteText}
+              onChange={(e) => setNewNoteText(e.target.value)}
+              placeholder="Write your note here..."
+              autoFocus
+              rows={6}
+              className={`w-full px-4 py-3 rounded-lg border ${
+                darkMode
+                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                  : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-500'
+              } focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
+            />
 
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-4 shadow-sm min-h-[120px]`}>
-          <div className="flex items-center justify-between mb-3">
-            <h4 className={`font-semibold ${darkMode ? 'text-white' : ''}`}>In Progress</h4>
-            <span className={`text-xs px-2 py-0.5 rounded ${
-              darkMode ? 'text-gray-300 bg-gray-700' : 'text-gray-600 bg-gray-100'
-            }`}>
-              {inProgress.length}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {inProgress.map((n) => (
-              <div key={n.id} className="group">
-                {renderNote('inProgress', n)}
+            {/* Color Picker */}
+            <div className="mt-4">
+              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Choose Color
+              </label>
+              <div className="flex gap-3">
+                {noteColors.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => setSelectedColor(color)}
+                    className={`w-10 h-10 rounded-full transition-all ${
+                      selectedColor === color 
+                        ? 'ring-4 ring-blue-500 scale-110' 
+                        : 'hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-4 shadow-sm min-h-[120px]`}>
-          <div className="flex items-center justify-between mb-3">
-            <h4 className={`font-semibold ${darkMode ? 'text-white' : ''}`}>Done</h4>
-            <span className={`text-xs px-2 py-0.5 rounded ${
-              darkMode ? 'text-gray-300 bg-gray-700' : 'text-gray-600 bg-gray-100'
-            }`}>
-              {done.length}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {done.map((n) => (
-              <div key={n.id} className="group">
-                {renderNote('done', n)}
-              </div>
-            ))}
-          </div>
+            {/* Action Buttons */}
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={editingNote ? saveEdit : addNote}
+                disabled={!newNoteText.trim()}
+                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+              >
+                {editingNote ? 'Save Changes' : 'Add Note'}
+              </button>
+              <button
+                onClick={cancelModal}
+                className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${
+                  darkMode
+                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
+                }`}
+              >
+                Cancel
+              </button>
+            </div>
+          </motion.div>
         </div>
-      </div>
+      )}
     </motion.div>
   );
 };

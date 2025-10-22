@@ -19,6 +19,9 @@ export interface Column {
 export interface Database {
   id: string;
   name: string;
+  icon?: string; // ✨ Added for emoji icon
+  cover?: string; // ✨ Added for cover image URL
+  description?: string; // ✨ Added for database description
   rows: DatabaseRow[];
   columns: Column[];
 }
@@ -31,4 +34,7 @@ export interface MenuItem {
 export type Note = {
   id: string;
   text: string;
+  color?: string; // ✨ Added for note card background color
+  date?: string; // ✨ Added for note creation/edit date
+  favorite?: boolean; // ✨ Added for favorite/starred notes
 };

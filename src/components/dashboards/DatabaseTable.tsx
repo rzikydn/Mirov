@@ -74,6 +74,22 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const newRowRef = useRef<HTMLTableRowElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const newColumnRef = useRef<HTMLTableHeaderCellElement>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showCoverPicker, setShowCoverPicker] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+
+  // Emoji list
+  const emojiList = ['🏠', '📚', '💼', '🎯', '📊', '🎨', '🚀', '💡', '🔥', '⭐', '🌟', '💪', '🎓', '📝', '📅', '✅', '🎉', '🏆', '💰', '📱', '🌈', '🎵', '🍕', '🏋️', '🎮', '📷', '🎬', '✈️', '🌍', '🏖️'];
+
+  // Cover images (using Unsplash placeholders)
+  const coverImages = [
+    'https://images.unsplash.com/photo-1557683316-973673baf926?w=1200&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=1200&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1617791160505-6f00504e3519?w=1200&h=400&fit=crop',
+    'https://images.unsplash.com/photo-1579546929662-711aa81148cf?w=1200&h=400&fit=crop',
+  ];
 
   const updateThisDb = (mutator: (db: Database) => Database) =>
     setDatabases((prev) => prev.map((d) => (d.id === database.id ? mutator(d) : d)));
