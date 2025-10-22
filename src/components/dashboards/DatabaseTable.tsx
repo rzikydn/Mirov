@@ -1,8 +1,8 @@
-// src/components/dashboards/DatabaseTable.tsx (Notion Style)
+// src/components/dashboards/DatabaseTable.tsx (Notion Style - Enhanced)
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, MoreHorizontal, Image, FileText, Smile } from 'lucide-react';
+import { Plus, MoreHorizontal, Image, FileText, Smile, Edit3, Calendar, Hash, Type, CheckSquare, ChevronDown } from 'lucide-react';
 import { Database, DatabaseRow } from '../../types/database';
 import { propertyTypes } from '../../constants/dashboard';
 import AddPropertyModal from './modals/AddPropertyModal';
@@ -13,6 +13,51 @@ interface DatabaseTableProps {
   setDatabases: React.Dispatch<React.SetStateAction<Database[]>>;
   darkMode: boolean;
 }
+
+// Property type icons mapping
+const propertyTypeIcons: Record<string, React.ReactNode> = {
+  text: <Type className="w-3 h-3" />,
+  number: <Hash className="w-3 h-3" />,
+  date: <Calendar className="w-3 h-3" />,
+  checkbox: <CheckSquare className="w-3 h-3" />,
+};
+
+// Type Change Dropdown Component
+const TypeChangeDropdown: React.FC<{
+  currentType: string;
+  darkMode: boolean;
+  onTypeChange: (type: string) => void;
+  onClose: () => void;
+}> = ({ currentType, darkMode, onTypeChange, onClose }) => {
+  const types = [
+    { value: 'text', label: 'Text', icon: <Type className="w-4 h-4" /> },
+    { value: 'number', label: 'Number', icon: <Hash className="w-4 h-4" /> },
+    { value: 'date', label: 'Date', icon: <Calendar className="w-4 h-4" /> },
+    { value: 'checkbox', label: 'Checkbox', icon: <CheckSquare className="w-4 h-4" /> },
+  ];
+
+  return (
+    <div className={`absolute top-full left-0 mt-1 ${darkMode ? 'bg-[#2a2a2a]' : 'bg-white'} rounded-lg shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} py-1 z-50 min-w-[150px]`}>
+      {types.map((type) => (
+        <button
+          key={type.value}
+          onClick={() => {
+            onTypeChange(type.value);
+            onClose();
+          }}
+          className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
+            currentType === type.value
+              ? darkMode ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-900'
+              : darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          {type.icon}
+          {type.label}
+        </button>
+      ))}
+    </div>
+  );
+};
 
 const DatabaseTable: React.FC<DatabaseTableProps> = ({
   database,
@@ -25,6 +70,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(database.name);
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState<string | null>(null);
+  const newRowRef = useRef<HTMLTableRowElement>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const newColumnRef = useRef<HTMLTableHeaderCellElement>(null);
 
   const updateThisDb = (mutator: (db: Database) => Database) =>
     setDatabases((prev) => prev.map((d) => (d.id === database.id ? mutator(d) : d)));
@@ -78,6 +127,16 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       return { ...db, columns: updatedColumns, rows: updatedRows };
     });
     setShowAddProperty(false);
+    
+    // Scroll to new column after it's added
+    setTimeout(() => {
+      if (tableContainerRef.current && newColumnRef.current) {
+        const container = tableContainerRef.current;
+        const column = newColumnRef.current;
+        const scrollLeft = column.offsetLeft - container.offsetWidth + column.offsetWidth + 50;
+        container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+      }
+    }, 100);
   };
 
   const handleDeleteProperty = (key: string) => {
@@ -120,6 +179,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       ),
     };
     updateThisDb((db) => ({ ...db, rows: [...db.rows, newRow] }));
+    
+    // Scroll to new row after it's added
+    setTimeout(() => {
+      newRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
   };
 
   const handleDatabaseNameChange = () => {
@@ -144,7 +208,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className={`h-full ${darkMode ? 'bg-[#191919]' : 'bg-white'}`}
+      className={`h-full overflow-auto ${darkMode ? 'bg-[#191919]' : 'bg-white'}`}
     >
       {/* Header - Notion Style */}
       <div className="px-8 sm:px-12 lg:px-24 pt-12 pb-4">
@@ -170,7 +234,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           </button>
         </div>
 
-        {/* Title */}
+        {/* Title with Edit Icon */}
         <div className="mb-8">
           {isEditingName ? (
             <input
@@ -185,14 +249,25 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               placeholder="Untitled"
             />
           ) : (
-            <h1
-              onClick={() => setIsEditingName(true)}
-              className={`text-4xl font-bold cursor-text ${
-                darkMode ? 'text-white' : 'text-gray-900'
-              }`}
-            >
-              {database.name}
-            </h1>
+            <div className="flex items-center gap-3 group">
+              <h1
+                onClick={() => setIsEditingName(true)}
+                className={`text-4xl font-bold cursor-text ${
+                  darkMode ? 'text-white' : 'text-gray-900'
+                }`}
+              >
+                {database.name}
+              </h1>
+              <button
+                onClick={() => setIsEditingName(true)}
+                className={`opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded ${
+                  darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+                }`}
+                title="Edit title"
+              >
+                <Edit3 className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+              </button>
+            </div>
           )}
         </div>
 
@@ -221,155 +296,184 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         </div>
       </div>
 
-      {/* Table - Notion Style */}
-      <div className="px-8 sm:px-12 lg:px-24">
+      {/* Table - Notion Style with Scroll */}
+      <div className="px-8 sm:px-12 lg:px-24 pb-12">
         <div className={`border rounded-lg overflow-hidden ${
           darkMode ? 'border-gray-800' : 'border-gray-200'
         }`}>
-          <table className="w-full">
-            {/* Table Header */}
-            <thead>
-              <tr className={`${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}`}>
-                {database.columns.map((col, index) => (
-                  <th
-                    key={col.key}
-                    className={`text-left px-4 py-2 font-normal ${
-                      index === 0 ? 'w-80' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 group">
-                      <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Aa
-                      </span>
-                      <input
-                        value={col.label}
-                        onChange={(e) => handleColumnLabelChange(col.key, e.target.value)}
-                        className={`text-sm font-medium ${
-                          darkMode ? 'text-gray-300 bg-transparent' : 'text-gray-700 bg-transparent'
-                        } border-0 focus:outline-none px-0 py-0`}
-                        placeholder="Name"
-                      />
-                      <button
-                        onClick={() => handleDeleteProperty(col.key)}
-                        className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity ${
-                          darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-                        }`}
-                      >
-                        <MoreHorizontal className={`w-3 h-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
-                      </button>
-                    </div>
+          {/* Scrollable container - only horizontal scroll here */}
+          <div className="overflow-x-auto" ref={tableContainerRef}>
+            <table className="w-full">
+              {/* Table Header - Sticky */}
+              <thead className={`sticky top-0 z-10 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}`}>
+                <tr>
+                  {database.columns.map((col, index) => (
+                    <th
+                      key={col.key}
+                      ref={index === database.columns.length - 1 ? newColumnRef : null}
+                      className={`text-left px-4 py-2 font-normal ${
+                        index === 0 ? 'min-w-[320px]' : 'min-w-[200px]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 group">
+                        {/* Type Icon with Dropdown */}
+                        <div className="relative">
+                          <button
+                            onClick={() => setTypeDropdownOpen(typeDropdownOpen === col.key ? null : col.key)}
+                            className={`flex items-center gap-1 px-1 py-0.5 rounded ${
+                              darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+                            }`}
+                          >
+                            <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {propertyTypeIcons[col.type] || propertyTypeIcons.text}
+                            </span>
+                            <ChevronDown className={`w-3 h-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                          </button>
+                          {typeDropdownOpen === col.key && (
+                            <TypeChangeDropdown
+                              currentType={col.type}
+                              darkMode={darkMode}
+                              onTypeChange={(type) => handleColumnTypeChange(col.key, type)}
+                              onClose={() => setTypeDropdownOpen(null)}
+                            />
+                          )}
+                        </div>
+                        
+                        {/* Column Label */}
+                        <input
+                          value={col.label}
+                          onChange={(e) => handleColumnLabelChange(col.key, e.target.value)}
+                          className={`text-sm font-medium ${
+                            darkMode ? 'text-gray-300 bg-transparent' : 'text-gray-700 bg-transparent'
+                          } border-0 focus:outline-none px-0 py-0 flex-1`}
+                          placeholder="Name"
+                        />
+                        
+                        {/* Delete Button */}
+                        <button
+                          onClick={() => handleDeleteProperty(col.key)}
+                          className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity ${
+                            darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+                          }`}
+                        >
+                          <MoreHorizontal className={`w-3 h-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                        </button>
+                      </div>
+                    </th>
+                  ))}
+                  <th className="w-12 sticky right-0">
+                    <button
+                      onClick={() => setShowAddProperty(true)}
+                      className={`p-1 rounded ${
+                        darkMode ? 'hover:bg-gray-700 text-gray-500' : 'hover:bg-gray-200 text-gray-400'
+                      }`}
+                      title="Add property"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
                   </th>
-                ))}
-                <th className="w-12">
-                  <button
-                    onClick={() => setShowAddProperty(true)}
-                    className={`p-1 rounded ${
-                      darkMode ? 'hover:bg-gray-700 text-gray-500' : 'hover:bg-gray-200 text-gray-400'
+                </tr>
+              </thead>
+
+              {/* Table Body */}
+              <tbody className={`${darkMode ? 'divide-gray-800' : 'divide-gray-200'} divide-y`}>
+                {database.rows.map((row, rowIndex) => (
+                  <tr
+                    key={row.id}
+                    ref={rowIndex === database.rows.length - 1 ? newRowRef : null}
+                    onMouseEnter={() => setHoveredRow(row.id)}
+                    onMouseLeave={() => setHoveredRow(null)}
+                    className={`group ${
+                      darkMode ? 'hover:bg-[#202020]' : 'hover:bg-gray-50'
                     }`}
-                    title="Add property"
                   >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </th>
-              </tr>
-            </thead>
+                    {database.columns.map((col) => {
+                      const prop = row.properties[col.key];
+                      if (!prop) return <td key={col.key} className="px-4 py-3"></td>;
 
-            {/* Table Body */}
-            <tbody className={`${darkMode ? 'divide-gray-800' : 'divide-gray-200'} divide-y`}>
-              {database.rows.map((row) => (
-                <tr
-                  key={row.id}
-                  onMouseEnter={() => setHoveredRow(row.id)}
-                  onMouseLeave={() => setHoveredRow(null)}
-                  className={`group ${
-                    darkMode ? 'hover:bg-[#202020]' : 'hover:bg-gray-50'
-                  }`}
-                >
-                  {database.columns.map((col) => {
-                    const prop = row.properties[col.key];
-                    if (!prop) return <td key={col.key} className="px-4 py-3"></td>;
+                      return (
+                        <td key={col.key} className="px-4 py-3">
+                          {prop.type === 'text' && (
+                            <input
+                              type="text"
+                              value={prop.value}
+                              onChange={(e) => handleValueChange(row.id, col.key, e.target.value)}
+                              placeholder="Empty"
+                              className={`w-full text-sm ${
+                                darkMode 
+                                  ? 'bg-transparent text-gray-300 placeholder-gray-600' 
+                                  : 'bg-transparent text-gray-900 placeholder-gray-400'
+                              } border-0 focus:outline-none px-0 py-0`}
+                            />
+                          )}
+                          {prop.type === 'number' && (
+                            <input
+                              type="number"
+                              value={prop.value}
+                              onChange={(e) => handleValueChange(row.id, col.key, e.target.valueAsNumber)}
+                              placeholder="0"
+                              className={`w-full text-sm ${
+                                darkMode 
+                                  ? 'bg-transparent text-gray-300 placeholder-gray-600' 
+                                  : 'bg-transparent text-gray-900 placeholder-gray-400'
+                              } border-0 focus:outline-none px-0 py-0`}
+                            />
+                          )}
+                          {prop.type === 'date' && (
+                            <input
+                              type="date"
+                              value={prop.value}
+                              onChange={(e) => handleValueChange(row.id, col.key, e.target.value)}
+                              className={`w-full text-sm ${
+                                darkMode 
+                                  ? 'bg-transparent text-gray-300' 
+                                  : 'bg-transparent text-gray-900'
+                              } border-0 focus:outline-none px-0 py-0`}
+                            />
+                          )}
+                          {prop.type === 'checkbox' && (
+                            <input
+                              type="checkbox"
+                              checked={!!prop.value}
+                              onChange={(e) => handleValueChange(row.id, col.key, e.target.checked)}
+                              className="w-4 h-4"
+                            />
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="px-4 py-3 sticky right-0">
+                      {hoveredRow === row.id && (
+                        <button
+                          onClick={() => handleDeleteRow(row.id)}
+                          className={`p-1 rounded ${
+                            darkMode ? 'hover:bg-gray-700 text-gray-500' : 'hover:bg-gray-200 text-gray-400'
+                          }`}
+                        >
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
 
-                    return (
-                      <td key={col.key} className="px-4 py-3">
-                        {prop.type === 'text' && (
-                          <input
-                            type="text"
-                            value={prop.value}
-                            onChange={(e) => handleValueChange(row.id, col.key, e.target.value)}
-                            placeholder="Empty"
-                            className={`w-full text-sm ${
-                              darkMode 
-                                ? 'bg-transparent text-gray-300 placeholder-gray-600' 
-                                : 'bg-transparent text-gray-900 placeholder-gray-400'
-                            } border-0 focus:outline-none px-0 py-0`}
-                          />
-                        )}
-                        {prop.type === 'number' && (
-                          <input
-                            type="number"
-                            value={prop.value}
-                            onChange={(e) => handleValueChange(row.id, col.key, e.target.valueAsNumber)}
-                            className={`w-full text-sm ${
-                              darkMode 
-                                ? 'bg-transparent text-gray-300' 
-                                : 'bg-transparent text-gray-900'
-                            } border-0 focus:outline-none px-0 py-0`}
-                          />
-                        )}
-                        {prop.type === 'date' && (
-                          <input
-                            type="date"
-                            value={prop.value}
-                            onChange={(e) => handleValueChange(row.id, col.key, e.target.value)}
-                            className={`w-full text-sm ${
-                              darkMode 
-                                ? 'bg-transparent text-gray-300' 
-                                : 'bg-transparent text-gray-900'
-                            } border-0 focus:outline-none px-0 py-0`}
-                          />
-                        )}
-                        {prop.type === 'checkbox' && (
-                          <input
-                            type="checkbox"
-                            checked={!!prop.value}
-                            onChange={(e) => handleValueChange(row.id, col.key, e.target.checked)}
-                            className="w-4 h-4"
-                          />
-                        )}
-                      </td>
-                    );
-                  })}
-                  <td className="px-4 py-3">
-                    {hoveredRow === row.id && (
-                      <button
-                        onClick={() => handleDeleteRow(row.id)}
-                        className={`p-1 rounded ${
-                          darkMode ? 'hover:bg-gray-700 text-gray-500' : 'hover:bg-gray-200 text-gray-400'
-                        }`}
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
-                    )}
+                {/* New Page Row */}
+                <tr className={darkMode ? 'hover:bg-[#202020]' : 'hover:bg-gray-50'}>
+                  <td colSpan={database.columns.length + 1} className="px-4 py-3">
+                    <button
+                      onClick={handleAddRow}
+                      className={`flex items-center gap-2 text-sm ${
+                        darkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      <Plus className="w-4 h-4" />
+                      New page
+                    </button>
                   </td>
                 </tr>
-              ))}
-
-              {/* New Page Row */}
-              <tr className={darkMode ? 'hover:bg-[#202020]' : 'hover:bg-gray-50'}>
-                <td colSpan={database.columns.length + 1} className="px-4 py-3">
-                  <button
-                    onClick={handleAddRow}
-                    className={`flex items-center gap-2 text-sm ${
-                      darkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'
-                    }`}
-                  >
-                    <Plus className="w-4 h-4" />
-                    New page
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
