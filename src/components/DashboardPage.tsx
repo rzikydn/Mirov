@@ -1,5 +1,3 @@
-// src/components/DashboardPage.tsx
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,7 +17,23 @@ export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { darkMode, toggleDarkMode } = useDarkMode();
 
-  // Initialize with one database
+  // 🧩 Ambil data user dari localStorage
+  const [user, setUser] = useState<{ username?: string; email?: string } | null>(null);
+
+  // ✅ Cek login state
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+
+    if (!token || !storedUser) {
+      // Belum login → kembali ke halaman auth
+      navigate('/auth');
+    } else {
+      setUser(JSON.parse(storedUser));
+    }
+  }, [navigate]);
+
+  // 🧱 Initialize one default database (contoh demo)
   useEffect(() => {
     if (databases.length === 0) {
       const k = `title-${Date.now()}`;
@@ -51,14 +65,8 @@ export default function DashboardPage() {
       name: `New database ${nextNumber}`,
       columns: [{ key: colKey, label: 'Name', type: 'text' }],
       rows: [
-        { 
-          id: `row-1-${Date.now()}`, 
-          properties: { [colKey]: { value: '', type: 'text' } } 
-        },
-        { 
-          id: `row-2-${Date.now()}`, 
-          properties: { [colKey]: { value: '', type: 'text' } } 
-        },
+        { id: `row-1-${Date.now()}`, properties: { [colKey]: { value: '', type: 'text' } } },
+        { id: `row-2-${Date.now()}`, properties: { [colKey]: { value: '', type: 'text' } } },
       ],
     };
     setDatabases((prev) => [...prev, newDb]);
@@ -72,7 +80,10 @@ export default function DashboardPage() {
     }
   };
 
+  // 🚪 Logout
   const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     navigate('/auth');
   };
 
@@ -99,6 +110,10 @@ export default function DashboardPage() {
         <Header onMenuClick={() => setSidebarOpen(true)} darkMode={darkMode} />
 
         <main className={`flex-1 relative overflow-hidden ${darkMode ? 'bg-gray-900' : 'bg-slate-100'}`}>
+          <div className="p-4 text-right text-sm text-gray-500">
+            {user ? `Logged in as ${user.username} (${user.email})` : ''}
+          </div>
+
           <AnimatePresence mode="wait">
             {!selectedDatabase ? (
               <TeamNotes key="notes" darkMode={darkMode} />

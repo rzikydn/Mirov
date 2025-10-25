@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Lock, Eye, EyeOff, Shield, Zap, } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, Shield, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 
 type AuthMode = 'login' | 'register';
@@ -20,6 +21,8 @@ interface FormErrors {
 }
 
 export default function AuthPage() {
+  const { setUser, setToken } = useAuth();
+  
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -58,30 +61,58 @@ export default function AuthPage() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setMessage(null);
+    e.preventDefault();
+    setMessage(null);
 
-  if (!validateForm()) return;
+    if (!validateForm()) return;
 
-  setIsLoading(true);
+    setIsLoading(true);
 
-  setTimeout(() => {
-    setMessage({
-      type: 'success',
-      text: authMode === 'login'
-        ? 'Login successful!'
-        : 'Account created successfully!'
-    });
-    setIsLoading(false);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/auth/${authMode}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        }
+      );
 
-    // ✅ Arahkan ke dashboard setelah login sukses
-    if (authMode === 'login') {
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 800);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Request failed");
+      }
+
+      setMessage({ 
+        type: "success", 
+        text: authMode === 'login' ? 'Login successful!' : 'Account created successfully!'
+      });
+
+      if (authMode === "login") {
+        setUser(data.user);
+        setToken(data.token);
+        
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+
+        console.log('✅ User logged in:', data.user);
+
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 800);
+      } else {
+        setTimeout(() => {
+          setAuthMode("login");
+        }, 1000);
+      }
+
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message });
+    } finally {
+      setIsLoading(false);
     }
-  }, 1500);
-};
+  };
 
 
   const handleInputChange = (field: keyof FormData, value: string) => {
@@ -124,9 +155,12 @@ export default function AuthPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center p-4 overflow-hidden relative">
-      {/* Background tetap - tidak akan hilang */}
-      <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 -z-10" />
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-200 to-blue-100 flex items-center justify-center p-4 overflow-hidden relative">
+      {/* Enhanced Background with richer blue */}
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-100 via-blue-200 to-blue-100 -z-10" />
+      
+      {/* Additional gradient overlay for depth */}
+      <div className="fixed inset-0 bg-gradient-to-tr from-cyan-100/40 via-transparent to-blue-100/40 -z-10" />
       
       <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-8 items-center relative z-10">
 
@@ -158,7 +192,7 @@ export default function AuthPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.6 }}
-              className="text-5xl font-bold text-slate-800 mb-4 leading-tight "
+              className="text-5xl font-bold text-slate-800 mb-4 leading-tight"
             >
               Transform Your
               <br />
@@ -183,9 +217,11 @@ export default function AuthPage() {
               transition={{ delay: 0.8, duration: 0.6 }}
               className="space-y-6"
             >
-              {[{ icon: Shield, text: 'Built with privacy and performance in mind' },
+              {[
+                { icon: Shield, text: 'Built with privacy and performance in mind' },
                 { icon: Zap, text: 'Lightning-fast performance' },
-                { icon: User, text: 'Intuitive & modern interface' }].map((feature, index) => (
+                { icon: User, text: 'Intuitive & modern interface' }
+              ].map((feature, index) => (
                 <motion.div
                   key={index}
                   initial={{ opacity: 0, x: -20 }}
@@ -202,26 +238,24 @@ export default function AuthPage() {
             </motion.div>
           </div>
 
-          {/* Background Decorations */}
+          {/* Enhanced Background Decorations - More vibrant blue circles */}
           <div className="absolute inset-0 -z-10">
-            <div className="absolute top-1/4 -left-20 w-[500px] h-[500px] bg-gradient-to-br from-blue-400/30 via-cyan-400/20 to-blue-500/30 rounded-full blur-3xl" />
-            <div className="absolute bottom-1/4 left-10 w-[900px] h-[900px] bg-gradient-to-tl from-cyan-400/20 via-blue-400/30 to-blue-500/20 rounded-full blur-3xl" />
-            <div className="absolute inset-0 bg-[linear-radient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:40px_40px]" />
+            <div className="absolute top-1/4 -left-16 w-96 h-96 bg-blue-400/30 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute bottom-1/4 -left-8 w-80 h-80 bg-cyan-400/25 rounded-full blur-3xl" />
+            <div className="absolute top-1/2 -left-4 w-72 h-72 bg-blue-300/20 rounded-full blur-2xl" />
+            <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-blue-200/15 rounded-full blur-3xl" />
           </div>
         </motion.div>
 
-        {/* Right Side - Auth Form */}
+        {/* Right Side - Form */}
         <motion.div
           initial={{ opacity: 0, x: 50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
           className="w-full"
         >
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl shadow-blue-500/10 p-8 md:p-12 border border-white/60">
-
-
-
-            {/* Mobile Logo */}
+          <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-8 lg:p-12 border border-white/40">
+            {/* Logo Mobile */}
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}

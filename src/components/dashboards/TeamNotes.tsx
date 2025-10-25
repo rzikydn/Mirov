@@ -1,9 +1,10 @@
 // src/components/dashboards/TeamNotes.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Edit3, Trash2, Star, Plus, Search } from 'lucide-react';
 import { Note } from '../../types/database';
+import { useAuth } from '../../context/AuthContext'; // ⭐ DITAMBAHKAN
 
 interface TeamNotesProps {
   darkMode: boolean;
@@ -27,50 +28,66 @@ const noteColors = [
 ];
 
 const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
-  const [notes, setNotes] = useState<ColoredNote[]>([
-    { 
-      id: '1', 
-      text: 'The beginning of screenless design: UI jobs to be taken over by Solution Architect',
-      color: '#FFD89B',
-      date: 'May 21, 2020',
-      favorite: false
-    },
-    { 
-      id: '2', 
-      text: '13 Things You Should Give Up If You Want To Be a Successful UX Designer',
-      color: '#FFA896',
-      date: 'May 25, 2020',
-      favorite: true
-    },
-    { 
-      id: '3', 
-      text: 'The Psychology Principles Every UI/UX Designer Needs to Know',
-      color: '#C4F5A4',
-      date: 'June 5, 2020',
-      favorite: false
-    },
-    { 
-      id: '4', 
-      text: '10 UI & UX Lessons from Designing My Own Product',
-      color: '#B5A4F5',
-      date: 'June 12, 2020',
-      favorite: true
-    },
-    { 
-      id: '5', 
-      text: '52 Research Terms you need to know as a UX Designer',
-      color: '#C4F5A4',
-      date: 'June 18, 2020',
-      favorite: false
-    },
-    { 
-      id: '6', 
-      text: 'Text fields & Forms design – UI components series',
-      color: '#A4E5F5',
-      date: 'June 22, 2020',
-      favorite: false
-    },
-  ]);
+  const { user } = useAuth(); // ⭐ DITAMBAHKAN
+  const API_URL = "http://localhost:5000/api/notes";
+
+  // Fetch notes dari backend
+  const fetchNotes = async () => {
+    try {
+      const res = await fetch(API_URL);
+      const data = await res.json();
+      setNotes(data);
+    } catch (err) {
+      console.error("Failed to fetch notes:", err);
+    }
+  };
+
+  // Tambah note
+  const createNote = async (note: { text: string; color: string; userId: number }) => {
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(note),
+      });
+      const data = await res.json();
+      setNotes(prev => [data, ...prev]);
+    } catch (err) {
+      console.error("Failed to create note:", err);
+    }
+  };
+
+  // Update note
+  const editNote = async (id: number, note: { text: string; color: string; favorite: boolean }) => {
+    try {
+      const res = await fetch(`${API_URL}/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(note),
+      });
+      const data = await res.json();
+      setNotes(prev => prev.map(n => n.id === data.id ? data : n));
+    } catch (err) {
+      console.error("Failed to update note:", err);
+    }
+  };
+
+  // Hapus note
+  const removeNote = async (id: number) => {
+    try {
+      await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+      setNotes(prev => prev.filter(n => n.id !== id));
+    } catch (err) {
+      console.error("Failed to delete note:", err);
+    }
+  };
+
+  // Ambil data saat component mount
+  useEffect(() => {
+    fetchNotes();
+  }, []);
+
+  const [notes, setNotes] = useState<ColoredNote[]>([]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -80,31 +97,39 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
 
   const addNote = () => {
     if (!newNoteText.trim()) return;
-    
-    const newNote: ColoredNote = {
-      id: `note-${Date.now()}`,
+
+    // ⭐ DITAMBAHKAN: CEK LOGIN
+    if (!user) {
+      alert('Please login first');
+      return;
+    }
+
+    console.log('✅ Adding note for userId:', user.id); // Debug
+
+    createNote({
       text: newNoteText.trim(),
       color: selectedColor,
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      favorite: false
-    };
-    
-    setNotes([newNote, ...notes]);
+      userId: user.id // ⭐ DITAMBAHKAN: GUNAKAN user.id dari context
+    });
+
     setNewNoteText('');
     setShowAddModal(false);
     setSelectedColor(noteColors[0]);
   };
 
-  const deleteNote = (id: string) => {
+  const deleteNote = (id: number) => {
     const confirmed = window.confirm('Delete this note?');
     if (!confirmed) return;
-    setNotes(notes.filter(n => n.id !== id));
+
+    removeNote(id);
   };
 
-  const toggleFavorite = (id: string) => {
-    setNotes(notes.map(n => 
-      n.id === id ? { ...n, favorite: !n.favorite } : n
-    ));
+  const toggleFavorite = (note: ColoredNote) => {
+    editNote(note.id, {
+      text: note.text,
+      color: note.color,
+      favorite: !note.favorite
+    });
   };
 
   const startEdit = (note: ColoredNote) => {
@@ -116,13 +141,13 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
 
   const saveEdit = () => {
     if (!editingNote || !newNoteText.trim()) return;
-    
-    setNotes(notes.map(n => 
-      n.id === editingNote.id 
-        ? { ...n, text: newNoteText.trim(), color: selectedColor }
-        : n
-    ));
-    
+
+    editNote(editingNote.id, {
+      text: newNoteText.trim(),
+      color: selectedColor,
+      favorite: editingNote.favorite || false
+    });
+
     setEditingNote(null);
     setNewNoteText('');
     setShowAddModal(false);
@@ -197,7 +222,7 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
             >
               {/* Favorite Star */}
               <button
-                onClick={() => toggleFavorite(note.id)}
+                onClick={() => toggleFavorite(note)}
                 className={`absolute top-4 right-4 w-10 h-10 rounded-full bg-black/80 flex items-center justify-center transition-all ${
                   note.favorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                 }`}
