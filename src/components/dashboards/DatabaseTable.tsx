@@ -1,4 +1,4 @@
-// src/components/dashboards/DatabaseTable.tsx (Enhanced with Share & Export)
+// src/components/dashboards/DatabaseTable.tsx (Enhanced with Share & Export + Date Icon Fix)
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
@@ -21,6 +21,25 @@ const propertyTypeIcons: Record<string, React.ReactNode> = {
   date: <Calendar className="w-3 h-3" />,
   checkbox: <CheckSquare className="w-3 h-3" />,
 };
+
+// CSS for date input calendar icon
+const dateInputStyles = `
+  /* Custom styles for date input in dark mode */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0);
+    opacity: 0.6;
+    cursor: pointer;
+  }
+  
+  input[type="date"].dark-mode::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.8;
+  }
+  
+  input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+`;
 
 // Share Modal Component
 const ShareModal: React.FC<{
@@ -543,6 +562,7 @@ const EmojiPicker: React.FC<{
       ]
     },
   };
+
   const filteredEmojis = () => {
     if (!searchQuery) {
       return emojiCategories[activeCategory as keyof typeof emojiCategories].emojis;
@@ -716,6 +736,17 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [editedDescription, setEditedDescription] = useState(database.description || '');
   const [showShareModal, setShowShareModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+
+  // Inject styles for date input calendar icon
+  useEffect(() => {
+    const styleId = 'date-input-styles';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = dateInputStyles;
+      document.head.appendChild(style);
+    }
+  }, []);
 
   const updateThisDb = (mutator: (db: Database) => Database) =>
     setDatabases((prev) => prev.map((d) => (d.id === database.id ? mutator(d) : d)));
@@ -1193,7 +1224,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                               onChange={(e) => handleValueChange(row.id, col.key, e.target.value)}
                               className={`w-full text-sm ${
                                 darkMode 
-                                  ? 'bg-transparent text-gray-300' 
+                                  ? 'bg-transparent text-gray-300 dark-mode' 
                                   : 'bg-transparent text-gray-900'
                               } border-0 focus:outline-none px-0 py-0`}
                             />
@@ -1221,7 +1252,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         </button>
                       )}
                     </td>
-                  </tr>
+                    </tr>
                 ))}
 
                 {/* New Page Row */}
