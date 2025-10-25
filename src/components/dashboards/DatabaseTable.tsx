@@ -1,8 +1,8 @@
 // src/components/dashboards/DatabaseTable.tsx (Notion Style - Enhanced)
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, MoreHorizontal, Image, FileText, Smile, Edit3, Calendar, Hash, Type, CheckSquare, ChevronDown } from 'lucide-react';
+import { Plus, MoreHorizontal, Smile, FileText, Edit3, Calendar, Hash, Type, CheckSquare, ChevronDown, X } from 'lucide-react';
 import { Database, DatabaseRow } from '../../types/database';
 import { propertyTypes } from '../../constants/dashboard';
 import AddPropertyModal from './modals/AddPropertyModal';
@@ -20,6 +20,220 @@ const propertyTypeIcons: Record<string, React.ReactNode> = {
   number: <Hash className="w-3 h-3" />,
   date: <Calendar className="w-3 h-3" />,
   checkbox: <CheckSquare className="w-3 h-3" />,
+};
+
+// Emoji Picker Component with Categories
+const EmojiPicker: React.FC<{
+  darkMode: boolean;
+  onSelect: (emoji: string) => void;
+  onClose: () => void;
+}> = ({ darkMode, onSelect, onClose }) => {
+  const [activeCategory, setActiveCategory] = useState('smileys');
+  const [searchQuery, setSearchQuery] = useState('');
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  const emojiCategories = {
+    smileys: {
+      label: '😊 Smileys',
+      emojis: [
+        '😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂',
+        '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋',
+        '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🥸', '🤩',
+        '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣',
+        '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
+      ]
+    },
+    nature: {
+      label: '🌿 Nature',
+      emojis: [
+        '🌸', '🌺', '🌻', '🌼', '🌷', '🌹', '🥀', '🌾', '🌱', '🌿',
+        '🍀', '🍁', '🍂', '🍃', '🌳', '🌲', '🌴', '🌵', '🌊', '🌬️',
+        '🌀', '🌈', '⭐', '🌟', '✨', '⚡', '☀️', '🌤️', '⛅', '🌥️',
+        '☁️', '🌦️', '🌧️', '⛈️', '🌩️', '❄️', '☃️', '⛄', '🌙', '🌎',
+        '🌍', '🌏', '🪐', '💫', '🔥', '💧', '🌊', '🏔️', '⛰️', '🌋',
+      ]
+    },
+    food: {
+      label: '🍕 Food',
+      emojis: [
+        '🍎', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒',
+        '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🥑', '🥦', '🥬', '🥒',
+        '🌶️', '🫑', '🌽', '🥕', '🧄', '🧅', '🥔', '🍠', '🥐', '🥯',
+        '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🧈', '🥞', '🧇', '🥓',
+        '🥩', '🍗', '🍖', '🌭', '🍔', '🍟', '🍕', '🥪', '🥙', '🧆',
+      ]
+    },
+    activity: {
+      label: '⚽ Activity',
+      emojis: [
+        '⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱',
+        '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳',
+        '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '🛷',
+        '⛸️', '🥌', '🎿', '⛷️', '🏂', '🪂', '🏋️', '🤼', '🤸', '🤺',
+        '🤾', '🏌️', '🏇', '🧘', '🏄', '🏊', '🤽', '🚣', '🧗', '🚴',
+      ]
+    },
+    travel: {
+      label: '✈️ Travel',
+      emojis: [
+        '🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐',
+        '🛻', '🚚', '🚛', '🚜', '🦯', '🦽', '🦼', '🛴', '🚲', '🛵',
+        '🏍️', '🛺', '🚨', '🚔', '🚍', '🚘', '🚖', '🚡', '🚠', '🚟',
+        '🚃', '🚋', '🚞', '🚝', '🚄', '🚅', '🚈', '🚂', '🚆', '🚇',
+        '🚊', '🚉', '✈️', '🛫', '🛬', '🛩️', '💺', '🚁', '🛸', '🚀',
+        '🛰️', '🚢', '⛵', '🛶', '⛴️', '🛥️', '🚤', '⚓', '🏠', '🏡',
+        '🏘️', '🏚️', '🏗️', '🏭', '🏢', '🏬', '🏣', '🏤', '🏥', '🏦',
+        '🏨', '🏪', '🏫', '🏩', '💒', '🏛️', '⛪', '🕌', '🕍', '🛕',
+        '🕋', '⛩️', '🛤️', '🛣️', '🗾', '🎑', '🏞️', '🌅', '🌄', '🌠',
+        '🎇', '🎆', '🌇', '🌆', '🏙️', '🌃', '🌌', '🌉', '🌁', '🗻',
+      ]
+    },
+    objects: {
+      label: '💼 Objects',
+      emojis: [
+        '⌚', '📱', '📲', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '🖲️', '🕹️',
+        '🗜️', '💽', '💾', '💿', '📀', '📼', '📷', '📸', '📹', '🎥',
+        '📽️', '🎞️', '📞', '☎️', '📟', '📠', '📺', '📻', '🎙️', '🎚️',
+        '🎛️', '🧭', '⏱️', '⏲️', '⏰', '🕰️', '⌛', '⏳', '📡', '🔋',
+        '🔌', '💡', '🔦', '🕯️', '🪔', '🧯', '🛢️', '💸', '💵', '💴',
+      ]
+    },
+    symbols: {
+      label: '❤️ Symbols',
+      emojis: [
+        '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔',
+        '❤️‍🔥', '❤️‍🩹', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟',
+        '☮️', '✝️', '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️',
+        '🛐', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏',
+        '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️', '📴',
+      ]
+    },
+    flags: {
+      label: '🏁 Flags',
+      emojis: [
+        '🏁', '🚩', '🎌', '🏴', '🏳️', '🏳️‍🌈', '🏳️‍⚧️', '🏴‍☠️', '🇦🇨', '🇦🇩',
+        '🇦🇪', '🇦🇫', '🇦🇬', '🇦🇮', '🇦🇱', '🇦🇲', '🇦🇴', '🇦🇶', '🇦🇷', '🇦🇸',
+        '🇦🇹', '🇦🇺', '🇦🇼', '🇦🇽', '🇦🇿', '🇧🇦', '🇧🇧', '🇧🇩', '🇧🇪', '🇧🇫',
+        '🇧🇬', '🇧🇭', '🇧🇮', '🇧🇯', '🇧🇱', '🇧🇲', '🇧🇳', '🇧🇴', '🇧🇶', '🇧🇷',
+        '🇧🇸', '🇧🇹', '🇧🇻', '🇧🇼', '🇧🇾', '🇧🇿', '🇨🇦', '🇨🇨', '🇨🇩', '🇨🇫',
+      ]
+    },
+  };
+
+  const filteredEmojis = () => {
+    if (!searchQuery) {
+      return emojiCategories[activeCategory as keyof typeof emojiCategories].emojis;
+    }
+    
+    // Search across all categories
+    return Object.values(emojiCategories)
+      .flatMap(cat => cat.emojis)
+      .filter(emoji => emoji.includes(searchQuery));
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={pickerRef}
+      className={`absolute top-full left-0 mt-2 ${
+        darkMode ? 'bg-[#2a2a2a]' : 'bg-white'
+      } rounded-lg shadow-xl border ${
+        darkMode ? 'border-gray-700' : 'border-gray-200'
+      } z-50 w-80`}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}">
+        <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+          Choose an emoji
+        </span>
+        <button
+          onClick={onClose}
+          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+        >
+          <X className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+        </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}">
+        <input
+          type="text"
+          placeholder="Search emoji..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className={`w-full px-3 py-2 rounded text-sm ${
+            darkMode 
+              ? 'bg-[#1a1a1a] text-gray-300 placeholder-gray-500 border-gray-700' 
+              : 'bg-gray-50 text-gray-900 placeholder-gray-400 border-gray-200'
+          } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+        />
+      </div>
+
+      {/* Category Tabs */}
+      {!searchQuery && (
+        <div className={`flex gap-1 px-2 py-2 border-b overflow-x-auto ${
+          darkMode ? 'border-gray-700' : 'border-gray-200'
+        }`}>
+          {Object.entries(emojiCategories).map(([key, category]) => (
+            <button
+              key={key}
+              onClick={() => setActiveCategory(key)}
+              className={`px-2 py-1 rounded text-xs whitespace-nowrap transition-colors ${
+                activeCategory === key
+                  ? darkMode 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-blue-100 text-blue-900'
+                  : darkMode 
+                    ? 'text-gray-400 hover:bg-gray-700' 
+                    : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {category.label.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Emoji Grid */}
+      <div className="p-3">
+        <div className="grid grid-cols-8 gap-1 max-h-64 overflow-y-auto">
+          {filteredEmojis().map((emoji, index) => (
+            <button
+              key={index}
+              onClick={() => {
+                onSelect(emoji);
+                onClose();
+              }}
+              className={`text-2xl p-2 rounded hover:bg-opacity-80 transition-all ${
+                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+              }`}
+              title={emoji}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+        
+        {filteredEmojis().length === 0 && (
+          <div className={`text-center py-8 text-sm ${
+            darkMode ? 'text-gray-500' : 'text-gray-400'
+          }`}>
+            No emoji found
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 // Type Change Dropdown Component
@@ -75,21 +289,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const newColumnRef = useRef<HTMLTableHeaderCellElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showCoverPicker, setShowCoverPicker] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
-
-  // Emoji list
-  const emojiList = ['🏠', '📚', '💼', '🎯', '📊', '🎨', '🚀', '💡', '🔥', '⭐', '🌟', '💪', '🎓', '📝', '📅', '✅', '🎉', '🏆', '💰', '📱', '🌈', '🎵', '🍕', '🏋️', '🎮', '📷', '🎬', '✈️', '🌍', '🏖️'];
-
-  // Cover images (using Unsplash placeholders)
-  const coverImages = [
-    'https://images.unsplash.com/photo-1557683316-973673baf926?w=1200&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=1200&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1617791160505-6f00504e3519?w=1200&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1579546929662-711aa81148cf?w=1200&h=400&fit=crop',
-  ];
+  const [editedDescription, setEditedDescription] = useState(database.description || '');
 
   const updateThisDb = (mutator: (db: Database) => Database) =>
     setDatabases((prev) => prev.map((d) => (d.id === database.id ? mutator(d) : d)));
@@ -144,7 +345,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     });
     setShowAddProperty(false);
     
-    // Scroll to new column after it's added
     setTimeout(() => {
       if (tableContainerRef.current && newColumnRef.current) {
         const container = tableContainerRef.current;
@@ -196,7 +396,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     };
     updateThisDb((db) => ({ ...db, rows: [...db.rows, newRow] }));
     
-    // Scroll to new row after it's added
     setTimeout(() => {
       newRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
@@ -219,6 +418,41 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }
   };
 
+  const handleEmojiSelect = (emoji: string) => {
+    // Add emoji to the beginning of the name
+    const newName = database.icon 
+      ? database.name.replace(database.icon, emoji) 
+      : `${emoji} ${database.name}`;
+    updateThisDb((db) => ({ ...db, name: newName, icon: emoji }));
+    setEditedName(newName);
+  };
+
+  const handleRemoveIcon = () => {
+    // Remove emoji from the name
+    if (database.icon) {
+      const newName = database.name.replace(database.icon, '').trim();
+      updateThisDb((db) => ({ ...db, name: newName, icon: undefined }));
+      setEditedName(newName);
+    }
+  };
+
+  const handleDescriptionChange = () => {
+    updateThisDb((db) => ({ ...db, description: editedDescription.trim() }));
+    setIsEditingDescription(false);
+  };
+
+  const handleDescriptionKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') {
+      setEditedDescription(database.description || '');
+      setIsEditingDescription(false);
+    }
+  };
+
+  const handleAddDescription = () => {
+    setIsEditingDescription(true);
+    setEditedDescription(database.description || '');
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -230,28 +464,41 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       <div className="px-8 sm:px-12 lg:px-24 pt-12 pb-4">
         {/* Action Buttons */}
         <div className="flex items-center gap-3 mb-6">
-          <button className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
-            darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
-          }`}>
-            <Smile className="w-4 h-4" />
-            Add icon
-          </button>
-          <button className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
-            darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
-          }`}>
-            <Image className="w-4 h-4" />
-            Add cover
-          </button>
-          <button className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
-            darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
-          }`}>
-            <FileText className="w-4 h-4" />
-            Add description
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
+                darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <Smile className="w-4 h-4" />
+              {database.icon ? 'Change icon' : 'Add icon'}
+            </button>
+            {showEmojiPicker && (
+              <EmojiPicker
+                darkMode={darkMode}
+                onSelect={handleEmojiSelect}
+                onClose={() => setShowEmojiPicker(false)}
+              />
+            )}
+          </div>
+          
+          {!database.description && (
+            <button
+              onClick={handleAddDescription}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
+                darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Add description
+            </button>
+          )}
         </div>
 
-        {/* Title with Edit Icon */}
+        {/* Title Section */}
         <div className="mb-8">
+          {/* Title with Icon (Inline) */}
           {isEditingName ? (
             <input
               value={editedName}
@@ -283,6 +530,63 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               >
                 <Edit3 className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
               </button>
+              {database.icon && (
+                <button
+                  onClick={handleRemoveIcon}
+                  className={`opacity-0 group-hover:opacity-100 p-1.5 rounded transition-opacity ${
+                    darkMode ? 'hover:bg-gray-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
+                  }`}
+                  title="Remove icon"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Description Section */}
+          {(database.description || isEditingDescription) && (
+            <div className="mt-4">
+              {isEditingDescription ? (
+                <textarea
+                  value={editedDescription}
+                  onChange={(e) => setEditedDescription(e.target.value)}
+                  onBlur={handleDescriptionChange}
+                  onKeyDown={handleDescriptionKeyPress}
+                  autoFocus
+                  placeholder="Add a description..."
+                  rows={3}
+                  className={`w-full text-base ${
+                    darkMode ? 'bg-[#191919] text-gray-400' : 'bg-white text-gray-600'
+                  } border-0 focus:outline-none p-0 resize-none`}
+                />
+              ) : (
+                <div className="flex items-start gap-3 group">
+                  <p
+                    onClick={() => {
+                      setIsEditingDescription(true);
+                      setEditedDescription(database.description || '');
+                    }}
+                    className={`text-base cursor-text ${
+                      darkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}
+                  >
+                    {database.description}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setIsEditingDescription(true);
+                      setEditedDescription(database.description || '');
+                    }}
+                    className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${
+                      darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+                    }`}
+                    title="Edit description"
+                  >
+                    <Edit3 className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -307,7 +611,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             onClick={handleAddRow}
             className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium"
           >
-            New
+            + New Rows
           </button>
         </div>
       </div>
@@ -483,7 +787,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       }`}
                     >
                       <Plus className="w-4 h-4" />
-                      New page
+                      New rows
                     </button>
                   </td>
                 </tr>

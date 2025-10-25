@@ -183,7 +183,7 @@ export default function AuthPage() {
               transition={{ delay: 0.8, duration: 0.6 }}
               className="space-y-6"
             >
-              {[{ icon: Shield, text: 'Bank-level security & encryption' },
+              {[{ icon: Shield, text: 'Built with privacy and performance in mind' },
                 { icon: Zap, text: 'Lightning-fast performance' },
                 { icon: User, text: 'Intuitive & modern interface' }].map((feature, index) => (
                 <motion.div

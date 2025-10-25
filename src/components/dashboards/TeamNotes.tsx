@@ -154,10 +154,14 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
               Notes
             </h1>
             
-            {/* Add Button */}
+            {/* Add Button - Fixed for Dark Mode */}
             <button
               onClick={() => setShowAddModal(true)}
-              className="w-14 h-14 rounded-full bg-gray-900 hover:bg-gray-800 text-white flex items-center justify-center shadow-lg transition-all hover:scale-105"
+              className={`w-14 h-14 rounded-full ${
+                darkMode 
+                  ? 'bg-white hover:bg-gray-100 text-gray-900' 
+                  : 'bg-gray-900 hover:bg-gray-800 text-white'
+              } flex items-center justify-center shadow-lg transition-all hover:scale-105`}
               title="Add new note"
             >
               <Plus className="w-6 h-6" />
