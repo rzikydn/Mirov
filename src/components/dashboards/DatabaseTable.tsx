@@ -1,8 +1,8 @@
-// src/components/dashboards/DatabaseTable.tsx (Notion Style - Enhanced)
+// src/components/dashboards/DatabaseTable.tsx (Enhanced with Share & Export)
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, MoreHorizontal, Smile, FileText, Edit3, Calendar, Hash, Type, CheckSquare, ChevronDown, X } from 'lucide-react';
+import { Plus, MoreHorizontal, Smile, FileText, Edit3, Calendar, Hash, Type, CheckSquare, ChevronDown, X, Share2, Download, Link2, Copy, Check, Users, Lock, Eye, Edit } from 'lucide-react';
 import { Database, DatabaseRow } from '../../types/database';
 import { propertyTypes } from '../../constants/dashboard';
 import AddPropertyModal from './modals/AddPropertyModal';
@@ -20,6 +20,435 @@ const propertyTypeIcons: Record<string, React.ReactNode> = {
   number: <Hash className="w-3 h-3" />,
   date: <Calendar className="w-3 h-3" />,
   checkbox: <CheckSquare className="w-3 h-3" />,
+};
+
+// Share Modal Component
+const ShareModal: React.FC<{
+  show: boolean;
+  darkMode: boolean;
+  databaseId: string;
+  onClose: () => void;
+}> = ({ show, darkMode, databaseId, onClose }) => {
+  const [shareLink, setShareLink] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [accessLevel, setAccessLevel] = useState<'view' | 'edit'>('view');
+  const [sharedUsers, setSharedUsers] = useState<Array<{id: string, email: string, access: 'view' | 'edit'}>>([
+    { id: '1', email: 'user@example.com', access: 'edit' },
+    { id: '2', email: 'viewer@example.com', access: 'view' },
+  ]);
+  const [newUserEmail, setNewUserEmail] = useState('');
+
+  useEffect(() => {
+    if (show) {
+      // Generate share link (in real app, this would come from backend)
+      const link = `${window.location.origin}/shared/${databaseId}?access=${accessLevel}`;
+      setShareLink(link);
+    }
+  }, [show, databaseId, accessLevel]);
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(shareLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleAddUser = () => {
+    if (newUserEmail.trim()) {
+      setSharedUsers([...sharedUsers, { 
+        id: Date.now().toString(), 
+        email: newUserEmail.trim(), 
+        access: accessLevel 
+      }]);
+      setNewUserEmail('');
+    }
+  };
+
+  const handleRemoveUser = (userId: string) => {
+    setSharedUsers(sharedUsers.filter(u => u.id !== userId));
+  };
+
+  const handleChangeUserAccess = (userId: string, newAccess: 'view' | 'edit') => {
+    setSharedUsers(sharedUsers.map(u => 
+      u.id === userId ? { ...u, access: newAccess } : u
+    ));
+  };
+
+  if (!show) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className={`${
+          darkMode ? 'bg-[#2a2a2a]' : 'bg-white'
+        } rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col`}
+      >
+        {/* Header */}
+        <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Share2 className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+              <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Share Database
+              </h2>
+            </div>
+            <button
+              onClick={onClose}
+              className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+            >
+              <X className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* General Access Section */}
+          <div>
+            <h3 className={`text-sm font-medium mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              General access
+            </h3>
+            <div className={`flex items-center justify-between p-4 rounded-lg border ${
+              darkMode ? 'bg-[#1a1a1a] border-gray-700' : 'bg-gray-50 border-gray-200'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                  <Link2 className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+                </div>
+                <div>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Anyone on the web with link
+                  </p>
+                  <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                    Anyone with the link can access
+                  </p>
+                </div>
+              </div>
+              <select
+                value={accessLevel}
+                onChange={(e) => setAccessLevel(e.target.value as 'view' | 'edit')}
+                className={`px-3 py-1.5 rounded text-sm border ${
+                  darkMode 
+                    ? 'bg-[#2a2a2a] text-gray-300 border-gray-700' 
+                    : 'bg-white text-gray-900 border-gray-300'
+                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              >
+                <option value="view">Can view</option>
+                <option value="edit">Can edit</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Copy Link Section */}
+          <div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={shareLink}
+                readOnly
+                className={`flex-1 px-4 py-2 rounded border text-sm ${
+                  darkMode 
+                    ? 'bg-[#1a1a1a] text-gray-300 border-gray-700' 
+                    : 'bg-gray-50 text-gray-900 border-gray-300'
+                } focus:outline-none`}
+              />
+              <button
+                onClick={handleCopyLink}
+                className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                  copied
+                    ? 'bg-green-600 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {copied ? (
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4" />
+                    Copied
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Copy className="w-4 h-4" />
+                    Copy link
+                  </div>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Page-level Access Section */}
+          <div>
+            <h3 className={`text-sm font-medium mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              Page-level access
+            </h3>
+            
+            {/* Add User Input */}
+            <div className="flex items-center gap-2 mb-4">
+              <input
+                type="email"
+                value={newUserEmail}
+                onChange={(e) => setNewUserEmail(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddUser()}
+                placeholder="Add people, emails, or groups"
+                className={`flex-1 px-4 py-2 rounded border text-sm ${
+                  darkMode 
+                    ? 'bg-[#1a1a1a] text-gray-300 border-gray-700 placeholder-gray-600' 
+                    : 'bg-white text-gray-900 border-gray-300 placeholder-gray-400'
+                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              />
+              <button
+                onClick={handleAddUser}
+                disabled={!newUserEmail.trim()}
+                className={`px-4 py-2 rounded text-sm font-medium ${
+                  newUserEmail.trim()
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : darkMode
+                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                Invite
+              </button>
+            </div>
+
+            {/* Shared Users List */}
+            <div className="space-y-2">
+              {sharedUsers.map((user) => (
+                <div
+                  key={user.id}
+                  className={`flex items-center justify-between p-3 rounded-lg border ${
+                    darkMode ? 'bg-[#1a1a1a] border-gray-700' : 'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-600'
+                    }`}>
+                      {user.email[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {user.email}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                        {user.access === 'edit' ? 'Can edit' : 'Can view'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={user.access}
+                      onChange={(e) => handleChangeUserAccess(user.id, e.target.value as 'view' | 'edit')}
+                      className={`px-3 py-1 rounded text-xs border ${
+                        darkMode 
+                          ? 'bg-[#2a2a2a] text-gray-300 border-gray-700' 
+                          : 'bg-white text-gray-900 border-gray-300'
+                      } focus:outline-none`}
+                    >
+                      <option value="view">Can view</option>
+                      <option value="edit">Can edit</option>
+                    </select>
+                    <button
+                      onClick={() => handleRemoveUser(user.id)}
+                      className={`p-1 rounded ${
+                        darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-500'
+                      }`}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {sharedUsers.length === 0 && (
+              <div className={`text-center py-8 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                No users added yet
+              </div>
+            )}
+          </div>
+
+          {/* Learn About Sharing */}
+          <div className={`flex items-center gap-2 text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+            <Lock className="w-3 h-3" />
+            <span>Learn about sharing</span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className={`px-6 py-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+          <button
+            onClick={onClose}
+            className={`w-full px-4 py-2 rounded text-sm font-medium ${
+              darkMode 
+                ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+            }`}
+          >
+            Done
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// Export Modal Component
+const ExportModal: React.FC<{
+  show: boolean;
+  darkMode: boolean;
+  database: Database;
+  onClose: () => void;
+}> = ({ show, darkMode, database, onClose }) => {
+  const handleExportJSON = () => {
+    const dataStr = JSON.stringify(database, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${database.name.replace(/\s+/g, '_')}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    onClose();
+  };
+
+  const handleExportXLSX = () => {
+    // Create CSV content (simplified XLSX export)
+    let csv = '';
+    
+    // Header row
+    csv += database.columns.map(col => `"${col.label}"`).join(',') + '\n';
+    
+    // Data rows
+    database.rows.forEach(row => {
+      const rowData = database.columns.map(col => {
+        const prop = row.properties[col.key];
+        if (!prop) return '""';
+        
+        if (prop.type === 'checkbox') {
+          return prop.value ? '"Yes"' : '"No"';
+        }
+        
+        const value = String(prop.value || '');
+        return `"${value.replace(/"/g, '""')}"`;
+      });
+      csv += rowData.join(',') + '\n';
+    });
+    
+    // Create download
+    const dataBlob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${database.name.replace(/\s+/g, '_')}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    onClose();
+  };
+
+  if (!show) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className={`${
+          darkMode ? 'bg-[#2a2a2a]' : 'bg-white'
+        } rounded-lg shadow-xl w-full max-w-md`}
+      >
+        {/* Header */}
+        <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Download className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+              <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Export Database
+              </h2>
+            </div>
+            <button
+              onClick={onClose}
+              className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+            >
+              <X className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-3">
+          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-4`}>
+            Choose export format for "{database.name}"
+          </p>
+
+          {/* Export Options */}
+          <button
+            onClick={handleExportXLSX}
+            className={`w-full flex items-center justify-between p-4 rounded-lg border transition-colors ${
+              darkMode 
+                ? 'bg-[#1a1a1a] border-gray-700 hover:bg-gray-800' 
+                : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded ${darkMode ? 'bg-green-900' : 'bg-green-100'}`}>
+                <FileText className={`w-5 h-5 ${darkMode ? 'text-green-300' : 'text-green-600'}`} />
+              </div>
+              <div className="text-left">
+                <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Export as CSV/Excel
+                </p>
+                <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                  Compatible with Excel, Google Sheets
+                </p>
+              </div>
+            </div>
+            <Download className={`w-5 h-5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+          </button>
+
+          <button
+            onClick={handleExportJSON}
+            className={`w-full flex items-center justify-between p-4 rounded-lg border transition-colors ${
+              darkMode 
+                ? 'bg-[#1a1a1a] border-gray-700 hover:bg-gray-800' 
+                : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded ${darkMode ? 'bg-blue-900' : 'bg-blue-100'}`}>
+                <FileText className={`w-5 h-5 ${darkMode ? 'text-blue-300' : 'text-blue-600'}`} />
+              </div>
+              <div className="text-left">
+                <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Export as JSON
+                </p>
+                <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                  Raw data format for developers
+                </p>
+              </div>
+            </div>
+            <Download className={`w-5 h-5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+          </button>
+        </div>
+
+        {/* Footer */}
+        <div className={`px-6 py-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+          <button
+            onClick={onClose}
+            className={`w-full px-4 py-2 rounded text-sm font-medium ${
+              darkMode 
+                ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+            }`}
+          >
+            Cancel
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
 };
 
 // Emoji Picker Component with Categories
@@ -81,11 +510,6 @@ const EmojiPicker: React.FC<{
         '🏍️', '🛺', '🚨', '🚔', '🚍', '🚘', '🚖', '🚡', '🚠', '🚟',
         '🚃', '🚋', '🚞', '🚝', '🚄', '🚅', '🚈', '🚂', '🚆', '🚇',
         '🚊', '🚉', '✈️', '🛫', '🛬', '🛩️', '💺', '🚁', '🛸', '🚀',
-        '🛰️', '🚢', '⛵', '🛶', '⛴️', '🛥️', '🚤', '⚓', '🏠', '🏡',
-        '🏘️', '🏚️', '🏗️', '🏭', '🏢', '🏬', '🏣', '🏤', '🏥', '🏦',
-        '🏨', '🏪', '🏫', '🏩', '💒', '🏛️', '⛪', '🕌', '🕍', '🛕',
-        '🕋', '⛩️', '🛤️', '🛣️', '🗾', '🎑', '🏞️', '🌅', '🌄', '🌠',
-        '🎇', '🎆', '🌇', '🌆', '🏙️', '🌃', '🌌', '🌉', '🌁', '🗻',
       ]
     },
     objects: {
@@ -119,7 +543,6 @@ const EmojiPicker: React.FC<{
       ]
     },
   };
-
   const filteredEmojis = () => {
     if (!searchQuery) {
       return emojiCategories[activeCategory as keyof typeof emojiCategories].emojis;
@@ -152,7 +575,7 @@ const EmojiPicker: React.FC<{
       } z-50 w-80`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}">
+      <div className={`flex items-center justify-between p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
         <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
           Choose an emoji
         </span>
@@ -165,7 +588,7 @@ const EmojiPicker: React.FC<{
       </div>
 
       {/* Search Bar */}
-      <div className="p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}">
+      <div className={`p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
         <input
           type="text"
           placeholder="Search emoji..."
@@ -291,6 +714,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState(database.description || '');
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const updateThisDb = (mutator: (db: Database) => Database) =>
     setDatabases((prev) => prev.map((d) => (d.id === database.id ? mutator(d) : d)));
@@ -494,6 +919,28 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               Add description
             </button>
           )}
+
+          {/* Share Button */}
+          <button
+            onClick={() => setShowShareModal(true)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
+              darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Share2 className="w-4 h-4" />
+            Share
+          </button>
+
+          {/* Export Button */}
+          <button
+            onClick={() => setShowExportModal(true)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
+              darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Download className="w-4 h-4" />
+            Export
+          </button>
         </div>
 
         {/* Title Section */}
@@ -812,6 +1259,20 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         message={`Are you sure you want to delete this ${deleteTarget?.type}?`}
         onConfirm={confirmDelete}
         onCancel={() => setShowConfirmDelete(false)}
+      />
+
+      <ShareModal
+        show={showShareModal}
+        darkMode={darkMode}
+        databaseId={database.id}
+        onClose={() => setShowShareModal(false)}
+      />
+
+      <ExportModal
+        show={showExportModal}
+        darkMode={darkMode}
+        database={database}
+        onClose={() => setShowExportModal(false)}
       />
     </motion.div>
   );
