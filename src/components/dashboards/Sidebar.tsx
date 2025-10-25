@@ -81,44 +81,78 @@ const Sidebar: React.FC<SidebarProps> = ({
               darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
             } border-r h-full flex flex-col ${isOpen ? 'shadow-xl' : ''}`}
           >
-            {/* Scrollable Content Wrapper */}
-            <div className="flex flex-col h-full overflow-hidden">
-              {/* Header - Fixed */}
-              <div className="flex-shrink-0 p-5 pb-0">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#2563eb] to-[#3b82f6] flex items-center justify-center text-white font-semibold text-lg">
-                      M
-                    </div>
-                    <div>
-                      <div className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        My Workspace
-                      </div>
+            <div className="p-5 flex flex-col flex-1 overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#2563eb] to-[#3b82f6] flex items-center justify-center text-white font-semibold text-lg">
+                    M
+                  </div>
+                  <div>
+                    <div className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      My Workspace
                     </div>
                   </div>
-                  <button
-                    className={`lg:hidden p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                    onClick={() => setIsOpen(false)}
-                    aria-label="Close menu"
-                  >
-                    <X className={`w-5 h-5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} />
-                  </button>
                 </div>
+                <button
+                  className={`lg:hidden p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                  onClick={() => setIsOpen(false)}
+                  aria-label="Close menu"
+                >
+                  <X className={`w-5 h-5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} />
+                </button>
               </div>
 
-              {/* Scrollable Content */}
-              <div className="flex-1 overflow-y-auto px-5">
-                <nav className="space-y-2 mb-4">
-                  {menuItems.map((item) => (
+              <nav className="space-y-2 mb-4">
+                {menuItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      onSelectMenu(item.id);
+                      onSelectDatabase(null);
+                      setIsOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors duration-150 ${
+                      selectedMenu === item.id && !selectedDatabase
+                        ? darkMode
+                          ? 'bg-blue-900 text-blue-300'
+                          : 'bg-blue-50 text-[#2563eb]'
+                        : darkMode
+                        ? 'text-gray-300 hover:bg-gray-700 hover:text-blue-300'
+                        : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
+                    }`}
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </nav>
+
+              <div className="mb-4 flex-1">
+                <div className="flex items-center justify-between mb-3">
+                  <span className={`text-sm font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Databases
+                  </span>
+                  <button
+                    onClick={onCreateDatabase}
+                    className={`p-1 rounded transition-colors ${
+                      darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                    }`}
+                    title="New Database"
+                    aria-label="Create database"
+                  >
+                    <Plus className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {databases.map((db) => (
                     <button
-                      key={item.id}
+                      key={db.id}
                       onClick={() => {
-                        onSelectMenu(item.id);
-                        onSelectDatabase(null);
+                        onSelectDatabase(db.id);
                         setIsOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors duration-150 ${
-                        selectedMenu === item.id && !selectedDatabase
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-150 flex items-center gap-2 group ${
+                        selectedDatabase === db.id
                           ? darkMode
                             ? 'bg-blue-900 text-blue-300'
                             : 'bg-blue-50 text-[#2563eb]'
@@ -127,126 +161,71 @@ const Sidebar: React.FC<SidebarProps> = ({
                           : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
                       }`}
                     >
-                      {item.name}
+                      <ChevronRight className="w-3 h-3" />
+                      <span className="truncate flex-1">{db.name}</span>
+                      <button
+                        onClick={(e) => handleDeleteClick(e, db.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-opacity"
+                        title="Delete database"
+                        aria-label={`Delete ${db.name}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </button>
                     </button>
                   ))}
-                </nav>
-
-                <div className="mb-4 flex-1">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className={`text-sm font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Databases
-                    </span>
-                    <button
-                      onClick={onCreateDatabase}
-                      className={`p-1 rounded transition-colors ${
-                        darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-                      }`}
-                      title="New Database"
-                      aria-label="Create database"
-                    >
-                      <Plus className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-                    </button>
-                  </div>
-
-                  <div className="space-y-2">
-                    {databases.map((db) => (
-                      <button
-                        key={db.id}
-                        onClick={() => {
-                          onSelectDatabase(db.id);
-                          setIsOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-150 flex items-center gap-2 group ${
-                          selectedDatabase === db.id
-                            ? darkMode
-                              ? 'bg-blue-900 text-blue-300'
-                              : 'bg-blue-50 text-[#2563eb]'
-                            : darkMode
-                            ? 'text-gray-300 hover:bg-gray-700 hover:text-blue-300'
-                            : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
-                        }`}
-                      >
-                        <ChevronRight className="w-3 h-3" />
-                        <span className="truncate flex-1">{db.name}</span>
-                        <button
-                          onClick={(e) => handleDeleteClick(e, db.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-opacity"
-                          title="Delete database"
-                          aria-label={`Delete ${db.name}`}
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </button>
-                      </button>
-                    ))}
-                  </div>
                 </div>
-
-                {/* Add extra spacing at bottom for mobile devices */}
-                <div className="h-32 lg:h-0" />
               </div>
 
-              {/* Footer - Fixed at Bottom with Safe Area */}
-              <div className={`flex-shrink-0 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} p-5 pb-safe`}>
-                <div className="space-y-2">
-                  {/* Dark Mode Toggle */}
-                  <button
-                    onClick={toggleDarkMode}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
-                      darkMode
-                        ? 'text-gray-300 hover:bg-gray-700'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
+              <div className={`border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} pt-3 space-y-2`}>
+                {/* Dark Mode Toggle */}
+                <button
+                  onClick={toggleDarkMode}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
+                    darkMode
+                      ? 'text-gray-300 hover:bg-gray-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {darkMode ? (
+                      <Sun className="w-5 h-5" />
+                    ) : (
+                      <Moon className="w-5 h-5" />
+                    )}
+                    <span className="font-medium">
+                      {darkMode ? 'Light Mode' : 'Dark Mode'}
+                    </span>
+                  </div>
+                  <div
+                    className={`w-10 h-6 rounded-full transition-colors ${
+                      darkMode ? 'bg-blue-600' : 'bg-gray-300'
+                    } relative`}
                   >
-                    <div className="flex items-center gap-3">
-                      {darkMode ? (
-                        <Sun className="w-5 h-5" />
-                      ) : (
-                        <Moon className="w-5 h-5" />
-                      )}
-                      <span className="font-medium">
-                        {darkMode ? 'Light Mode' : 'Dark Mode'}
-                      </span>
-                    </div>
                     <div
-                      className={`w-10 h-6 rounded-full transition-colors ${
-                        darkMode ? 'bg-blue-600' : 'bg-gray-300'
-                      } relative`}
-                    >
-                      <div
-                        className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                          darkMode ? 'translate-x-5' : 'translate-x-1'
-                        }`}
-                      />
-                    </div>
-                  </button>
+                      className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                        darkMode ? 'translate-x-5' : 'translate-x-1'
+                      }`}
+                    />
+                  </div>
+                </button>
 
-                  {/* Logout Button */}
-                  <button
-                    onClick={() => setShowLogoutConfirm(true)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                      darkMode
-                        ? 'text-gray-300 hover:bg-red-900 hover:text-red-300'
-                        : 'text-gray-700 hover:bg-red-50 hover:text-red-600'
-                    }`}
-                  >
-                    <Home className="w-5 h-5" />
-                    <span className="font-medium">Logout</span>
-                  </button>
-                </div>
+                {/* Logout Button */}
+                <button
+                  onClick={() => setShowLogoutConfirm(true)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                    darkMode
+                      ? 'text-gray-300 hover:bg-red-900 hover:text-red-300'
+                      : 'text-gray-700 hover:bg-red-50 hover:text-red-600'
+                  }`}
+                >
+                  <Home className="w-5 h-5" />
+                  <span className="font-medium">Logout</span>
+                </button>
               </div>
             </div>
           </motion.aside>
         )}
       </AnimatePresence>
-
-      {/* Overlay for mobile */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
 
       {/* Delete Database Modal */}
       <DeleteModal
