@@ -110,10 +110,6 @@ export default function DashboardPage() {
         <Header onMenuClick={() => setSidebarOpen(true)} darkMode={darkMode} />
 
         <main className={`flex-1 relative overflow-hidden ${darkMode ? 'bg-gray-900' : 'bg-slate-100'}`}>
-          <div className="p-4 text-right text-sm text-gray-500">
-            {user ? `Logged in as ${user.username} (${user.email})` : ''}
-          </div>
-
           <AnimatePresence mode="wait">
             {!selectedDatabase ? (
               <TeamNotes key="notes" darkMode={darkMode} />

@@ -27,6 +27,24 @@ const noteColors = [
   '#FFB8D1', // Light Pink
 ];
 
+// ⭐ FUNGSI BARU: Format tanggal ke bahasa Indonesia
+const formatDateIndonesian = (dateString: string): string => {
+  const date = new Date(dateString);
+  
+  const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const months = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+  
+  const dayName = days[date.getDay()];
+  const day = date.getDate();
+  const month = months[date.getMonth()];
+  const year = date.getFullYear();
+  
+  return `${dayName}, ${day} ${month} ${year}`;
+};
+
 const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
   const { user } = useAuth(); // ⭐ DITAMBAHKAN
   const API_URL = "http://localhost:5000/api/notes";
@@ -239,8 +257,9 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
 
               {/* Bottom Section */}
               <div className="flex items-center justify-between mt-6">
-                <span className="text-gray-700 text-sm">
-                  {note.date}
+                {/* ⭐ DIUBAH: Format tanggal menggunakan fungsi baru */}
+                <span className="text-gray-700 text-sm font-medium">
+                  {formatDateIndonesian(note.date)}
                 </span>
 
                 {/* Edit Button */}
