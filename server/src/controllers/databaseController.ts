@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 // Get all databases
-export const getAllDatabases = async (req: Request, res: Response): Promise<void> => {
+export const getAllDatabases = async (_req: Request, res: Response): Promise<void> => {
   try {
     const databases = await prisma.database.findMany({
       orderBy: { createdAt: 'desc' },

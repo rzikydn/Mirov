@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export const getAllNotes = async (req: Request, res: Response): Promise<void> => {
+export const getAllNotes = async (_req: Request, res: Response): Promise<void> => {
   try {
     const notes = await prisma.note.findMany({
       include: {

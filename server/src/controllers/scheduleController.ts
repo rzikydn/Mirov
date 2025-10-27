@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export const getAllSchedules = async (req: Request, res: Response): Promise<void> => {
+export const getAllSchedules = async (_req: Request, res: Response): Promise<void> => {
   try {
     const schedules = await prisma.schedule.findMany({
       include: {

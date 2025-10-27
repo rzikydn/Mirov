@@ -7,7 +7,7 @@ import {
   deleteSchedule
 } from '../controllers/scheduleController';
 import { authenticate } from '../middleware/authMiddleware';
-import { requireAdmin, requireAuth, UserRole } from '../middleware/roleCheck';
+import { requireAdmin, requireAuth } from '../middleware/roleCheck';
 
 const router = Router();
 
