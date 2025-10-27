@@ -21,3 +21,10 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Invalid Windows filenames
+nul
+server/nul
+
+# Claude Code
+.claude/settings.local.json

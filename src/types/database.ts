@@ -17,7 +17,7 @@ export interface Column {
 }
 
 export interface Database {
-  id: string;
+  id: string | number;
   name: string;
   icon?: string; // ✨ Added for emoji icon
   cover?: string; // ✨ Added for cover image URL

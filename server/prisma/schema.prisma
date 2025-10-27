@@ -1,0 +1,81 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPERUSER
+  ADMIN
+  UMUM
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  password  String
+  name      String
+  role      Role      @default(UMUM)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  schedules Schedule[]
+  notes     Note[]
+  databases Database[]
+
+  @@map("users")
+}
+
+model Schedule {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  location    String?
+  status      String   @default("planned")
+  createdBy   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator     User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@map("schedules")
+}
+
+model Note {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String
+  color     String?
+  favorite  Boolean  @default(false)
+  userId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notes")
+}
+
+model Database {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  icon        String?
+  columns     Json     // Array of {key, label, type}
+  rows        Json     // Array of {id, properties}
+  createdBy   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator     User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@map("databases")
+}

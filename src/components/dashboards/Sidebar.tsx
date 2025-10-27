@@ -82,16 +82,18 @@ const Sidebar: React.FC<SidebarProps> = ({
             } border-r h-full flex flex-col ${isOpen ? 'shadow-xl' : ''}`}
           >
             <div className="p-5 flex flex-col flex-1 overflow-y-auto">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#2563eb] to-[#3b82f6] flex items-center justify-center text-white font-semibold text-lg">
-                    M
-                  </div>
-                  <div>
-                    <div className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      My Workspace
-                    </div>
-                  </div>
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4 flex-1">
+                  {/* Mirov Logo - Larger */}
+                  <svg className="w-12 h-12 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z" fill={darkMode ? '#60A5FA' : '#2563EB'} />
+                    <path d="M2 17L12 22L22 17" fill={darkMode ? '#3B82F6' : '#3B82F6'} opacity="0.7" />
+                    <path d="M2 12L12 17L22 12" fill={darkMode ? '#60A5FA' : '#2563EB'} opacity="0.85" />
+                  </svg>
+                  {/* Mirov Text - Larger */}
+                  <span className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Mirov
+                  </span>
                 </div>
                 <button
                   className={`lg:hidden p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
@@ -145,12 +147,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                 <div className="space-y-2">
                   {databases.map((db) => (
-                    <button
+                    <div
                       key={db.id}
-                      onClick={() => {
-                        onSelectDatabase(db.id);
-                        setIsOpen(false);
-                      }}
                       className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-150 flex items-center gap-2 group ${
                         selectedDatabase === db.id
                           ? darkMode
@@ -161,17 +159,28 @@ const Sidebar: React.FC<SidebarProps> = ({
                           : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
                       }`}
                     >
-                      <ChevronRight className="w-3 h-3" />
-                      <span className="truncate flex-1">{db.name}</span>
                       <button
-                        onClick={(e) => handleDeleteClick(e, db.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-opacity"
+                        onClick={() => {
+                          onSelectDatabase(db.id);
+                          setIsOpen(false);
+                        }}
+                        className="flex items-center gap-2 flex-1 min-w-0"
+                      >
+                        <ChevronRight className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate">{db.name}</span>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClick(e, db.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-opacity flex-shrink-0"
                         title="Delete database"
                         aria-label={`Delete ${db.name}`}
                       >
                         <Trash2 className="w-4 h-4 text-red-500" />
                       </button>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </div>

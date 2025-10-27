@@ -46,17 +46,45 @@ const formatDateIndonesian = (dateString: string): string => {
 };
 
 const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
-  const { user } = useAuth(); // ⭐ DITAMBAHKAN
+  const { user, canManageSchedules, token } = useAuth(); // ⭐ DITAMBAHKAN token
   const API_URL = "http://localhost:5000/api/notes";
+
+  // Check if user can edit (ADMIN or SUPERUSER)
+  const canEdit = canManageSchedules();
+
+  // Get auth headers
+  const getAuthHeaders = () => {
+    const authToken = token || localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      ...(authToken && { 'Authorization': `Bearer ${authToken}` })
+    };
+  };
 
   // Fetch notes dari backend
   const fetchNotes = async () => {
     try {
-      const res = await fetch(API_URL);
+      const res = await fetch(API_URL, {
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) {
+        console.warn("Notes API not available, using empty array");
+        setNotes([]);
+        return;
+      }
       const data = await res.json();
-      setNotes(data);
+      // Pastikan data adalah array
+      if (Array.isArray(data)) {
+        setNotes(data);
+      } else if (data.data && Array.isArray(data.data)) {
+        setNotes(data.data);
+      } else {
+        console.warn("Notes response is not an array, using empty array");
+        setNotes([]);
+      }
     } catch (err) {
       console.error("Failed to fetch notes:", err);
+      setNotes([]); // Set empty array on error
     }
   };
 
@@ -65,11 +93,14 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
     try {
       const res = await fetch(API_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(note),
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ content: note.text, color: note.color }),
       });
       const data = await res.json();
-      setNotes(prev => [data, ...prev]);
+      if (data.success && data.data) {
+        // Refresh notes list
+        fetchNotes();
+      }
     } catch (err) {
       console.error("Failed to create note:", err);
     }
@@ -78,13 +109,31 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
   // Update note
   const editNote = async (id: number, note: { text: string; color: string; favorite: boolean }) => {
     try {
+      console.log('📝 Sending update to API:', {
+        id,
+        body: {
+          content: note.text,
+          color: note.color,
+          favorite: note.favorite
+        }
+      });
       const res = await fetch(`${API_URL}/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(note),
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          content: note.text,
+          color: note.color,
+          favorite: note.favorite
+        }),
       });
       const data = await res.json();
-      setNotes(prev => prev.map(n => n.id === data.id ? data : n));
+      console.log('✅ API Response:', data);
+      if (data.success) {
+        // Refresh notes list
+        fetchNotes();
+      } else {
+        console.error('❌ Update failed:', data);
+      }
     } catch (err) {
       console.error("Failed to update note:", err);
     }
@@ -93,8 +142,14 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
   // Hapus note
   const removeNote = async (id: number) => {
     try {
-      await fetch(`${API_URL}/${id}`, { method: "DELETE" });
-      setNotes(prev => prev.filter(n => n.id !== id));
+      const res = await fetch(`${API_URL}/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders()
+      });
+      if (res.ok) {
+        // Refresh notes list
+        fetchNotes();
+      }
     } catch (err) {
       console.error("Failed to delete note:", err);
     }
@@ -143,6 +198,13 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
   };
 
   const toggleFavorite = (note: ColoredNote) => {
+    console.log('🌟 Toggle favorite clicked!', {
+      noteId: note.id,
+      currentFavorite: note.favorite,
+      newFavorite: !note.favorite,
+      noteText: note.text,
+      noteColor: note.color
+    });
     editNote(note.id, {
       text: note.text,
       color: note.color,
@@ -179,9 +241,10 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
     setSelectedColor(noteColors[0]);
   };
 
-  const filteredNotes = notes.filter(note => 
-    note.text.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredNotes = notes.filter(note => {
+    const noteText = note.text || note.content || '';
+    return noteText.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   return (
     <motion.div 
@@ -197,18 +260,20 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
               Notes
             </h1>
             
-            {/* Add Button - Fixed for Dark Mode */}
-            <button
-              onClick={() => setShowAddModal(true)}
-              className={`w-14 h-14 rounded-full ${
-                darkMode 
-                  ? 'bg-white hover:bg-gray-100 text-gray-900' 
-                  : 'bg-gray-900 hover:bg-gray-800 text-white'
-              } flex items-center justify-center shadow-lg transition-all hover:scale-105`}
-              title="Add new note"
-            >
-              <Plus className="w-6 h-6" />
-            </button>
+            {/* Add Button - Only for ADMIN/SUPERUSER */}
+            {canEdit && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className={`w-14 h-14 rounded-full ${
+                  darkMode
+                    ? 'bg-white hover:bg-gray-100 text-gray-900'
+                    : 'bg-gray-900 hover:bg-gray-800 text-white'
+                } flex items-center justify-center shadow-lg transition-all hover:scale-105`}
+                title="Add new note"
+              >
+                <Plus className="w-6 h-6" />
+              </button>
+            )}
           </div>
 
           {/* Search Bar */}
@@ -238,46 +303,56 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
               className="group relative rounded-3xl p-6 shadow-md hover:shadow-xl transition-all duration-300 min-h-[280px] flex flex-col"
               style={{ backgroundColor: note.color }}
             >
-              {/* Favorite Star */}
-              <button
-                onClick={() => toggleFavorite(note)}
-                className={`absolute top-4 right-4 w-10 h-10 rounded-full bg-black/80 flex items-center justify-center transition-all ${
-                  note.favorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                }`}
-              >
-                <Star 
-                  className={`w-5 h-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-white'}`}
-                />
-              </button>
+              {/* Favorite Star - Only for ADMIN/SUPERUSER */}
+              {canEdit && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleFavorite(note);
+                  }}
+                  className={`absolute top-4 right-4 w-10 h-10 rounded-full bg-black/80 flex items-center justify-center transition-all ${
+                    note.favorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                  }`}
+                  title={note.favorite ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  <Star
+                    className={`w-5 h-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-white'}`}
+                  />
+                </button>
+              )}
 
               {/* Note Text */}
               <p className="text-gray-900 text-lg leading-relaxed flex-1 pr-8">
-                {note.text}
+                {note.content || note.text || ''}
               </p>
 
               {/* Bottom Section */}
               <div className="flex items-center justify-between mt-6">
                 {/* ⭐ DIUBAH: Format tanggal menggunakan fungsi baru */}
                 <span className="text-gray-700 text-sm font-medium">
-                  {formatDateIndonesian(note.date)}
+                  {note.createdAt ? new Date(note.createdAt).toLocaleDateString('id-ID') : (note.date ? formatDateIndonesian(note.date) : '')}
                 </span>
 
-                {/* Edit Button */}
-                <button
-                  onClick={() => startEdit(note)}
-                  className="w-10 h-10 rounded-full bg-black/80 hover:bg-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-                >
-                  <Edit3 className="w-4 h-4 text-white" />
-                </button>
+                {/* Edit Button - Only for ADMIN/SUPERUSER */}
+                {canEdit && (
+                  <button
+                    onClick={() => startEdit(note)}
+                    className="w-10 h-10 rounded-full bg-black/80 hover:bg-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <Edit3 className="w-4 h-4 text-white" />
+                  </button>
+                )}
               </div>
 
-              {/* Delete Button - Top Left on Hover */}
-              <button
-                onClick={() => deleteNote(note.id)}
-                className="absolute top-4 left-4 w-10 h-10 rounded-full bg-red-500/90 hover:bg-red-600 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-              >
-                <Trash2 className="w-4 h-4 text-white" />
-              </button>
+              {/* Delete Button - Top Left on Hover - Only for ADMIN/SUPERUSER */}
+              {canEdit && (
+                <button
+                  onClick={() => deleteNote(note.id)}
+                  className="absolute top-4 left-4 w-10 h-10 rounded-full bg-red-500/90 hover:bg-red-600 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+                >
+                  <Trash2 className="w-4 h-4 text-white" />
+                </button>
+              )}
             </motion.div>
           ))}
         </div>
@@ -286,7 +361,11 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
         {filteredNotes.length === 0 && (
           <div className="text-center py-12">
             <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              {searchQuery ? 'No notes found' : 'No notes yet. Click the + button to add one!'}
+              {searchQuery
+                ? 'No notes found'
+                : canEdit
+                ? 'No notes yet. Click the + button to add one!'
+                : 'No notes available yet.'}
             </p>
           </div>
         )}
@@ -345,7 +424,7 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={editingNote ? saveEdit : addNote}
-                disabled={!newNoteText.trim()}
+                disabled={!newNoteText || !newNoteText.trim()}
                 className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
               >
                 {editingNote ? 'Save Changes' : 'Add Note'}

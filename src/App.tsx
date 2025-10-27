@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import AuthPage from './components/Authpage.tsx';
-import DashboardPage from './components/DashboardPage.tsx'; // ✅ tambahkan ini
+import DashboardPage from './components/DashboardPage.tsx';
+import DebugDashboard from './components/DebugDashboard.tsx';
 
 function App() {
   return (
@@ -11,6 +12,10 @@ function App() {
 
         {/* Halaman Auth (Login & Register) */}
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/login" element={<Navigate to="/auth" />} />
+
+        {/* Debug Dashboard */}
+        <Route path="/debug" element={<DebugDashboard />} />
 
         {/* Halaman Dashboard */}
         <Route path="/dashboard" element={<DashboardPage />} />

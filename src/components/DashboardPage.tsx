@@ -9,6 +9,8 @@ import { Database } from '../types/database';
 import { menuItems } from '../constants/dashboard';
 import { useDarkMode } from '../hooks/useDarkMode';
 
+const API_URL = 'http://localhost:5000/api/databases';
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [databases, setDatabases] = useState<Database[]>([]);
@@ -25,58 +27,109 @@ export default function DashboardPage() {
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
 
+    console.log('🔍 Dashboard - Checking auth:', { token: !!token, storedUser });
+
     if (!token || !storedUser) {
       // Belum login → kembali ke halaman auth
+      console.log('❌ No token/user, redirecting to /auth');
       navigate('/auth');
     } else {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        console.log('✅ User loaded:', parsedUser);
+        setUser(parsedUser);
+      } catch (error) {
+        console.error('❌ Error parsing user:', error);
+        navigate('/auth');
+      }
     }
   }, [navigate]);
 
-  // 🧱 Initialize one default database (contoh demo)
+  // 🧱 Fetch databases from backend
   useEffect(() => {
-    if (databases.length === 0) {
-      const k = `title-${Date.now()}`;
-      setDatabases([
-        {
-          id: `db-${Date.now()}`,
-          name: 'New database 1',
-          columns: [{ key: k, label: 'Name', type: 'text' }],
-          rows: [
-            { 
-              id: `row-1-${Date.now()}`, 
-              properties: { [k]: { value: 'Example row 1', type: 'text' } } 
-            },
-            { 
-              id: `row-2-${Date.now()}`, 
-              properties: { [k]: { value: 'Example row 2', type: 'text' } } 
-            },
-          ],
-        },
-      ]);
-    }
-  }, [databases.length]);
+    const fetchDatabases = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
 
-  const handleCreateDatabase = () => {
+      try {
+        const response = await fetch(API_URL, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            setDatabases(result.data);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching databases:', error);
+      }
+    };
+
+    fetchDatabases();
+  }, []);
+
+  const handleCreateDatabase = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     const colKey = `title-${Date.now()}`;
     const nextNumber = databases.length + 1;
-    const newDb: Database = {
-      id: `db-${Date.now()}`,
-      name: `New database ${nextNumber}`,
-      columns: [{ key: colKey, label: 'Name', type: 'text' }],
-      rows: [
-        { id: `row-1-${Date.now()}`, properties: { [colKey]: { value: '', type: 'text' } } },
-        { id: `row-2-${Date.now()}`, properties: { [colKey]: { value: '', type: 'text' } } },
-      ],
-    };
-    setDatabases((prev) => [...prev, newDb]);
-    setSelectedDatabase(newDb.id);
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: `New database ${nextNumber}`,
+          columns: [{ key: colKey, label: 'Name', type: 'text' }],
+          rows: [
+            { id: `row-1-${Date.now()}`, properties: { [colKey]: { value: '', type: 'text' } } },
+            { id: `row-2-${Date.now()}`, properties: { [colKey]: { value: '', type: 'text' } } },
+          ]
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setDatabases((prev) => [...prev, result.data]);
+          setSelectedDatabase(result.data.id.toString());
+        }
+      }
+    } catch (error) {
+      console.error('Error creating database:', error);
+    }
   };
 
-  const handleDeleteDatabase = (id: string) => {
-    setDatabases((prev) => prev.filter((db) => db.id !== id));
-    if (selectedDatabase === id) {
-      setSelectedDatabase(null);
+  const handleDeleteDatabase = async (id: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${API_URL}/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        setDatabases((prev) => prev.filter((db) => db.id !== id && db.id !== parseInt(id)));
+        if (selectedDatabase === id) {
+          setSelectedDatabase(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting database:', error);
     }
   };
 

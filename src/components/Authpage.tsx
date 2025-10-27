@@ -32,15 +32,11 @@ export default function AuthPage() {
     const newErrors: FormErrors = {};
 
     if (!formData.email.trim()) {
-      newErrors.email = 'User is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Invalid email format';
+      newErrors.email = 'Username is required';
     }
 
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'min 8 chars';
     }
 
     setErrors(newErrors);
@@ -71,23 +67,33 @@ export default function AuthPage() {
         throw new Error(data.message || "Request failed");
       }
 
-      setMessage({ 
-        type: "success", 
+      // Backend response format: { success: true, data: { user, token } }
+      const userData = data.data?.user || data.user;
+      const tokenData = data.data?.token || data.token;
+
+      setMessage({
+        type: "success",
         text: 'Login successful!'
       });
 
-      setUser(data.user);
-      setToken(data.token);
-      
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      setUser(userData);
+      setToken(tokenData);
+
+      localStorage.setItem("token", tokenData);
+      localStorage.setItem("user", JSON.stringify(userData));
+
+      console.log('✅ Login successful, user data:', userData);
+      console.log('✅ Token saved:', tokenData ? 'Yes' : 'No');
+      console.log('✅ Navigating to /dashboard in 800ms...');
 
       setTimeout(() => {
+        console.log('🚀 Redirecting to /dashboard now');
         navigate("/dashboard");
       }, 800);
 
-    } catch (err: any) {
-      setMessage({ type: "error", text: err.message });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      setMessage({ type: "error", text: errorMessage });
     } finally {
       setIsLoading(false);
     }

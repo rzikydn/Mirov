@@ -4,6 +4,7 @@ interface User {
   id: number;
   name: string;
   email: string;
+  role: 'SUPERUSER' | 'ADMIN' | 'UMUM';
 }
 
 interface AuthContextType {
@@ -13,6 +14,8 @@ interface AuthContextType {
   setToken: (token: string | null) => void;
   logout: () => void;
   isAuthenticated: boolean;
+  hasRole: (roles: Array<'SUPERUSER' | 'ADMIN' | 'UMUM'>) => boolean;
+  canManageSchedules: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,18 +39,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setToken(null);
     localStorage.removeItem('user');
     localStorage.removeItem('token');
-    window.location.href = '/login';
+    window.location.href = '/auth';
+  };
+
+  const hasRole = (roles: Array<'SUPERUSER' | 'ADMIN' | 'UMUM'>): boolean => {
+    if (!user) return false;
+    // SUPERUSER can access everything
+    if (user.role === 'SUPERUSER') return true;
+    return roles.includes(user.role);
+  };
+
+  const canManageSchedules = (): boolean => {
+    return hasRole(['SUPERUSER', 'ADMIN']);
   };
 
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        token, 
-        setUser, 
-        setToken, 
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        setUser,
+        setToken,
         logout,
-        isAuthenticated: !!user && !!token 
+        isAuthenticated: !!user && !!token,
+        hasRole,
+        canManageSchedules
       }}
     >
       {children}
