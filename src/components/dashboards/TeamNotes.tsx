@@ -47,7 +47,7 @@ const formatDateIndonesian = (dateString: string): string => {
 
 const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
   const { user, canManageSchedules, token } = useAuth(); // ⭐ DITAMBAHKAN token
-  const API_URL = "http://localhost:5000/api/notes";
+  const API_URL = `${import.meta.env.VITE_API_URL}/api/notes`;
 
   // Check if user can edit (ADMIN or SUPERUSER)
   const canEdit = canManageSchedules();

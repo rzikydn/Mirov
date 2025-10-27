@@ -9,7 +9,7 @@ import AddPropertyModal from './modals/AddPropertyModal';
 import DeleteModal from './modals/DeleteModal';
 import { useAuth } from '../../context/AuthContext';
 
-const API_URL = 'http://localhost:5000/api/databases';
+const API_URL = `${import.meta.env.VITE_API_URL}/api/databases`;
 
 interface DatabaseTableProps {
   database: Database;

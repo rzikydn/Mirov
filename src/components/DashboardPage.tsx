@@ -9,7 +9,7 @@ import { Database } from '../types/database';
 import { menuItems } from '../constants/dashboard';
 import { useDarkMode } from '../hooks/useDarkMode';
 
-const API_URL = 'http://localhost:5000/api/databases';
+const API_URL = `${import.meta.env.VITE_API_URL}/api/databases`;
 
 export default function DashboardPage() {
   const navigate = useNavigate();
