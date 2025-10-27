@@ -5,6 +5,7 @@ import authRoutes from './routes/authRoutes';
 import scheduleRoutes from './routes/scheduleRoutes';
 import noteRoutes from './routes/noteRoutes';
 import databaseRoutes from './routes/databaseRoutes';
+import setupRoutes from './routes/setupRoutes';
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/databases', databaseRoutes);
+app.use('/api/setup', setupRoutes);
 
 // Health check
 app.get('/health', (_req: Request, res: Response) => {
