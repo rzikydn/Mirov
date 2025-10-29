@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Edit3, Trash2, Star, Plus, Search } from 'lucide-react';
 import { Note } from '../../types/database';
-import { useAuth } from '../../context/AuthContext'; // ⭐ DITAMBAHKAN
+import { useAuth } from '../../context/AuthContext';
+import { useHistory } from '../../context/HistoryContext';
 
 interface TeamNotesProps {
   darkMode: boolean;
@@ -46,7 +47,8 @@ const formatDateIndonesian = (dateString: string): string => {
 };
 
 const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
-  const { user, canManageSchedules, token } = useAuth(); // ⭐ DITAMBAHKAN token
+  const { user, canManageSchedules, token } = useAuth();
+  const { addHistory } = useHistory();
   const API_URL = `${import.meta.env.VITE_API_URL}/api/notes`;
 
   // Check if user can edit (ADMIN or SUPERUSER)
@@ -98,6 +100,17 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       });
       const data = await res.json();
       if (data.success && data.data) {
+        // Add to history
+        if (user) {
+          addHistory({
+            userName: user.name,
+            userRole: user.role,
+            action: 'create',
+            target: 'note',
+            targetName: note.text.substring(0, 30) + (note.text.length > 30 ? '...' : ''),
+            description: `${user.name} added a note`
+          });
+        }
         // Refresh notes list
         fetchNotes();
       }
@@ -129,6 +142,17 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       const data = await res.json();
       console.log('✅ API Response:', data);
       if (data.success) {
+        // Add to history
+        if (user) {
+          addHistory({
+            userName: user.name,
+            userRole: user.role,
+            action: 'edit',
+            target: 'note',
+            targetName: note.text.substring(0, 30) + (note.text.length > 30 ? '...' : ''),
+            description: `${user.name} changed a note`
+          });
+        }
         // Refresh notes list
         fetchNotes();
       } else {
@@ -147,6 +171,16 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
         headers: getAuthHeaders()
       });
       if (res.ok) {
+        // Add to history
+        if (user) {
+          addHistory({
+            userName: user.name,
+            userRole: user.role,
+            action: 'delete',
+            target: 'note',
+            description: `${user.name} deleted a note`
+          });
+        }
         // Refresh notes list
         fetchNotes();
       }

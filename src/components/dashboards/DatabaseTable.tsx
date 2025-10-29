@@ -8,6 +8,7 @@ import { propertyTypes } from '../../constants/dashboard';
 import AddPropertyModal from './modals/AddPropertyModal';
 import DeleteModal from './modals/DeleteModal';
 import { useAuth } from '../../context/AuthContext';
+import { useHistory } from '../../context/HistoryContext';
 
 const API_URL = `${import.meta.env.VITE_API_URL}/api/databases`;
 
@@ -452,7 +453,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   setDatabases,
   darkMode,
 }) => {
-  const { canManageSchedules } = useAuth();
+  const { canManageSchedules, user } = useAuth();
+  const { addHistory } = useHistory();
 
   // Check if user can edit (ADMIN or SUPERUSER)
   const canEdit = canManageSchedules();
@@ -514,7 +516,19 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           })
         });
 
-        if (!response.ok) {
+        if (response.ok) {
+          // Add to history
+          if (user) {
+            addHistory({
+              userName: user.name,
+              userRole: user.role,
+              action: 'edit',
+              target: 'database',
+              targetName: updatedDb.name,
+              description: `${user.name} changed database "${updatedDb.name}"`
+            });
+          }
+        } else {
           console.error('Failed to sync database with backend');
         }
       } catch (error) {

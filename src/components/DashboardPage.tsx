@@ -8,11 +8,13 @@ import TeamNotes from './dashboards/TeamNotes';
 import { Database } from '../types/database';
 import { menuItems } from '../constants/dashboard';
 import { useDarkMode } from '../hooks/useDarkMode';
+import { useHistory } from '../context/HistoryContext';
 
 const API_URL = `${import.meta.env.VITE_API_URL}/api/databases`;
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { addHistory } = useHistory();
   const [databases, setDatabases] = useState<Database[]>([]);
   const [selectedDatabase, setSelectedDatabase] = useState<string | null>(null);
   const [selectedMenu, setSelectedMenu] = useState<string | null>(menuItems[0].id);
@@ -100,6 +102,17 @@ export default function DashboardPage() {
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data) {
+          // Add to history
+          if (user) {
+            addHistory({
+              userName: user.name,
+              userRole: user.role,
+              action: 'create',
+              target: 'database',
+              targetName: result.data.name,
+              description: `${user.name} added a database`
+            });
+          }
           setDatabases((prev) => [...prev, result.data]);
           setSelectedDatabase(result.data.id.toString());
         }
@@ -113,6 +126,9 @@ export default function DashboardPage() {
     const token = localStorage.getItem('token');
     if (!token) return;
 
+    // Find database name before deleting
+    const dbToDelete = databases.find((db) => db.id === id || db.id === parseInt(id));
+
     try {
       const response = await fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
@@ -123,6 +139,17 @@ export default function DashboardPage() {
       });
 
       if (response.ok) {
+        // Add to history
+        if (user && dbToDelete) {
+          addHistory({
+            userName: user.name,
+            userRole: user.role,
+            action: 'delete',
+            target: 'database',
+            targetName: dbToDelete.name,
+            description: `${user.name} deleted a database`
+          });
+        }
         setDatabases((prev) => prev.filter((db) => db.id !== id && db.id !== parseInt(id)));
         if (selectedDatabase === id) {
           setSelectedDatabase(null);

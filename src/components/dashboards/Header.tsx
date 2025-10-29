@@ -3,14 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Menu } from 'lucide-react';
+import { useHistory } from '../../context/HistoryContext';
+import { getTimeAgo } from '../../utils/timeAgo';
 
 interface HeaderProps {
   onMenuClick: () => void;
   darkMode: boolean;
-  lastEditInfo?: {
-    timestamp: Date | null;
-    userName?: string;
-  };
 }
 
 type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
@@ -59,7 +57,8 @@ const timeConfigs: Record<TimeOfDay, TimeConfig> = {
   },
 };
 
-const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, lastEditInfo }) => {
+const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode }) => {
+  const { getLastChange } = useHistory();
   const [lastEditedText, setLastEditedText] = useState<string>('No changes yet');
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('morning');
 
@@ -84,43 +83,18 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, lastEditInfo }) 
     return () => clearInterval(interval);
   }, []);
 
-  // Fungsi untuk menghitung waktu relatif
-  const getRelativeTime = (timestamp: Date): string => {
-    const now = new Date();
-    const diffInMs = now.getTime() - timestamp.getTime();
-    const diffInMinutes = Math.floor(diffInMs / 60000);
-    const diffInHours = Math.floor(diffInMs / 3600000);
-    const diffInDays = Math.floor(diffInMs / 86400000);
-
-    if (diffInMinutes < 1) {
-      return 'Just now';
-    } else if (diffInMinutes < 60) {
-      return `${diffInMinutes} ${diffInMinutes === 1 ? 'minute' : 'minutes'} ago`;
-    } else if (diffInHours < 24) {
-      return `${diffInHours} ${diffInHours === 1 ? 'hour' : 'hours'} ago`;
-    } else if (diffInDays < 7) {
-      return `${diffInDays} ${diffInDays === 1 ? 'day' : 'days'} ago`;
-    } else {
-      // Format tanggal lengkap jika lebih dari 7 hari
-      return timestamp.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    }
-  };
-
   // Update teks setiap menit untuk memperbarui waktu relatif
   useEffect(() => {
     const updateLastEditedText = () => {
-      if (!lastEditInfo?.timestamp) {
+      const lastChange = getLastChange();
+
+      if (!lastChange) {
         setLastEditedText('No changes yet');
         return;
       }
 
-      const relativeTime = getRelativeTime(lastEditInfo.timestamp);
-      const userPrefix = lastEditInfo.userName ? `by ${lastEditInfo.userName} ` : '';
-      setLastEditedText(`Last edited ${userPrefix}${relativeTime}`);
+      const timeAgo = getTimeAgo(lastChange.timestamp);
+      setLastEditedText(`Changed ${timeAgo}`);
     };
 
     // Update immediately
@@ -130,7 +104,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, lastEditInfo }) 
     const interval = setInterval(updateLastEditedText, 60000);
 
     return () => clearInterval(interval);
-  }, [lastEditInfo]);
+  }, [getLastChange]);
 
   const config = timeConfigs[timeOfDay];
 
