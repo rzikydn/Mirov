@@ -20,7 +20,7 @@ export default function DashboardPage() {
   const { darkMode, toggleDarkMode } = useDarkMode();
 
   // 🧩 Ambil data user dari localStorage
-  const [user, setUser] = useState<{ username?: string; email?: string } | null>(null);
+  const [user, setUser] = useState<{ name: string; email: string; role: 'SUPERUSER' | 'ADMIN' | 'UMUM' } | null>(null);
 
   // ✅ Cek login state
   useEffect(() => {
@@ -157,6 +157,7 @@ export default function DashboardPage() {
         setIsOpen={setSidebarOpen}
         darkMode={darkMode}
         toggleDarkMode={toggleDarkMode}
+        user={user}
       />
 
       <div className="flex-1 flex flex-col min-w-0">

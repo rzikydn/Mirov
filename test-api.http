@@ -1,0 +1,71 @@
+### Register SUPERUSER
+POST https://mirov-production.up.railway.app/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "superusermirov",
+  "password": "superuser123",
+  "name": "Super User"
+}
+
+###
+
+### Register ADMIN
+POST https://mirov-production.up.railway.app/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "adminmirov",
+  "password": "admin123",
+  "name": "Admin User"
+}
+
+###
+
+### Register UMUM
+POST https://mirov-production.up.railway.app/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "usermirov",
+  "password": "user123",
+  "name": "User Umum"
+}
+
+###
+
+### Login as SUPERUSER
+POST https://mirov-production.up.railway.app/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "superusermirov",
+  "password": "superuser123"
+}
+
+###
+
+### Login as ADMIN
+POST https://mirov-production.up.railway.app/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "adminmirov",
+  "password": "admin123"
+}
+
+###
+
+### Login as UMUM
+POST https://mirov-production.up.railway.app/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "usermirov",
+  "password": "user123"
+}
+
+###
+
+### Health Check
+GET https://mirov-production.up.railway.app/health

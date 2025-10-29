@@ -10,6 +10,7 @@ import {
   Trash2,
   Moon,
   Sun,
+  User,
 } from 'lucide-react';
 import { Database } from '../../types/database';
 import { menuItems } from '../../constants/dashboard';
@@ -29,6 +30,7 @@ interface SidebarProps {
   setIsOpen: (v: boolean) => void;
   darkMode: boolean;
   toggleDarkMode: () => void;
+  user?: { name: string; email: string; role: 'SUPERUSER' | 'ADMIN' | 'UMUM' } | null;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -44,6 +46,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   setIsOpen,
   darkMode,
   toggleDarkMode,
+  user,
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteDbId, setDeleteDbId] = useState<string | null>(null);
@@ -186,6 +189,33 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
 
               <div className={`border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} pt-3 space-y-2`}>
+                {/* User Profile Display */}
+                {user && (
+                  <div className={`px-3 py-3 mb-2 rounded-lg ${
+                    darkMode ? 'bg-gray-700/50' : 'bg-gray-100'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        darkMode ? 'bg-blue-600' : 'bg-blue-500'
+                      }`}>
+                        <User className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold truncate ${
+                          darkMode ? 'text-white' : 'text-gray-900'
+                        }`}>
+                          {user.name}
+                        </p>
+                        <p className={`text-xs truncate ${
+                          darkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>
+                          {user.role === 'SUPERUSER' ? 'Super User' : user.role === 'ADMIN' ? 'Admin' : 'User Umum'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Dark Mode Toggle */}
                 <button
                   onClick={toggleDarkMode}
