@@ -209,7 +209,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         <p className={`text-xs truncate ${
                           darkMode ? 'text-gray-400' : 'text-gray-600'
                         }`}>
-                          {user.role === 'SUPERUSER' ? 'Super User' : user.role === 'ADMIN' ? 'Admin' : 'User Umum'}
+                          {user.role === 'SUPERUSER' ? 'Superuser' : user.role === 'ADMIN' ? 'Administrator' : 'Pengguna Umum'}
                         </p>
                       </div>
                     </div>
