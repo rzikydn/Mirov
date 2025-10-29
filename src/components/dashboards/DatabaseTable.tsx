@@ -519,7 +519,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         if (response.ok) {
           // Add to history
           if (user) {
-            addHistory({
+            await addHistory({
               userName: user.name,
               userRole: user.role,
               action: 'edit',

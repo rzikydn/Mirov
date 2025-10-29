@@ -104,7 +104,7 @@ export default function DashboardPage() {
         if (result.success && result.data) {
           // Add to history
           if (user) {
-            addHistory({
+            await addHistory({
               userName: user.name,
               userRole: user.role,
               action: 'create',
@@ -141,7 +141,7 @@ export default function DashboardPage() {
       if (response.ok) {
         // Add to history
         if (user && dbToDelete) {
-          addHistory({
+          await addHistory({
             userName: user.name,
             userRole: user.role,
             action: 'delete',

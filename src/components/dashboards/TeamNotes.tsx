@@ -102,7 +102,7 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       if (data.success && data.data) {
         // Add to history
         if (user) {
-          addHistory({
+          await addHistory({
             userName: user.name,
             userRole: user.role,
             action: 'create',
@@ -144,7 +144,7 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       if (data.success) {
         // Add to history
         if (user) {
-          addHistory({
+          await addHistory({
             userName: user.name,
             userRole: user.role,
             action: 'edit',
@@ -173,7 +173,7 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       if (res.ok) {
         // Add to history
         if (user) {
-          addHistory({
+          await addHistory({
             userName: user.name,
             userRole: user.role,
             action: 'delete',
