@@ -28,6 +28,7 @@ model User {
   schedules Schedule[]
   notes     Note[]
   databases Database[]
+  history   History[]
 
   @@map("users")
 }
@@ -78,4 +79,33 @@ model Database {
   creator     User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@map("databases")
+}
+
+enum HistoryAction {
+  CREATE
+  EDIT
+  DELETE
+}
+
+enum HistoryTarget {
+  NOTE
+  DATABASE
+  SCHEDULE
+}
+
+model History {
+  id          Int            @id @default(autoincrement())
+  userId      Int
+  userName    String
+  userRole    Role
+  action      HistoryAction
+  target      HistoryTarget
+  targetName  String?
+  description String
+  createdAt   DateTime       @default(now())
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("history")
+  @@index([createdAt(sort: Desc)])
 }

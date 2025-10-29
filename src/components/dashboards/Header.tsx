@@ -93,7 +93,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode }) => {
         return;
       }
 
-      const timeAgo = getTimeAgo(lastChange.timestamp);
+      const timeAgo = getTimeAgo(lastChange.createdAt);
       setLastEditedText(`Changed ${timeAgo}`);
     };
 

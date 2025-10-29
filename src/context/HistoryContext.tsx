@@ -1,21 +1,24 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
+const API_URL = `${import.meta.env.VITE_API_URL}/api/history`;
+
 export interface HistoryEntry {
-  id: string;
+  id: number;
   userName: string;
   userRole: 'SUPERUSER' | 'ADMIN' | 'UMUM';
   action: 'create' | 'edit' | 'delete';
   target: 'note' | 'database' | 'schedule';
   targetName?: string;
-  timestamp: Date;
+  createdAt: Date;
   description: string;
+  userId: number;
 }
 
 interface HistoryContextType {
   history: HistoryEntry[];
-  addHistory: (entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => void;
+  addHistory: (entry: Omit<HistoryEntry, 'id' | 'createdAt' | 'userId'>) => Promise<void>;
   getLastChange: () => HistoryEntry | null;
-  clearHistory: () => void;
+  refreshHistory: () => Promise<void>;
 }
 
 const HistoryContext = createContext<HistoryContextType | undefined>(undefined);
@@ -23,48 +26,70 @@ const HistoryContext = createContext<HistoryContextType | undefined>(undefined);
 export const HistoryProvider = ({ children }: { children: ReactNode }) => {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  // Load history from localStorage on mount
-  useEffect(() => {
-    const savedHistory = localStorage.getItem('appHistory');
-    if (savedHistory) {
-      try {
-        const parsed = JSON.parse(savedHistory);
-        // Convert timestamp strings back to Date objects
-        const historyWithDates = parsed.map((entry: any) => ({
-          ...entry,
-          timestamp: new Date(entry.timestamp)
-        }));
-        setHistory(historyWithDates);
-      } catch (error) {
-        console.error('Error loading history:', error);
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` })
+    };
+  };
+
+  // Fetch history from backend
+  const refreshHistory = async () => {
+    try {
+      const response = await fetch(API_URL, {
+        headers: getAuthHeaders()
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          const historyWithDates = data.data.map((entry: any) => ({
+            ...entry,
+            createdAt: new Date(entry.createdAt)
+          }));
+          setHistory(historyWithDates);
+        }
       }
+    } catch (error) {
+      console.error('Error fetching history:', error);
     }
+  };
+
+  // Load history on mount
+  useEffect(() => {
+    refreshHistory();
   }, []);
 
-  // Save history to localStorage whenever it changes
-  useEffect(() => {
-    if (history.length > 0) {
-      localStorage.setItem('appHistory', JSON.stringify(history));
+  const addHistory = async (entry: Omit<HistoryEntry, 'id' | 'createdAt' | 'userId'>) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          userId: user.id,
+          userName: entry.userName,
+          userRole: entry.userRole,
+          action: entry.action.toUpperCase(), // Convert to enum format (CREATE, EDIT, DELETE)
+          target: entry.target.toUpperCase(), // Convert to enum format (NOTE, DATABASE, SCHEDULE)
+          targetName: entry.targetName,
+          description: entry.description
+        })
+      });
+
+      if (response.ok) {
+        // Refresh history to get latest
+        await refreshHistory();
+      }
+    } catch (error) {
+      console.error('Error adding history:', error);
     }
-  }, [history]);
-
-  const addHistory = (entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
-    const newEntry: HistoryEntry = {
-      ...entry,
-      id: `history-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date()
-    };
-
-    setHistory(prev => [newEntry, ...prev].slice(0, 50)); // Keep last 50 entries
   };
 
   const getLastChange = (): HistoryEntry | null => {
     return history.length > 0 ? history[0] : null;
-  };
-
-  const clearHistory = () => {
-    setHistory([]);
-    localStorage.removeItem('appHistory');
   };
 
   return (
@@ -73,7 +98,7 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
         history,
         addHistory,
         getLastChange,
-        clearHistory
+        refreshHistory
       }}
     >
       {children}
