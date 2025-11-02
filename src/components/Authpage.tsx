@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -17,9 +17,9 @@ interface FormErrors {
 export default function AuthPage() {
   const { setUser, setToken } = useAuth();
   const navigate = useNavigate();
-  
+
   const [showPassword, setShowPassword] = useState(false);
-  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: ''
@@ -27,6 +27,21 @@ export default function AuthPage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Load saved credentials on mount
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    const savedPassword = localStorage.getItem('rememberedPassword');
+    const wasRemembered = localStorage.getItem('rememberMe') === 'true';
+
+    if (wasRemembered && savedEmail && savedPassword) {
+      setFormData({
+        email: savedEmail,
+        password: savedPassword
+      });
+      setRememberMe(true);
+    }
+  }, []);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -81,6 +96,19 @@ export default function AuthPage() {
 
       localStorage.setItem("token", tokenData);
       localStorage.setItem("user", JSON.stringify(userData));
+
+      // Handle Remember Me
+      if (rememberMe) {
+        localStorage.setItem('rememberedEmail', formData.email);
+        localStorage.setItem('rememberedPassword', formData.password);
+        localStorage.setItem('rememberMe', 'true');
+        console.log('💾 Credentials saved for next login');
+      } else {
+        localStorage.removeItem('rememberedEmail');
+        localStorage.removeItem('rememberedPassword');
+        localStorage.removeItem('rememberMe');
+        console.log('🗑️ Credentials cleared');
+      }
 
       console.log('✅ Login successful, user data:', userData);
       console.log('✅ Token saved:', tokenData ? 'Yes' : 'No');
@@ -194,22 +222,19 @@ export default function AuthPage() {
               )}
             </div>
 
-            {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between">
+            {/* Remember Me */}
+            <div className="flex items-center">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={agreeTerms}
-                  onChange={(e) => setAgreeTerms(e.target.checked)}
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-600">
                   Remember me
                 </span>
               </label>
-              <a href="#" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                Forgot password?
-              </a>
             </div>
 
             {/* Error/Success Message */}
