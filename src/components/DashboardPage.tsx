@@ -188,7 +188,7 @@ export default function DashboardPage() {
       />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <Header onMenuClick={() => setSidebarOpen(true)} darkMode={darkMode} />
+        <Header onMenuClick={() => setSidebarOpen(true)} darkMode={darkMode} user={user} />
 
         <main className={`flex-1 relative overflow-hidden ${darkMode ? 'bg-gray-900' : 'bg-slate-100'}`}>
           <AnimatePresence mode="wait">

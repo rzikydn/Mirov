@@ -9,6 +9,7 @@ import { getTimeAgo } from '../../utils/timeAgo';
 interface HeaderProps {
   onMenuClick: () => void;
   darkMode: boolean;
+  user?: { name: string; email: string; role: 'SUPERUSER' | 'ADMIN' | 'UMUM' } | null;
 }
 
 type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
@@ -57,7 +58,7 @@ const timeConfigs: Record<TimeOfDay, TimeConfig> = {
   },
 };
 
-const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode }) => {
+const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, user }) => {
   const { getLastChange, history } = useHistory();
   const [lastEditedText, setLastEditedText] = useState<string>('No changes yet');
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('morning');
@@ -328,14 +329,17 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode }) => {
             >
               {config.greeting}, Team!
             </motion.h1>
-            <p
-              className="text-xs sm:text-sm text-white/90 mt-0.5"
-              style={{
-                textShadow: '0 1px 5px rgba(0,0,0,0.3)',
-              }}
-            >
-              {lastEditedText}
-            </p>
+            {/* Only show last edited for ADMIN and SUPERUSER */}
+            {user && user.role !== 'UMUM' && (
+              <p
+                className="text-xs sm:text-sm text-white/90 mt-0.5"
+                style={{
+                  textShadow: '0 1px 5px rgba(0,0,0,0.3)',
+                }}
+              >
+                {lastEditedText}
+              </p>
+            )}
           </div>
         </div>
       </div>
