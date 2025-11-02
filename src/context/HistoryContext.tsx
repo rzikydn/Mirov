@@ -124,6 +124,8 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
   const deleteHistory = async (id: number): Promise<boolean> => {
     try {
       console.log('🗑️ Deleting history entry:', id);
+      console.log('🔐 Using token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+      console.log('👤 Current user:', JSON.parse(localStorage.getItem('user') || '{}'));
 
       const response = await fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
@@ -131,6 +133,7 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
       });
 
       console.log('📡 Delete history API response status:', response.status);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (response.ok) {
         console.log('✅ History deleted successfully');
@@ -139,11 +142,14 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
         return true;
       } else {
         const errorData = await response.json();
-        console.error('❌ Failed to delete history:', errorData);
+        console.error('❌ Failed to delete history:');
+        console.error('   Status:', response.status);
+        console.error('   Error data:', errorData);
+        console.error('   Message:', errorData.message || 'Unknown error');
         return false;
       }
     } catch (error) {
-      console.error('❌ Error deleting history:', error);
+      console.error('❌ Error deleting history (exception):', error);
       return false;
     }
   };

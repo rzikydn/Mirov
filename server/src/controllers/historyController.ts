@@ -124,8 +124,16 @@ export const deleteHistory = async (req: Request, res: Response): Promise<void> 
     const { id } = req.params;
     const user = (req as any).user; // From auth middleware
 
+    console.log('🔍 Delete history request:');
+    console.log('   Entry ID:', id);
+    console.log('   User from token:', user);
+    console.log('   User role:', user?.role);
+    console.log('   Role type:', typeof user?.role);
+    console.log('   Is SUPERUSER?:', user?.role === 'SUPERUSER');
+
     // Check if user is SUPERUSER
     if (!user || user.role !== 'SUPERUSER') {
+      console.log('❌ Authorization failed - User role:', user?.role);
       res.status(403).json({
         success: false,
         message: 'Only SUPERUSER can delete history entries'
