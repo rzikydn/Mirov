@@ -6,6 +6,7 @@ import { Edit3, Trash2, Star, Plus, Search } from 'lucide-react';
 import { Note } from '../../types/database';
 import { useAuth } from '../../context/AuthContext';
 import { useHistory } from '../../context/HistoryContext';
+import DeleteModal from './modals/DeleteModal';
 
 interface TeamNotesProps {
   darkMode: boolean;
@@ -201,6 +202,8 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
   const [newNoteText, setNewNoteText] = useState('');
   const [selectedColor, setSelectedColor] = useState(noteColors[0]);
   const [editingNote, setEditingNote] = useState<ColoredNote | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [noteToDelete, setNoteToDelete] = useState<{ id: number; text: string } | null>(null);
 
   const addNote = () => {
     if (!newNoteText.trim()) return;
@@ -224,11 +227,25 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
     setSelectedColor(noteColors[0]);
   };
 
-  const deleteNote = (id: number) => {
-    const confirmed = window.confirm('Delete this note?');
-    if (!confirmed) return;
+  const handleDeleteClick = (note: ColoredNote) => {
+    setNoteToDelete({
+      id: note.id,
+      text: (note.content || note.text || '').substring(0, 50) + ((note.content || note.text || '').length > 50 ? '...' : '')
+    });
+    setShowDeleteConfirm(true);
+  };
 
-    removeNote(id);
+  const confirmDelete = () => {
+    if (!noteToDelete) return;
+
+    setShowDeleteConfirm(false);
+    removeNote(noteToDelete.id);
+    setNoteToDelete(null);
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setNoteToDelete(null);
   };
 
   const toggleFavorite = (note: ColoredNote) => {
@@ -381,7 +398,7 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
               {/* Delete Button - Top Left on Hover - Only for ADMIN/SUPERUSER */}
               {canEdit && (
                 <button
-                  onClick={() => deleteNote(note.id)}
+                  onClick={() => handleDeleteClick(note)}
                   className="absolute top-4 left-4 w-10 h-10 rounded-full bg-red-500/90 hover:bg-red-600 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
                 >
                   <Trash2 className="w-4 h-4 text-white" />
@@ -477,6 +494,16 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
           </motion.div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteModal
+        show={showDeleteConfirm}
+        darkMode={darkMode}
+        title="Delete Note"
+        message={`Are you sure you want to delete this note?\n\n"${noteToDelete?.text || ''}"\n\nThis action cannot be undone.`}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </motion.div>
   );
 };

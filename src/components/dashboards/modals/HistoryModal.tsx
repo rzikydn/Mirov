@@ -4,6 +4,7 @@ import { X, Clock, FileText, Database as DatabaseIcon, Calendar, Trash2 } from '
 import { HistoryEntry, useHistory } from '../../../context/HistoryContext';
 import { getTimeAgo } from '../../../utils/timeAgo';
 import { useAuth } from '../../../context/AuthContext';
+import DeleteModal from './DeleteModal';
 
 interface HistoryModalProps {
   show: boolean;
@@ -16,28 +17,41 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
   const { deleteHistory } = useHistory();
   const { user } = useAuth();
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [entryToDelete, setEntryToDelete] = useState<{ id: number; name: string } | null>(null);
 
   // Check if user is SUPERUSER
   const isSuperUser = user?.role === 'SUPERUSER';
 
   if (!show) return null;
 
-  const handleDelete = async (id: number, entryName: string) => {
+  const handleDeleteClick = (id: number, entryName: string) => {
     if (!isSuperUser) {
       alert('Only SUPERUSER can delete history entries');
       return;
     }
 
-    const confirmed = window.confirm(`Are you sure you want to delete this history entry?\n\n"${entryName}"`);
-    if (!confirmed) return;
+    setEntryToDelete({ id, name: entryName });
+    setShowDeleteConfirm(true);
+  };
 
-    setDeletingId(id);
-    const success = await deleteHistory(id);
+  const confirmDelete = async () => {
+    if (!entryToDelete) return;
+
+    setShowDeleteConfirm(false);
+    setDeletingId(entryToDelete.id);
+    const success = await deleteHistory(entryToDelete.id);
     setDeletingId(null);
+    setEntryToDelete(null);
 
     if (!success) {
       alert('Failed to delete history entry. Please try again.');
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setEntryToDelete(null);
   };
 
   const getIcon = (target: 'note' | 'database' | 'schedule') => {
@@ -170,7 +184,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
                     {/* Delete button - Only for SUPERUSER */}
                     {isSuperUser && (
                       <button
-                        onClick={() => handleDelete(entry.id, entry.description)}
+                        onClick={() => handleDeleteClick(entry.id, entry.description)}
                         disabled={deletingId === entry.id}
                         className={`opacity-0 group-hover:opacity-100 p-2 rounded transition-all ${
                           darkMode
@@ -203,6 +217,16 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
           </button>
         </div>
       </motion.div>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteModal
+        show={showDeleteConfirm}
+        darkMode={darkMode}
+        title="Delete History Entry"
+        message={`Are you sure you want to delete this history entry?\n\n"${entryToDelete?.name || ''}"\n\nThis action cannot be undone.`}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </div>
   );
 };
