@@ -47,6 +47,8 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
         if (data.success && Array.isArray(data.data)) {
           const historyWithDates = data.data.map((entry: any) => ({
             ...entry,
+            action: entry.action.toLowerCase(), // Convert to lowercase
+            target: entry.target.toLowerCase(), // Convert to lowercase
             createdAt: new Date(entry.createdAt)
           }));
           setHistory(historyWithDates);

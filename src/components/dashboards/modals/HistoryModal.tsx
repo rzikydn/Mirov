@@ -36,6 +36,29 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
     }
   };
 
+  const getActionBadgeClasses = (action: 'create' | 'edit' | 'delete') => {
+    const baseClasses = 'inline-flex px-2 py-0.5 rounded-full text-xs font-semibold';
+    switch (action) {
+      case 'create':
+        return `${baseClasses} ${darkMode ? 'bg-green-900/50 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-200'}`;
+      case 'edit':
+        return `${baseClasses} ${darkMode ? 'bg-blue-900/50 text-blue-300 border border-blue-700' : 'bg-blue-100 text-blue-700 border border-blue-200'}`;
+      case 'delete':
+        return `${baseClasses} ${darkMode ? 'bg-red-900/50 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-200'}`;
+    }
+  };
+
+  const getActionText = (action: 'create' | 'edit' | 'delete') => {
+    switch (action) {
+      case 'create':
+        return 'Added';
+      case 'edit':
+        return 'Changed';
+      case 'delete':
+        return 'Deleted';
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <motion.div
@@ -93,21 +116,21 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
                       {getIcon(entry.target)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                           {entry.userName}
                         </span>
-                        {' '}
-                        <span className={getActionColor(entry.action)}>
-                          {entry.action === 'create' ? 'added' : entry.action === 'edit' ? 'changed' : 'deleted'}
+                        <span className={getActionBadgeClasses(entry.action)}>
+                          {getActionText(entry.action)}
                         </span>
-                        {' '}
-                        <span>
-                          {entry.target === 'note' ? 'note' : entry.target === 'database' ? 'database' : 'schedule'}
+                      </div>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <span className="capitalize">
+                          {entry.target === 'note' ? 'Note' : entry.target === 'database' ? 'Database' : 'Schedule'}
                         </span>
                         {entry.targetName && (
                           <>
-                            {' '}
+                            {' - '}
                             <span className={`font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
                               "{entry.targetName}"
                             </span>
