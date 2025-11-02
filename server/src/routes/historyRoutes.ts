@@ -4,7 +4,8 @@ import {
   getAllHistory,
   createHistory,
   getLastChange,
-  clearOldHistory
+  clearOldHistory,
+  deleteHistory
 } from '../controllers/historyController';
 
 const router = express.Router();
@@ -14,6 +15,9 @@ router.get('/last', authenticate, getLastChange);
 
 // DELETE /api/history/clear - Clear old history
 router.delete('/clear', authenticate, clearOldHistory);
+
+// DELETE /api/history/:id - Delete single history entry (SUPERUSER only)
+router.delete('/:id', authenticate, deleteHistory);
 
 // GET /api/history - Get all history
 router.get('/', authenticate, getAllHistory);

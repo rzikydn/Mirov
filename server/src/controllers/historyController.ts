@@ -118,6 +118,52 @@ export const getLastChange = async (_req: Request, res: Response): Promise<void>
   }
 };
 
+// Delete single history entry (SUPERUSER only)
+export const deleteHistory = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const user = (req as any).user; // From auth middleware
+
+    // Check if user is SUPERUSER
+    if (!user || user.role !== 'SUPERUSER') {
+      res.status(403).json({
+        success: false,
+        message: 'Only SUPERUSER can delete history entries'
+      });
+      return;
+    }
+
+    // Check if history entry exists
+    const historyEntry = await prisma.history.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!historyEntry) {
+      res.status(404).json({
+        success: false,
+        message: 'History entry not found'
+      });
+      return;
+    }
+
+    // Delete the history entry
+    await prisma.history.delete({
+      where: { id: parseInt(id) }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'History entry deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete history entry'
+    });
+  }
+};
+
 // Clear old history (keep last N entries)
 export const clearOldHistory = async (req: Request, res: Response): Promise<void> => {
   try {

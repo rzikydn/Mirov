@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, FileText, Database as DatabaseIcon, Calendar } from 'lucide-react';
-import { HistoryEntry } from '../../../context/HistoryContext';
+import { X, Clock, FileText, Database as DatabaseIcon, Calendar, Trash2 } from 'lucide-react';
+import { HistoryEntry, useHistory } from '../../../context/HistoryContext';
 import { getTimeAgo } from '../../../utils/timeAgo';
+import { useAuth } from '../../../context/AuthContext';
 
 interface HistoryModalProps {
   show: boolean;
@@ -12,7 +13,32 @@ interface HistoryModalProps {
 }
 
 const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, onClose }) => {
+  const { deleteHistory } = useHistory();
+  const { user } = useAuth();
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  // Check if user is SUPERUSER
+  const isSuperUser = user?.role === 'SUPERUSER';
+
   if (!show) return null;
+
+  const handleDelete = async (id: number, entryName: string) => {
+    if (!isSuperUser) {
+      alert('Only SUPERUSER can delete history entries');
+      return;
+    }
+
+    const confirmed = window.confirm(`Are you sure you want to delete this history entry?\n\n"${entryName}"`);
+    if (!confirmed) return;
+
+    setDeletingId(id);
+    const success = await deleteHistory(id);
+    setDeletingId(null);
+
+    if (!success) {
+      alert('Failed to delete history entry. Please try again.');
+    }
+  };
 
   const getIcon = (target: 'note' | 'database' | 'schedule') => {
     switch (target) {
@@ -103,11 +129,11 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
                   key={entry.id}
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`p-4 rounded-lg border ${
+                  className={`group relative p-4 rounded-lg border ${
                     darkMode
                       ? 'bg-gray-800/50 border-gray-700'
                       : 'bg-gray-50 border-gray-200'
-                  }`}
+                  } ${deletingId === entry.id ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                   <div className="flex items-start gap-3">
                     <div className={`p-2 rounded-lg ${
@@ -141,6 +167,21 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
                         {getTimeAgo(entry.createdAt)}
                       </p>
                     </div>
+                    {/* Delete button - Only for SUPERUSER */}
+                    {isSuperUser && (
+                      <button
+                        onClick={() => handleDelete(entry.id, entry.description)}
+                        disabled={deletingId === entry.id}
+                        className={`opacity-0 group-hover:opacity-100 p-2 rounded transition-all ${
+                          darkMode
+                            ? 'hover:bg-red-900/50 text-red-400 hover:text-red-300'
+                            : 'hover:bg-red-50 text-red-600 hover:text-red-700'
+                        } ${deletingId === entry.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title="Delete history entry (SUPERUSER only)"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               ))}

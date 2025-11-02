@@ -17,6 +17,7 @@ export interface HistoryEntry {
 interface HistoryContextType {
   history: HistoryEntry[];
   addHistory: (entry: Omit<HistoryEntry, 'id' | 'createdAt' | 'userId'>) => Promise<void>;
+  deleteHistory: (id: number) => Promise<boolean>;
   getLastChange: () => HistoryEntry | null;
   refreshHistory: () => Promise<void>;
 }
@@ -120,6 +121,33 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const deleteHistory = async (id: number): Promise<boolean> => {
+    try {
+      console.log('🗑️ Deleting history entry:', id);
+
+      const response = await fetch(`${API_URL}/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+
+      console.log('📡 Delete history API response status:', response.status);
+
+      if (response.ok) {
+        console.log('✅ History deleted successfully');
+        // Refresh history to get latest
+        await refreshHistory();
+        return true;
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Failed to delete history:', errorData);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error deleting history:', error);
+      return false;
+    }
+  };
+
   const getLastChange = (): HistoryEntry | null => {
     return history.length > 0 ? history[0] : null;
   };
@@ -129,6 +157,7 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
       value={{
         history,
         addHistory,
+        deleteHistory,
         getLastChange,
         refreshHistory
       }}
