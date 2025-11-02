@@ -56,9 +56,17 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Load history on mount
+  // Load history on mount and set up polling for real-time updates
   useEffect(() => {
+    // Initial fetch
     refreshHistory();
+
+    // Poll for updates every 5 seconds for real-time sync
+    const pollInterval = setInterval(() => {
+      refreshHistory();
+    }, 5000); // 5 seconds
+
+    return () => clearInterval(pollInterval);
   }, []);
 
   const addHistory = async (entry: Omit<HistoryEntry, 'id' | 'createdAt' | 'userId'>) => {

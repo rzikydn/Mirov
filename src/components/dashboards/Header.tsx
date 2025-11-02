@@ -58,7 +58,7 @@ const timeConfigs: Record<TimeOfDay, TimeConfig> = {
 };
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode }) => {
-  const { getLastChange } = useHistory();
+  const { getLastChange, history } = useHistory();
   const [lastEditedText, setLastEditedText] = useState<string>('No changes yet');
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('morning');
 
@@ -83,7 +83,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode }) => {
     return () => clearInterval(interval);
   }, []);
 
-  // Update teks setiap menit untuk memperbarui waktu relatif
+  // Update teks setiap kali history berubah atau setiap menit untuk memperbarui waktu relatif
   useEffect(() => {
     const updateLastEditedText = () => {
       const lastChange = getLastChange();
@@ -100,11 +100,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode }) => {
     // Update immediately
     updateLastEditedText();
 
-    // Update every minute
+    // Update every minute for relative time
     const interval = setInterval(updateLastEditedText, 60000);
 
     return () => clearInterval(interval);
-  }, [getLastChange]);
+  }, [getLastChange, history]); // Added history dependency to trigger on history changes
 
   const config = timeConfigs[timeOfDay];
 
