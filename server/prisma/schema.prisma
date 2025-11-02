@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,25 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  SUPERUSER
-  ADMIN
-  UMUM
-}
-
 model User {
-  id        Int       @id @default(autoincrement())
-  email     String    @unique
+  id        Int        @id @default(autoincrement())
+  email     String     @unique
   password  String
   name      String
-  role      Role      @default(UMUM)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  schedules Schedule[]
-  notes     Note[]
+  role      Role       @default(UMUM)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   databases Database[]
   history   History[]
+  notes     Note[]
+  schedules Schedule[]
 
   @@map("users")
 }
@@ -44,7 +34,6 @@ model Schedule {
   createdBy   Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   creator     User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@map("schedules")
@@ -55,11 +44,10 @@ model Note {
   title     String
   content   String
   color     String?
-  favorite  Boolean  @default(false)
   userId    Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
+  favorite  Boolean  @default(false)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notes")
@@ -70,15 +58,36 @@ model Database {
   name        String
   description String?
   icon        String?
-  columns     Json     // Array of {key, label, type}
-  rows        Json     // Array of {id, properties}
+  columns     Json
+  rows        Json
   createdBy   Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   creator     User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@map("databases")
+}
+
+model History {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  userName    String
+  userRole    Role
+  action      HistoryAction
+  target      HistoryTarget
+  targetName  String?
+  description String
+  createdAt   DateTime      @default(now())
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt(sort: Desc)])
+  @@map("history")
+}
+
+enum Role {
+  SUPERUSER
+  ADMIN
+  UMUM
 }
 
 enum HistoryAction {
@@ -91,21 +100,4 @@ enum HistoryTarget {
   NOTE
   DATABASE
   SCHEDULE
-}
-
-model History {
-  id          Int            @id @default(autoincrement())
-  userId      Int
-  userName    String
-  userRole    Role
-  action      HistoryAction
-  target      HistoryTarget
-  targetName  String?
-  description String
-  createdAt   DateTime       @default(now())
-
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("history")
-  @@index([createdAt(sort: Desc)])
 }
