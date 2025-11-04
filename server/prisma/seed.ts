@@ -13,34 +13,84 @@ async function main() {
 
   console.log('✨ Creating users...');
 
-  // Create SUPERUSER
-  const superuser = await prisma.user.create({
+  // Create SUPERUSER (3 users)
+  const superuser1 = await prisma.user.create({
     data: {
-      email: 'superusermirov',
-      password: await bcrypt.hash('superuser123', 10),
-      name: 'Super Admin',
+      email: 'usertaufan',
+      password: await bcrypt.hash('taufan123', 10),
+      name: 'Taufan',
       role: 'SUPERUSER'
     }
   });
-  console.log('✅ Superuser created:', superuser.email);
+  console.log('✅ Superuser created:', superuser1.email);
 
-  // Create ADMIN
-  const admin = await prisma.user.create({
+  const superuser2 = await prisma.user.create({
     data: {
-      email: 'adminmirov',
-      password: await bcrypt.hash('admin123', 10),
-      name: 'Admin User',
+      email: 'userhans',
+      password: await bcrypt.hash('hans123', 10),
+      name: 'Hans',
+      role: 'SUPERUSER'
+    }
+  });
+  console.log('✅ Superuser created:', superuser2.email);
+
+  const superuser3 = await prisma.user.create({
+    data: {
+      email: 'userjelly',
+      password: await bcrypt.hash('jelly123', 10),
+      name: 'Jelly',
+      role: 'SUPERUSER'
+    }
+  });
+  console.log('✅ Superuser created:', superuser3.email);
+
+  // Create ADMIN (4 users)
+  const admin1 = await prisma.user.create({
+    data: {
+      email: 'adminagung',
+      password: await bcrypt.hash('agung123', 10),
+      name: 'Agung',
       role: 'ADMIN'
     }
   });
-  console.log('✅ Admin created:', admin.email);
+  console.log('✅ Admin created:', admin1.email);
 
-  // Create UMUM (regular user)
+  const admin2 = await prisma.user.create({
+    data: {
+      email: 'adminamin',
+      password: await bcrypt.hash('amin123', 10),
+      name: 'Amin',
+      role: 'ADMIN'
+    }
+  });
+  console.log('✅ Admin created:', admin2.email);
+
+  const admin3 = await prisma.user.create({
+    data: {
+      email: 'adminsyaiful',
+      password: await bcrypt.hash('syaiful123', 10),
+      name: 'Syaiful',
+      role: 'ADMIN'
+    }
+  });
+  console.log('✅ Admin created:', admin3.email);
+
+  const admin4 = await prisma.user.create({
+    data: {
+      email: 'admindea',
+      password: await bcrypt.hash('dea123', 10),
+      name: 'Dea',
+      role: 'ADMIN'
+    }
+  });
+  console.log('✅ Admin created:', admin4.email);
+
+  // Create UMUM (1 user)
   const umum = await prisma.user.create({
     data: {
-      email: 'usermirov',
-      password: await bcrypt.hash('user123', 10),
-      name: 'Regular User',
+      email: 'umumalfi',
+      password: await bcrypt.hash('alfi123', 10),
+      name: 'Alfi',
       role: 'UMUM'
     }
   });
@@ -57,7 +107,7 @@ async function main() {
       endDate: new Date('2025-01-15T11:00:00'),
       location: 'Meeting Room A',
       status: 'planned',
-      createdBy: admin.id
+      createdBy: admin1.id
     }
   });
 
@@ -69,7 +119,7 @@ async function main() {
       endDate: new Date('2025-02-01T17:00:00'),
       location: 'Main Hall',
       status: 'planned',
-      createdBy: superuser.id
+      createdBy: superuser1.id
     }
   });
 
@@ -81,7 +131,7 @@ async function main() {
       endDate: new Date('2025-01-20T12:00:00'),
       location: 'Training Room',
       status: 'planned',
-      createdBy: admin.id
+      createdBy: admin2.id
     }
   });
 
@@ -95,7 +145,7 @@ async function main() {
       title: 'Project Ideas',
       content: 'Brainstorming ideas for upcoming projects and features',
       color: '#FEF08A',
-      userId: superuser.id
+      userId: superuser1.id
     }
   });
 
@@ -104,7 +154,7 @@ async function main() {
       title: 'Meeting Notes',
       content: 'Important points discussed in the last team meeting',
       color: '#FBCFE8',
-      userId: admin.id
+      userId: admin1.id
     }
   });
 
@@ -121,10 +171,18 @@ async function main() {
 
   console.log('\n📋 SEED DATA SUMMARY');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('👥 Users Created:');
-  console.log(`   • Superuser: ${superuser.email} / superuser123`);
-  console.log(`   • Admin: ${admin.email} / admin123`);
-  console.log(`   • User: ${umum.email} / user123`);
+  console.log('👥 Users Created (8 total):');
+  console.log('\n🔹 SUPERUSER (3 users):');
+  console.log(`   • ${superuser1.name}: ${superuser1.email} / taufan123`);
+  console.log(`   • ${superuser2.name}: ${superuser2.email} / hans123`);
+  console.log(`   • ${superuser3.name}: ${superuser3.email} / jelly123`);
+  console.log('\n🔹 ADMIN (4 users):');
+  console.log(`   • ${admin1.name}: ${admin1.email} / agung123`);
+  console.log(`   • ${admin2.name}: ${admin2.email} / amin123`);
+  console.log(`   • ${admin3.name}: ${admin3.email} / syaiful123`);
+  console.log(`   • ${admin4.name}: ${admin4.email} / dea123`);
+  console.log('\n🔹 UMUM (1 user):');
+  console.log(`   • ${umum.name}: ${umum.email} / alfi123`);
   console.log('\n📅 Schedules Created: 3');
   console.log('📝 Notes Created: 3');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
