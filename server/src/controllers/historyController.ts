@@ -131,7 +131,7 @@ export const deleteHistory = async (req: Request, res: Response): Promise<void> 
     console.log('   Role type:', typeof user?.role);
     console.log('   Is SUPERUSER?:', user?.role === 'SUPERUSER');
 
-    // Check if user is SUPERUSER
+    // Check if user is SUPERUSER only
     if (!user || user.role !== 'SUPERUSER') {
       console.log('❌ Authorization failed - User role:', user?.role);
       res.status(403).json({

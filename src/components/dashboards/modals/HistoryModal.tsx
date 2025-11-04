@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, FileText, Database as DatabaseIcon, Calendar, Trash2 } from 'lucide-react';
+import { X, Clock, FileText, Database as DatabaseIcon, Calendar, Trash2, Star } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { HistoryEntry, useHistory } from '../../../context/HistoryContext';
 import { getTimeAgo } from '../../../utils/timeAgo';
 import { useAuth } from '../../../context/AuthContext';
@@ -20,14 +21,16 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<{ id: number; name: string } | null>(null);
 
-  // Check if user is SUPERUSER
-  const isSuperUser = user?.role === 'SUPERUSER';
+  // Check if user is SUPERUSER only
+  const canDelete = user?.role === 'SUPERUSER';
 
   if (!show) return null;
 
   const handleDeleteClick = (id: number, entryName: string) => {
-    if (!isSuperUser) {
-      alert('Only SUPERUSER can delete history entries');
+    if (!canDelete) {
+      toast.error('Only SUPERUSER can delete history entries', {
+        icon: '🔒',
+      });
       return;
     }
 
@@ -40,13 +43,23 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
 
     setShowDeleteConfirm(false);
     setDeletingId(entryToDelete.id);
+
+    // Show loading toast
+    const loadingToast = toast.loading('Deleting history entry...');
+
     const success = await deleteHistory(entryToDelete.id);
     setDeletingId(null);
-    setEntryToDelete(null);
 
-    if (!success) {
-      alert('Failed to delete history entry. Please try again.');
+    // Dismiss loading toast
+    toast.dismiss(loadingToast);
+
+    if (success) {
+      toast.success('History entry deleted successfully!');
+    } else {
+      toast.error('Failed to delete history entry. Please try again.');
     }
+
+    setEntryToDelete(null);
   };
 
   const cancelDelete = () => {
@@ -54,7 +67,27 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
     setEntryToDelete(null);
   };
 
-  const getIcon = (target: 'note' | 'database' | 'schedule') => {
+  // Helper function to check if entry is a favorite action
+  const isFavoriteAction = (entry: HistoryEntry): boolean => {
+    return entry.description.includes('added note to favorites');
+  };
+
+  // Helper function to check if entry is an unfavorite action
+  const isUnfavoriteAction = (entry: HistoryEntry): boolean => {
+    return entry.description.includes('removed note from favorites');
+  };
+
+  const getIcon = (target: 'note' | 'database' | 'schedule', entry?: HistoryEntry) => {
+    // Show yellow star icon for favorite actions
+    if (entry && isFavoriteAction(entry)) {
+      return <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />;
+    }
+
+    // Show red star icon for unfavorite actions
+    if (entry && isUnfavoriteAction(entry)) {
+      return <Star className="w-4 h-4 fill-red-400 text-red-400" />;
+    }
+
     switch (target) {
       case 'note':
         return <FileText className="w-4 h-4" />;
@@ -76,8 +109,19 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
     }
   };
 
-  const getActionBadgeClasses = (action: 'create' | 'edit' | 'delete') => {
+  const getActionBadgeClasses = (action: 'create' | 'edit' | 'delete', entry?: HistoryEntry) => {
     const baseClasses = 'inline-flex px-2 py-0.5 rounded-full text-xs font-semibold';
+
+    // Special styling for favorite actions (yellow)
+    if (entry && isFavoriteAction(entry)) {
+      return `${baseClasses} ${darkMode ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-600' : 'bg-yellow-100 text-yellow-700 border border-yellow-400'}`;
+    }
+
+    // Special styling for unfavorite actions (red)
+    if (entry && isUnfavoriteAction(entry)) {
+      return `${baseClasses} ${darkMode ? 'bg-red-900/50 text-red-300 border border-red-600' : 'bg-red-100 text-red-700 border border-red-400'}`;
+    }
+
     switch (action) {
       case 'create':
         return `${baseClasses} ${darkMode ? 'bg-green-900/50 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-200'}`;
@@ -88,7 +132,17 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
     }
   };
 
-  const getActionText = (action: 'create' | 'edit' | 'delete') => {
+  const getActionText = (action: 'create' | 'edit' | 'delete', entry?: HistoryEntry) => {
+    // Special text for favorite actions
+    if (entry && isFavoriteAction(entry)) {
+      return 'Favorit';
+    }
+
+    // Special text for unfavorite actions
+    if (entry && isUnfavoriteAction(entry)) {
+      return 'Unfavorit';
+    }
+
     switch (action) {
       case 'create':
         return 'Added';
@@ -153,15 +207,15 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
                     <div className={`p-2 rounded-lg ${
                       darkMode ? 'bg-gray-700' : 'bg-white'
                     }`}>
-                      {getIcon(entry.target)}
+                      {getIcon(entry.target, entry)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                           {entry.userName}
                         </span>
-                        <span className={getActionBadgeClasses(entry.action)}>
-                          {getActionText(entry.action)}
+                        <span className={getActionBadgeClasses(entry.action, entry)}>
+                          {getActionText(entry.action, entry)}
                         </span>
                       </div>
                       <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -182,7 +236,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
                       </p>
                     </div>
                     {/* Delete button - Only for SUPERUSER */}
-                    {isSuperUser && (
+                    {canDelete && (
                       <button
                         onClick={() => handleDeleteClick(entry.id, entry.description)}
                         disabled={deletingId === entry.id}

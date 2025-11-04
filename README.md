@@ -4,13 +4,28 @@ Sistem manajemen internal yang aman dan modern untuk mengelola jadwal, catatan, 
 
 ## Features
 
+### Core Features
 - **Authentication & Authorization**: Login sistem dengan JWT dan role-based access (SUPERUSER, ADMIN, UMUM)
 - **Schedule Management**: Kelola jadwal meeting, event, dan kegiatan tim
 - **Team Notes**: Sistem catatan kolaboratif dengan warna custom
 - **Database Manager**: Kelola database internal dengan interface yang mudah
-- **History & Audit Trail**: Tracking semua aktivitas user (khusus ADMIN & SUPERUSER)
+- **History & Audit Trail**: Tracking semua aktivitas user dengan detail lengkap (khusus ADMIN & SUPERUSER)
 - **Dark Mode**: Tema gelap untuk kenyamanan mata
-- **Security**: Rate limiting, helmet security headers, password hashing dengan bcrypt
+
+### Note Features ⭐ NEW
+- **Favorite Notes**: Tandai catatan penting dengan sistem favorit (bintang kuning)
+- **Optimistic UI**: Animasi langsung tanpa loading saat toggle favorit
+- **Visual Feedback**: Animasi smooth dengan scale effect dan color transition
+- **Smart History**: History tracking otomatis untuk favorite/unfavorite actions
+
+### Security Features
+- **Rate Limiting**: Pembatasan request per IP address
+- **Helmet Security**: HTTP security headers lengkap
+- **Password Hashing**: bcrypt dengan 10 salt rounds
+- **JWT Authentication**: Token-based auth dengan expiration
+- **Role-Based Access Control (RBAC)**: Granular permissions per role
+- **SQL Injection Prevention**: Prisma ORM dengan prepared statements
+- **XSS Protection**: React auto-escaping dan CSP headers
 
 ## Tech Stack
 
@@ -158,11 +173,21 @@ Lihat [docs/KREDENSIAL-USER.md](docs/KREDENSIAL-USER.md) untuk detail lengkap.
 
 | Feature | SUPERUSER | ADMIN | UMUM |
 |---------|:---------:|:-----:|:----:|
+| **Schedules** | | | |
 | View Schedules | ✅ | ✅ | ✅ |
 | Create Schedule | ✅ | ✅ | ❌ |
 | Edit Schedule | ✅ | ✅ | ❌ |
 | Delete Schedule | ✅ | ✅ | ❌ |
+| **Notes** | | | |
+| View Notes | ✅ | ✅ | ✅ |
+| Create Note | ✅ | ✅ | ✅ |
+| Edit Note | ✅ | ✅ | ✅ (own only) |
+| Delete Note | ✅ | ✅ | ✅ (own only) |
+| **Favorite Notes ⭐** | ✅ | ✅ | ❌ |
+| **History & Audit** | | | |
 | View History | ✅ | ✅ | ❌ |
+| Delete History | ✅ | ❌ | ❌ |
+| **User Management** | | | |
 | Manage Users | ✅ | ❌ | ❌ |
 
 ## API Endpoints
@@ -181,8 +206,22 @@ Lihat [docs/KREDENSIAL-USER.md](docs/KREDENSIAL-USER.md) untuk detail lengkap.
 ### Notes
 - `GET /api/notes` - Get all notes
 - `POST /api/notes` - Create note
-- `PUT /api/notes/:id` - Update note
+- `PUT /api/notes/:id` - Update note (including favorite status)
 - `DELETE /api/notes/:id` - Delete note
+
+**Note Fields:**
+```json
+{
+  "id": 1,
+  "title": "Note Title",
+  "content": "Note content",
+  "color": "#FFD89B",
+  "favorite": true,
+  "userId": 1,
+  "createdAt": "2025-01-04T...",
+  "updatedAt": "2025-01-04T..."
+}
+```
 
 ### History
 - `GET /api/history` - Get audit trail
@@ -190,22 +229,80 @@ Lihat [docs/KREDENSIAL-USER.md](docs/KREDENSIAL-USER.md) untuk detail lengkap.
 
 Lihat [docs/API.http](docs/API.http) untuk contoh request lengkap.
 
-## Security Features
+## Security
 
-### Rate Limiting
-- **Auth endpoints**: 20 requests per 15 menit per IP
-- **General endpoints**: 100 requests per 15 menit per IP
+### Implemented Security Measures ✅
 
-### Security Headers (Helmet)
+**Rate Limiting:**
+- Auth endpoints: 20 requests per 15 minutes per IP
+- General endpoints: 100 requests per 15 minutes per IP
+- Disabled in development for testing
+
+**Security Headers (Helmet):**
 - Content Security Policy (CSP)
 - HTTP Strict Transport Security (HSTS)
 - X-Frame-Options
 - X-Content-Type-Options
 
-### Authentication
+**Authentication & Authorization:**
 - JWT with 7-day expiration
 - Password hashing dengan bcrypt (10 salt rounds)
 - Protected routes dengan middleware
+- Role-based access control (RBAC)
+
+**Database Security:**
+- Prisma ORM untuk SQL injection prevention
+- Parameterized queries
+- Password field never exposed in responses
+
+### Security Audit Results 🔒
+
+**Overall Score:** 7/10
+
+**Status:**
+- ✅ No backend dependency vulnerabilities
+- ✅ Strong password hashing
+- ✅ SQL injection protected
+- ⚠️ 7 frontend dependency vulnerabilities (needs update)
+- ⚠️ Missing CSRF protection
+- ⚠️ No input sanitization (XSS risk)
+
+**For detailed security audit report, see:** [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md)
+
+### Known Security Issues & Mitigations
+
+1. **Frontend Dependencies (7 vulnerabilities)**
+   - Status: Known issue
+   - Severity: 1 High, 4 Moderate, 2 Low
+   - Action: Run `npm audit fix` regularly
+
+2. **CSRF Protection**
+   - Status: Not implemented yet
+   - Mitigation: CORS restricted to specific origin
+   - Roadmap: Planned for v1.1.0
+
+3. **XSS Protection**
+   - Status: React auto-escaping only
+   - Mitigation: TypeScript type safety
+   - Roadmap: DOMPurify implementation planned
+
+### Security Best Practices for Developers
+
+When contributing to this project:
+
+1. **Never commit secrets** - Use .env files
+2. **Sanitize all user input** - Validate and escape
+3. **Test authentication** - Verify role permissions
+4. **Update dependencies** - Run `npm audit` regularly
+5. **Review security audit** - Read [SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md)
+
+### Reporting Security Issues
+
+If you discover a security vulnerability:
+1. **DO NOT** create a public GitHub issue
+2. Contact security team directly: security@mirov.internal
+3. Provide detailed information about the vulnerability
+4. Allow time for fix before public disclosure
 
 ## Development
 
@@ -246,6 +343,8 @@ Lihat [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) untuk panduan deploymen
 
 Dokumentasi lengkap tersedia di folder [docs/](docs/):
 - [KREDENSIAL-USER.md](docs/KREDENSIAL-USER.md) - User credentials & permissions
+- [FAVORITE-NOTES.md](docs/FAVORITE-NOTES.md) - Favorite notes feature documentation ⭐
+- [SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) - Security audit report & recommendations 🔒
 - [API.http](docs/API.http) - API testing dengan REST Client
 - [TEST-API.md](docs/TEST-API.md) - API testing guide
 - [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Common issues & solutions

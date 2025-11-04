@@ -14,9 +14,12 @@ interface TeamNotesProps {
 
 // Extended Note type with color
 interface ColoredNote extends Note {
+  content?: string; // Field dari backend API
   color: string;
   favorite?: boolean;
   date: string;
+  createdAt?: string; // Field dari backend API
+  updatedAt?: string; // Field dari backend API
 }
 
 // Pastel colors like in the image
@@ -248,19 +251,77 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
     setNoteToDelete(null);
   };
 
-  const toggleFavorite = (note: ColoredNote) => {
+  const toggleFavorite = async (note: ColoredNote) => {
+    const newFavoriteStatus = !note.favorite;
+    const noteContent = note.content || note.text || '';
+
     console.log('🌟 Toggle favorite clicked!', {
       noteId: note.id,
       currentFavorite: note.favorite,
-      newFavorite: !note.favorite,
-      noteText: note.text,
+      newFavorite: newFavoriteStatus,
+      noteContent: noteContent,
       noteColor: note.color
     });
-    editNote(note.id, {
-      text: note.text,
-      color: note.color,
-      favorite: !note.favorite
-    });
+
+    // Update state lokal terlebih dahulu untuk animasi instant
+    setNotes(prevNotes =>
+      prevNotes.map(n =>
+        n.id === note.id
+          ? { ...n, favorite: newFavoriteStatus }
+          : n
+      )
+    );
+
+    // Kemudian update ke backend
+    try {
+      const res = await fetch(`${API_URL}/${note.id}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          content: noteContent,
+          color: note.color,
+          favorite: newFavoriteStatus
+        }),
+      });
+      const data = await res.json();
+
+      console.log('✅ Toggle favorite response:', data);
+
+      if (data.success) {
+        // Add to history dengan deskripsi spesifik untuk favorit
+        if (user) {
+          const historyResult = await addHistory({
+            userName: user.name,
+            userRole: user.role,
+            action: 'edit', // Use 'edit' instead of 'favorite'/'unfavorite'
+            target: 'note',
+            targetName: noteContent.substring(0, 30) + (noteContent.length > 30 ? '...' : ''),
+            description: `${user.name} ${newFavoriteStatus ? 'added note to favorites' : 'removed note from favorites'}`
+          });
+          console.log('📝 History added:', historyResult);
+        }
+      } else {
+        // Jika gagal, kembalikan state ke semula
+        setNotes(prevNotes =>
+          prevNotes.map(n =>
+            n.id === note.id
+              ? { ...n, favorite: note.favorite }
+              : n
+          )
+        );
+        console.error('❌ Toggle favorite failed:', data);
+      }
+    } catch (err) {
+      // Jika error, kembalikan state ke semula
+      setNotes(prevNotes =>
+        prevNotes.map(n =>
+          n.id === note.id
+            ? { ...n, favorite: note.favorite }
+            : n
+        )
+      );
+      console.error("Failed to toggle favorite:", err);
+    }
   };
 
   const startEdit = (note: ColoredNote) => {
@@ -361,13 +422,13 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
                     e.stopPropagation();
                     toggleFavorite(note);
                   }}
-                  className={`absolute top-4 right-4 w-10 h-10 rounded-full bg-black/80 flex items-center justify-center transition-all ${
+                  className={`absolute top-4 right-4 w-10 h-10 rounded-full bg-black/80 flex items-center justify-center transition-all duration-300 hover:scale-110 ${
                     note.favorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                   }`}
                   title={note.favorite ? 'Remove from favorites' : 'Add to favorites'}
                 >
                   <Star
-                    className={`w-5 h-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-white'}`}
+                    className={`w-5 h-5 transition-all duration-300 ${note.favorite ? 'fill-yellow-400 text-yellow-400 scale-110' : 'text-white scale-100'}`}
                   />
                 </button>
               )}

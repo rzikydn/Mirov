@@ -16,26 +16,32 @@ const app: Application = express();
 const PORT = process.env.PORT || 5000;
 
 // Rate limiting configuration
+// Disabled in development for easier testing
+// Enabled in production for security
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // Limit each IP to 20 requests per windowMs (increased for office environment)
+  max: isDevelopment ? 99999 : 20, // Unlimited in dev, 20 in prod
   message: {
     success: false,
     message: 'Too many login attempts from this IP, please try again after 15 minutes'
   },
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => isDevelopment, // Skip rate limiting in development
 });
 
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: isDevelopment ? 99999 : 100, // Unlimited in dev, 100 in prod
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later'
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isDevelopment, // Skip rate limiting in development
 });
 
 // Middleware
