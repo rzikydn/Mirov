@@ -28,17 +28,16 @@ export default function AuthPage() {
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load saved credentials on mount
+  // Load saved email only (NOT password for security)
   useEffect(() => {
     const savedEmail = localStorage.getItem('rememberedEmail');
-    const savedPassword = localStorage.getItem('rememberedPassword');
     const wasRemembered = localStorage.getItem('rememberMe') === 'true';
 
-    if (wasRemembered && savedEmail && savedPassword) {
-      setFormData({
-        email: savedEmail,
-        password: savedPassword
-      });
+    if (wasRemembered && savedEmail) {
+      setFormData(prev => ({
+        ...prev,
+        email: savedEmail
+      }));
       setRememberMe(true);
     }
   }, []);
@@ -97,18 +96,19 @@ export default function AuthPage() {
       localStorage.setItem("token", tokenData);
       localStorage.setItem("user", JSON.stringify(userData));
 
-      // Handle Remember Me
+      // Handle Remember Me (save email only, NOT password for security)
       if (rememberMe) {
         localStorage.setItem('rememberedEmail', formData.email);
-        localStorage.setItem('rememberedPassword', formData.password);
         localStorage.setItem('rememberMe', 'true');
-        console.log('💾 Credentials saved for next login');
+        console.log('💾 Email saved for next login (password NOT saved for security)');
       } else {
         localStorage.removeItem('rememberedEmail');
-        localStorage.removeItem('rememberedPassword');
         localStorage.removeItem('rememberMe');
-        console.log('🗑️ Credentials cleared');
+        console.log('🗑️ Saved email cleared');
       }
+
+      // Clear any old password storage (security cleanup)
+      localStorage.removeItem('rememberedPassword');
 
       console.log('✅ Login successful, user data:', userData);
       console.log('✅ Token saved:', tokenData ? 'Yes' : 'No');
