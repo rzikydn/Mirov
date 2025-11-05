@@ -22,7 +22,7 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDevelopment ? 99999 : 20, // Unlimited in dev, 20 in prod
+  max: isDevelopment ? 99999 : 100, // Unlimited in dev, 100 in prod (increased from 20)
   message: {
     success: false,
     message: 'Too many login attempts from this IP, please try again after 15 minutes'
@@ -34,7 +34,7 @@ const authLimiter = rateLimit({
 
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDevelopment ? 99999 : 100, // Unlimited in dev, 100 in prod
+  max: isDevelopment ? 99999 : 500, // Unlimited in dev, 500 in prod (increased from 100)
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later'
