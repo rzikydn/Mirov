@@ -345,6 +345,8 @@ Dokumentasi lengkap tersedia di folder [docs/](docs/):
 - [KREDENSIAL-USER.md](docs/KREDENSIAL-USER.md) - User credentials & permissions
 - [FAVORITE-NOTES.md](docs/FAVORITE-NOTES.md) - Favorite notes feature documentation ⭐
 - [SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) - Security audit report & recommendations 🔒
+- [PRODUCTION-DATABASE-SETUP.md](docs/PRODUCTION-DATABASE-SETUP.md) - Panduan setup database production 🚀
+- [RAILWAY-SQL-UPDATE.sql](docs/RAILWAY-SQL-UPDATE.sql) - SQL untuk update user di Railway 🔧
 - [API.http](docs/API.http) - API testing dengan REST Client
 - [TEST-API.md](docs/TEST-API.md) - API testing guide
 - [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Common issues & solutions

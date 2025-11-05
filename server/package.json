@@ -14,7 +14,8 @@
     "prisma:push": "prisma db push",
     "prisma:seed": "ts-node prisma/seed.ts",
     "db:reset": "prisma migrate reset",
-    "db:setup": "npm run prisma:migrate && npm run prisma:seed"
+    "db:setup": "npm run prisma:migrate && npm run prisma:seed",
+    "update-users": "ts-node scripts/update-production-users.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
