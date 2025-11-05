@@ -12,12 +12,6 @@ Sistem manajemen internal yang aman dan modern untuk mengelola jadwal, catatan, 
 - **History & Audit Trail**: Tracking semua aktivitas user dengan detail lengkap (khusus ADMIN & SUPERUSER)
 - **Dark Mode**: Tema gelap untuk kenyamanan mata
 
-### Note Features ⭐ NEW
-- **Favorite Notes**: Tandai catatan penting dengan sistem favorit (bintang kuning)
-- **Optimistic UI**: Animasi langsung tanpa loading saat toggle favorit
-- **Visual Feedback**: Animasi smooth dengan scale effect dan color transition
-- **Smart History**: History tracking otomatis untuk favorite/unfavorite actions
-
 ### Security Features
 - **Rate Limiting**: Pembatasan request per IP address
 - **Helmet Security**: HTTP security headers lengkap
