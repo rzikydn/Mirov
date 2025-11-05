@@ -69,16 +69,16 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Apply general rate limiting to all routes
-app.use(generalLimiter);
-
 // Routes
-// Apply strict rate limiting to auth routes
+// Apply strict rate limiting ONLY to auth routes (login, register, etc.)
+// Authenticated routes (notes, schedules, etc.) are NOT rate limited
 app.use('/api/auth', authLimiter, authRoutes);
+
+// Authenticated routes - NO rate limiting for better UX
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/databases', databaseRoutes);
-app.use('/api/setup', setupRoutes);
+app.use('/api/setup', generalLimiter, setupRoutes); // Setup gets general limit for safety
 app.use('/api/history', historyRoutes);
 
 // Health check
