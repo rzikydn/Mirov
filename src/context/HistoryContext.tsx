@@ -44,7 +44,6 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('📊 History fetched:', data);
         if (data.success && Array.isArray(data.data)) {
           const historyWithDates = data.data.map((entry: any) => ({
             ...entry,
@@ -53,7 +52,6 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
             createdAt: new Date(entry.createdAt)
           }));
           setHistory(historyWithDates);
-          console.log('✅ History updated, total entries:', historyWithDates.length);
         }
       } else {
         const errorData = await response.json();
@@ -64,32 +62,15 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Load history on mount and set up polling for real-time updates
+  // Load history on mount only (no auto-polling to prevent infinite loops)
   useEffect(() => {
     // Initial fetch
     refreshHistory();
-
-    // Poll for updates every 5 seconds for real-time sync
-    const pollInterval = setInterval(() => {
-      refreshHistory();
-    }, 5000); // 5 seconds
-
-    return () => clearInterval(pollInterval);
   }, []);
 
   const addHistory = async (entry: Omit<HistoryEntry, 'id' | 'createdAt' | 'userId'>) => {
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-
-      console.log('📝 Adding history entry:', {
-        userId: user.id,
-        userName: entry.userName,
-        userRole: entry.userRole,
-        action: entry.action.toUpperCase(),
-        target: entry.target.toUpperCase(),
-        targetName: entry.targetName,
-        description: entry.description
-      });
 
       const response = await fetch(API_URL, {
         method: 'POST',
@@ -105,11 +86,7 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
         })
       });
 
-      console.log('📡 History API response status:', response.status);
-
       if (response.ok) {
-        const data = await response.json();
-        console.log('✅ History added successfully:', data);
         // Refresh history to get latest
         await refreshHistory();
       } else {
@@ -123,33 +100,22 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteHistory = async (id: number): Promise<boolean> => {
     try {
-      console.log('🗑️ Deleting history entry:', id);
-      console.log('🔐 Using token:', localStorage.getItem('token') ? 'Present' : 'Missing');
-      console.log('👤 Current user:', JSON.parse(localStorage.getItem('user') || '{}'));
-
       const response = await fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
 
-      console.log('📡 Delete history API response status:', response.status);
-      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
-
       if (response.ok) {
-        console.log('✅ History deleted successfully');
         // Refresh history to get latest
         await refreshHistory();
         return true;
       } else {
         const errorData = await response.json();
-        console.error('❌ Failed to delete history:');
-        console.error('   Status:', response.status);
-        console.error('   Error data:', errorData);
-        console.error('   Message:', errorData.message || 'Unknown error');
+        console.error('❌ Failed to delete history:', errorData.message || errorData);
         return false;
       }
     } catch (error) {
-      console.error('❌ Error deleting history (exception):', error);
+      console.error('❌ Error deleting history:', error);
       return false;
     }
   };
