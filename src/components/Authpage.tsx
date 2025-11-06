@@ -100,22 +100,15 @@ export default function AuthPage() {
       if (rememberMe) {
         localStorage.setItem('rememberedEmail', formData.email);
         localStorage.setItem('rememberMe', 'true');
-        console.log('💾 Email saved for next login (password NOT saved for security)');
       } else {
         localStorage.removeItem('rememberedEmail');
         localStorage.removeItem('rememberMe');
-        console.log('🗑️ Saved email cleared');
       }
 
       // Clear any old password storage (security cleanup)
       localStorage.removeItem('rememberedPassword');
 
-      console.log('✅ Login successful, user data:', userData);
-      console.log('✅ Token saved:', tokenData ? 'Yes' : 'No');
-      console.log('✅ Navigating to /dashboard in 800ms...');
-
       setTimeout(() => {
-        console.log('🚀 Redirecting to /dashboard now');
         navigate("/dashboard");
       }, 800);
 

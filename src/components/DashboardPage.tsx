@@ -29,16 +29,12 @@ export default function DashboardPage() {
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
 
-    console.log('🔍 Dashboard - Checking auth:', { token: !!token, storedUser });
-
     if (!token || !storedUser) {
       // Belum login → kembali ke halaman auth
-      console.log('❌ No token/user, redirecting to /auth');
       navigate('/auth');
     } else {
       try {
         const parsedUser = JSON.parse(storedUser);
-        console.log('✅ User loaded:', parsedUser);
         setUser(parsedUser);
       } catch (error) {
         console.error('❌ Error parsing user:', error);

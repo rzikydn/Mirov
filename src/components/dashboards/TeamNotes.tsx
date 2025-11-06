@@ -126,14 +126,6 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
   // Update note
   const editNote = async (id: number, note: { text: string; color: string; favorite: boolean }) => {
     try {
-      console.log('📝 Sending update to API:', {
-        id,
-        body: {
-          content: note.text,
-          color: note.color,
-          favorite: note.favorite
-        }
-      });
       const res = await fetch(`${API_URL}/${id}`, {
         method: "PUT",
         headers: getAuthHeaders(),
@@ -144,7 +136,6 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
         }),
       });
       const data = await res.json();
-      console.log('✅ API Response:', data);
       if (data.success) {
         // Add to history
         if (user) {
@@ -217,12 +208,10 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       return;
     }
 
-    console.log('✅ Adding note for userId:', user.id); // Debug
-
     createNote({
       text: newNoteText.trim(),
       color: selectedColor,
-      userId: user.id // ⭐ DITAMBAHKAN: GUNAKAN user.id dari context
+      userId: user.id
     });
 
     setNewNoteText('');
@@ -255,14 +244,6 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
     const newFavoriteStatus = !note.favorite;
     const noteContent = note.content || note.text || '';
 
-    console.log('🌟 Toggle favorite clicked!', {
-      noteId: note.id,
-      currentFavorite: note.favorite,
-      newFavorite: newFavoriteStatus,
-      noteContent: noteContent,
-      noteColor: note.color
-    });
-
     // Update state lokal terlebih dahulu untuk animasi instant
     setNotes(prevNotes =>
       prevNotes.map(n =>
@@ -285,12 +266,10 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       });
       const data = await res.json();
 
-      console.log('✅ Toggle favorite response:', data);
-
       if (data.success) {
         // Add to history dengan deskripsi spesifik untuk favorit
         if (user) {
-          const historyResult = await addHistory({
+          await addHistory({
             userName: user.name,
             userRole: user.role,
             action: 'edit', // Use 'edit' instead of 'favorite'/'unfavorite'
@@ -298,7 +277,6 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
             targetName: noteContent.substring(0, 30) + (noteContent.length > 30 ? '...' : ''),
             description: `${user.name} ${newFavoriteStatus ? 'added note to favorites' : 'removed note from favorites'}`
           });
-          console.log('📝 History added:', historyResult);
         }
       } else {
         // Jika gagal, kembalikan state ke semula
