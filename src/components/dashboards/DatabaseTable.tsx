@@ -65,17 +65,24 @@ const ExportModal: React.FC<{
   };
 
   const handleExportXLSX = () => {
-    // Create CSV content with proper formatting
-    let csv = '';
+    console.log('🔍 Starting CSV export for database:', database.name);
+    console.log('📊 Columns:', database.columns);
+    console.log('📝 Rows count:', database.rows.length);
 
-    // Add UTF-8 BOM for Excel compatibility
-    const BOM = '\uFEFF';
+    // Create CSV content with proper formatting
+    const csvRows: string[] = [];
 
     // Header row - Column labels
-    csv += database.columns.map(col => `"${col.label}"`).join(',') + '\r\n';
+    const headers = database.columns.map(col => {
+      console.log('📌 Column label:', col.label);
+      return `"${col.label}"`;
+    });
+    csvRows.push(headers.join(','));
+
+    console.log('✅ Header row created:', csvRows[0]);
 
     // Data rows
-    database.rows.forEach(row => {
+    database.rows.forEach((row, index) => {
       const rowData = database.columns.map(col => {
         const prop = row.properties[col.key];
         if (!prop) return '""';
@@ -88,17 +95,31 @@ const ExportModal: React.FC<{
         // Escape double quotes by doubling them
         return `"${value.replace(/"/g, '""')}"`;
       });
-      csv += rowData.join(',') + '\r\n';
+      csvRows.push(rowData.join(','));
     });
 
+    // Join all rows with CRLF
+    const csv = csvRows.join('\r\n');
+
+    console.log('📄 CSV Preview (first 200 chars):', csv.substring(0, 200));
+    console.log('📏 CSV total length:', csv.length);
+
+    // Add UTF-8 BOM for Excel compatibility
+    const BOM = '\uFEFF';
+    const finalContent = BOM + csv;
+
     // Create download with BOM for proper UTF-8 encoding
-    const dataBlob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+    const dataBlob = new Blob([finalContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
     link.download = `${database.name.replace(/\s+/g, '_')}.csv`;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(url);
+
+    console.log('✅ CSV export completed!');
     onClose();
   };
 
