@@ -9,6 +9,7 @@ import AddPropertyModal from './modals/AddPropertyModal';
 import DeleteModal from './modals/DeleteModal';
 import { useAuth } from '../../context/AuthContext';
 import { useHistory } from '../../context/HistoryContext';
+import * as XLSX from 'xlsx';
 
 const API_URL = `${import.meta.env.VITE_API_URL}/api/databases`;
 
@@ -65,61 +66,83 @@ const ExportModal: React.FC<{
   };
 
   const handleExportXLSX = () => {
-    console.log('🔍 Starting CSV export for database:', database.name);
-    console.log('📊 Columns:', database.columns);
-    console.log('📝 Rows count:', database.rows.length);
+    // Prepare data for Excel export
+    const worksheetData: any[][] = [];
 
-    // Create CSV content with proper formatting
-    const csvRows: string[] = [];
+    // Add header row with column labels
+    const headers = database.columns.map(col => col.label);
+    worksheetData.push(headers);
 
-    // Header row - Column labels
-    const headers = database.columns.map(col => {
-      console.log('📌 Column label:', col.label);
-      return `"${col.label}"`;
-    });
-    csvRows.push(headers.join(','));
-
-    console.log('✅ Header row created:', csvRows[0]);
-
-    // Data rows
-    database.rows.forEach((row, index) => {
+    // Add data rows
+    database.rows.forEach(row => {
       const rowData = database.columns.map(col => {
         const prop = row.properties[col.key];
-        if (!prop) return '""';
+        if (!prop) return '';
 
         if (prop.type === 'checkbox') {
-          return prop.value ? '"Yes"' : '"No"';
+          return prop.value ? 'Yes' : 'No';
         }
 
-        const value = String(prop.value || '');
-        // Escape double quotes by doubling them
-        return `"${value.replace(/"/g, '""')}"`;
+        return prop.value || '';
       });
-      csvRows.push(rowData.join(','));
+      worksheetData.push(rowData);
     });
 
-    // Join all rows with CRLF
-    const csv = csvRows.join('\r\n');
+    // Create worksheet from data
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
 
-    console.log('📄 CSV Preview (first 200 chars):', csv.substring(0, 200));
-    console.log('📏 CSV total length:', csv.length);
+    // Set column widths
+    const columnWidths = database.columns.map(col => ({
+      wch: Math.max(col.label.length + 5, 15) // Minimum 15 chars width
+    }));
+    worksheet['!cols'] = columnWidths;
 
-    // Add UTF-8 BOM for Excel compatibility
-    const BOM = '\uFEFF';
-    const finalContent = BOM + csv;
+    // Style the header row (first row)
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+      if (!worksheet[cellAddress]) continue;
 
-    // Create download with BOM for proper UTF-8 encoding
-    const dataBlob = new Blob([finalContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${database.name.replace(/\s+/g, '_')}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      // Apply header styling
+      worksheet[cellAddress].s = {
+        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 },
+        fill: { fgColor: { rgb: '1F4E78' } }, // Dark blue background
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        }
+      };
+    }
 
-    console.log('✅ CSV export completed!');
+    // Style data cells with borders
+    for (let row = range.s.r + 1; row <= range.e.r; row++) {
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+        if (!worksheet[cellAddress]) continue;
+
+        worksheet[cellAddress].s = {
+          border: {
+            top: { style: 'thin', color: { rgb: 'D3D3D3' } },
+            bottom: { style: 'thin', color: { rgb: 'D3D3D3' } },
+            left: { style: 'thin', color: { rgb: 'D3D3D3' } },
+            right: { style: 'thin', color: { rgb: 'D3D3D3' } }
+          },
+          alignment: { vertical: 'center' }
+        };
+      }
+    }
+
+    // Create workbook and add worksheet
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
+
+    // Generate Excel file and download
+    const fileName = `${database.name.replace(/\s+/g, '_').replace(/[^\w\s-]/g, '')}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+
     onClose();
   };
 
@@ -174,10 +197,10 @@ const ExportModal: React.FC<{
               </div>
               <div className="text-left">
                 <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Export as CSV/Excel
+                  Export as Excel (.xlsx)
                 </p>
                 <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                  Compatible with Excel, Google Sheets
+                  With formatting, colors, and borders
                 </p>
               </div>
             </div>
