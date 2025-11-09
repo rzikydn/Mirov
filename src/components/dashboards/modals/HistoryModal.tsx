@@ -21,6 +21,11 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<{ id: number; name: string } | null>(null);
 
+  // Bulk delete state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Check if user is SUPERUSER only
   const canDelete = user?.role === 'SUPERUSER';
 
@@ -65,6 +70,66 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
   const cancelDelete = () => {
     setShowDeleteConfirm(false);
     setEntryToDelete(null);
+  };
+
+  // Bulk delete functions
+  const toggleSelect = (id: number) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === history.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(history.map(entry => entry.id)));
+    }
+  };
+
+  const handleBulkDeleteClick = () => {
+    if (selectedIds.size === 0) {
+      toast.error('Please select at least one history entry');
+      return;
+    }
+    setShowBulkDeleteConfirm(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    setShowBulkDeleteConfirm(false);
+    setIsDeleting(true);
+
+    const loadingToast = toast.loading(`Deleting ${selectedIds.size} history entries...`);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const id of selectedIds) {
+      const success = await deleteHistory(id);
+      if (success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    }
+
+    setIsDeleting(false);
+    setSelectedIds(new Set());
+    toast.dismiss(loadingToast);
+
+    if (failCount === 0) {
+      toast.success(`Successfully deleted ${successCount} history entries!`);
+    } else {
+      toast.error(`Deleted ${successCount} entries, ${failCount} failed`);
+    }
+  };
+
+  const cancelBulkDelete = () => {
+    setShowBulkDeleteConfirm(false);
   };
 
   // Helper function to check if entry is a favorite action
@@ -165,7 +230,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
       >
         {/* Header */}
         <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <Clock className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
               <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -179,6 +244,41 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
               <X className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
             </button>
           </div>
+
+          {/* Bulk actions - Only for SUPERUSER */}
+          {canDelete && history.length > 0 && (
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size === history.length && history.length > 0}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Select All ({selectedIds.size}/{history.length})
+                  </span>
+                </label>
+              </div>
+              {selectedIds.size > 0 && (
+                <button
+                  onClick={handleBulkDeleteClick}
+                  disabled={isDeleting}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                    isDeleting
+                      ? 'opacity-50 cursor-not-allowed'
+                      : darkMode
+                      ? 'bg-red-900/50 text-red-300 hover:bg-red-900 border border-red-700'
+                      : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+                  }`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Selected ({selectedIds.size})
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -197,13 +297,27 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
                   key={entry.id}
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`group relative p-4 rounded-lg border ${
-                    darkMode
+                  className={`group relative p-4 rounded-lg border transition-colors ${
+                    selectedIds.has(entry.id)
+                      ? darkMode
+                        ? 'bg-blue-900/20 border-blue-700'
+                        : 'bg-blue-50 border-blue-300'
+                      : darkMode
                       ? 'bg-gray-800/50 border-gray-700'
                       : 'bg-gray-50 border-gray-200'
-                  } ${deletingId === entry.id ? 'opacity-50 pointer-events-none' : ''}`}
+                  } ${deletingId === entry.id || isDeleting ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                   <div className="flex items-start gap-3">
+                    {/* Checkbox for SUPERUSER */}
+                    {canDelete && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(entry.id)}
+                        onChange={() => toggleSelect(entry.id)}
+                        disabled={isDeleting}
+                        className="w-4 h-4 mt-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    )}
                     <div className={`p-2 rounded-lg ${
                       darkMode ? 'bg-gray-700' : 'bg-white'
                     }`}>
@@ -280,6 +394,16 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
         message={`Are you sure you want to delete this history entry?\n\n"${entryToDelete?.name || ''}"\n\nThis action cannot be undone.`}
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
+      />
+
+      {/* Bulk Delete Confirmation Modal */}
+      <DeleteModal
+        show={showBulkDeleteConfirm}
+        darkMode={darkMode}
+        title="Delete Multiple History Entries"
+        message={`Are you sure you want to delete ${selectedIds.size} history entries?\n\nThis action cannot be undone.`}
+        onConfirm={confirmBulkDelete}
+        onCancel={cancelBulkDelete}
       />
     </div>
   );
