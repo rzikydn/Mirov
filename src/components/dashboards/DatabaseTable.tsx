@@ -65,30 +65,34 @@ const ExportModal: React.FC<{
   };
 
   const handleExportXLSX = () => {
-    // Create CSV content (simplified XLSX export)
+    // Create CSV content with proper formatting
     let csv = '';
-    
-    // Header row
-    csv += database.columns.map(col => `"${col.label}"`).join(',') + '\n';
-    
+
+    // Add UTF-8 BOM for Excel compatibility
+    const BOM = '\uFEFF';
+
+    // Header row - Column labels
+    csv += database.columns.map(col => `"${col.label}"`).join(',') + '\r\n';
+
     // Data rows
     database.rows.forEach(row => {
       const rowData = database.columns.map(col => {
         const prop = row.properties[col.key];
         if (!prop) return '""';
-        
+
         if (prop.type === 'checkbox') {
           return prop.value ? '"Yes"' : '"No"';
         }
-        
+
         const value = String(prop.value || '');
+        // Escape double quotes by doubling them
         return `"${value.replace(/"/g, '""')}"`;
       });
-      csv += rowData.join(',') + '\n';
+      csv += rowData.join(',') + '\r\n';
     });
-    
-    // Create download
-    const dataBlob = new Blob([csv], { type: 'text/csv' });
+
+    // Create download with BOM for proper UTF-8 encoding
+    const dataBlob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
