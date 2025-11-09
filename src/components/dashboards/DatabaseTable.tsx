@@ -790,7 +790,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className={`h-full overflow-auto ${darkMode ? 'bg-[#191919]' : 'bg-white'}`}
+      className={`h-full overflow-auto hide-scrollbar ${darkMode ? 'bg-[#191919]' : 'bg-white'}`}
     >
       {/* Header - Notion Style */}
       <div className="px-8 sm:px-12 lg:px-24 pt-12 pb-4">
@@ -973,7 +973,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           darkMode ? 'border-gray-800' : 'border-gray-200'
         }`}>
           {/* Scrollable container - only horizontal scroll here */}
-          <div className="overflow-x-auto" ref={tableContainerRef}>
+          <div className="overflow-x-auto hide-scrollbar" ref={tableContainerRef}>
             <table className="w-full">
               {/* Table Header - Sticky */}
               <thead className={`sticky top-0 z-10 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}`}>
