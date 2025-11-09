@@ -984,6 +984,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       ref={index === database.columns.length - 1 ? newColumnRef : null}
                       className={`text-left px-4 py-2 font-normal ${
                         index === 0 ? 'min-w-[320px]' : 'min-w-[200px]'
+                      } ${
+                        index === 0
+                          ? `sticky left-0 z-20 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`
+                          : ''
                       }`}
                     >
                       <div className="flex items-center gap-2 group">
@@ -1064,12 +1068,19 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       darkMode ? 'hover:bg-[#202020]' : 'hover:bg-gray-50'
                     }`}
                   >
-                    {database.columns.map((col) => {
+                    {database.columns.map((col, colIndex) => {
                       const prop = row.properties[col.key];
                       if (!prop) return <td key={col.key} className="px-4 py-3"></td>;
 
                       return (
-                        <td key={col.key} className="px-4 py-3">
+                        <td
+                          key={col.key}
+                          className={`px-4 py-3 ${
+                            colIndex === 0
+                              ? `sticky left-0 z-10 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`
+                              : ''
+                          }`}
+                        >
                           {prop.type === 'text' && (
                             <input
                               type="text"
