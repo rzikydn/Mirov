@@ -1,17 +1,27 @@
-// src/components/dashboards/DatabaseTable.tsx (Enhanced with Share & Export + Date Icon Fix)
+// src/components/dashboards/DatabaseTable.tsx (Refactored with modular components)
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, MoreHorizontal, Smile, FileText, Edit3, Calendar, Hash, Type, CheckSquare, ChevronDown, X, Download, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
+import { Plus, MoreHorizontal, Smile, FileText, Edit3, ChevronDown, X, Download, ArrowUpDown } from 'lucide-react';
 import { Database, DatabaseRow } from '../../types/database';
-import { propertyTypes } from '../../constants/dashboard';
-import AddPropertyModal from './modals/AddPropertyModal';
-import DeleteModal from './modals/DeleteModal';
 import { useAuth } from '../../context/AuthContext';
 import { useHistory } from '../../context/HistoryContext';
-import * as XLSX from 'xlsx';
 
-const API_URL = `${import.meta.env.VITE_API_URL}/api/databases`;
+// Import modular components
+import EmojiPicker from './EmojiPicker';
+import TypeChangeDropdown from './TypeChangeDropdown';
+import SortDropdown from './SortDropdown';
+import AddPropertyModal from './modals/AddPropertyModal';
+import DeleteModal from './modals/DeleteModal';
+import ExportModal from './modals/ExportModal';
+
+// Import constants
+import { propertyTypeIcons } from '../../constants/propertyTypeIcons';
+import { dateInputStyles } from '../../styles/dateInputStyles';
+
+// Import utilities
+import { SortConfig, getSortedRows, addSort, updateSortDirection, deleteSort, clearAllSorts } from '../../utils/sortingUtils';
+import { updateDatabase } from '../../utils/databaseUtils';
 
 interface DatabaseTableProps {
   database: Database;
@@ -19,518 +29,12 @@ interface DatabaseTableProps {
   darkMode: boolean;
 }
 
-// Property type icons mapping
-const propertyTypeIcons: Record<string, React.ReactNode> = {
-  text: <Type className="w-3 h-3" />,
-  number: <Hash className="w-3 h-3" />,
-  date: <Calendar className="w-3 h-3" />,
-  checkbox: <CheckSquare className="w-3 h-3" />,
-};
-
-// CSS for date input calendar icon
-const dateInputStyles = `
-  /* Custom styles for date input in dark mode */
-  input[type="date"]::-webkit-calendar-picker-indicator {
-    filter: invert(0);
-    opacity: 0.6;
-    cursor: pointer;
-  }
-  
-  input[type="date"].dark-mode::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-    opacity: 0.8;
-  }
-  
-  input[type="date"]::-webkit-calendar-picker-indicator:hover {
-    opacity: 1;
-  }
-`;
-
-// Export Modal Component
-const ExportModal: React.FC<{
-  show: boolean;
-  darkMode: boolean;
-  database: Database;
-  onClose: () => void;
-}> = ({ show, darkMode, database, onClose }) => {
-  const handleExportJSON = () => {
-    const dataStr = JSON.stringify(database, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${database.name.replace(/\s+/g, '_')}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    onClose();
-  };
-
-  const handleExportXLSX = () => {
-    // Prepare data for Excel export
-    const worksheetData: any[][] = [];
-
-    // Add header row with column labels
-    const headers = database.columns.map(col => col.label);
-    worksheetData.push(headers);
-
-    // Add data rows
-    database.rows.forEach(row => {
-      const rowData = database.columns.map(col => {
-        const prop = row.properties[col.key];
-        if (!prop) return '';
-
-        if (prop.type === 'checkbox') {
-          return prop.value ? 'Yes' : 'No';
-        }
-
-        return prop.value || '';
-      });
-      worksheetData.push(rowData);
-    });
-
-    // Create worksheet from data
-    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-
-    // Set column widths
-    const columnWidths = database.columns.map(col => ({
-      wch: Math.max(col.label.length + 5, 15) // Minimum 15 chars width
-    }));
-    worksheet['!cols'] = columnWidths;
-
-    // Style the header row (first row)
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-    for (let col = range.s.c; col <= range.e.c; col++) {
-      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
-      if (!worksheet[cellAddress]) continue;
-
-      // Apply header styling
-      worksheet[cellAddress].s = {
-        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 },
-        fill: { fgColor: { rgb: '1F4E78' } }, // Dark blue background
-        alignment: { horizontal: 'center', vertical: 'center' },
-        border: {
-          top: { style: 'thin', color: { rgb: '000000' } },
-          bottom: { style: 'thin', color: { rgb: '000000' } },
-          left: { style: 'thin', color: { rgb: '000000' } },
-          right: { style: 'thin', color: { rgb: '000000' } }
-        }
-      };
-    }
-
-    // Style data cells with borders
-    for (let row = range.s.r + 1; row <= range.e.r; row++) {
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-        if (!worksheet[cellAddress]) continue;
-
-        worksheet[cellAddress].s = {
-          border: {
-            top: { style: 'thin', color: { rgb: 'D3D3D3' } },
-            bottom: { style: 'thin', color: { rgb: 'D3D3D3' } },
-            left: { style: 'thin', color: { rgb: 'D3D3D3' } },
-            right: { style: 'thin', color: { rgb: 'D3D3D3' } }
-          },
-          alignment: { vertical: 'center' }
-        };
-      }
-    }
-
-    // Create workbook and add worksheet
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
-
-    // Generate Excel file and download
-    const fileName = `${database.name.replace(/\s+/g, '_').replace(/[^\w\s-]/g, '')}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
-
-    onClose();
-  };
-
-  if (!show) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className={`${
-          darkMode ? 'bg-[#2a2a2a]' : 'bg-white'
-        } rounded-lg shadow-xl w-full max-w-md`}
-      >
-        {/* Header */}
-        <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Download className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-              <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                Export Database
-              </h2>
-            </div>
-            <button
-              onClick={onClose}
-              className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-            >
-              <X className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-            </button>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 space-y-3">
-          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-4`}>
-            Choose export format for "{database.name}"
-          </p>
-
-          {/* Export Options */}
-          <button
-            onClick={handleExportXLSX}
-            className={`w-full flex items-center justify-between p-4 rounded-lg border transition-colors ${
-              darkMode 
-                ? 'bg-[#1a1a1a] border-gray-700 hover:bg-gray-800' 
-                : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded ${darkMode ? 'bg-green-900' : 'bg-green-100'}`}>
-                <FileText className={`w-5 h-5 ${darkMode ? 'text-green-300' : 'text-green-600'}`} />
-              </div>
-              <div className="text-left">
-                <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Export as Excel (.xlsx)
-                </p>
-                <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                  With formatting, colors, and borders
-                </p>
-              </div>
-            </div>
-            <Download className={`w-5 h-5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
-          </button>
-
-          <button
-            onClick={handleExportJSON}
-            className={`w-full flex items-center justify-between p-4 rounded-lg border transition-colors ${
-              darkMode 
-                ? 'bg-[#1a1a1a] border-gray-700 hover:bg-gray-800' 
-                : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded ${darkMode ? 'bg-blue-900' : 'bg-blue-100'}`}>
-                <FileText className={`w-5 h-5 ${darkMode ? 'text-blue-300' : 'text-blue-600'}`} />
-              </div>
-              <div className="text-left">
-                <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Export as JSON
-                </p>
-                <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                  Raw data format for developers
-                </p>
-              </div>
-            </div>
-            <Download className={`w-5 h-5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
-          </button>
-        </div>
-
-        {/* Footer */}
-        <div className={`px-6 py-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <button
-            onClick={onClose}
-            className={`w-full px-4 py-2 rounded text-sm font-medium ${
-              darkMode 
-                ? 'bg-gray-700 hover:bg-gray-600 text-white' 
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
-            }`}
-          >
-            Cancel
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  );
-};
-
-// Emoji Picker Component with Categories
-const EmojiPicker: React.FC<{
-  darkMode: boolean;
-  onSelect: (emoji: string) => void;
-  onClose: () => void;
-}> = ({ darkMode, onSelect, onClose }) => {
-  const [activeCategory, setActiveCategory] = useState('smileys');
-  const pickerRef = useRef<HTMLDivElement>(null);
-
-  const emojiCategories = {
-    smileys: {
-      label: '😊 Smileys',
-      emojis: [
-        '😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂',
-        '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋',
-        '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🥸', '🤩',
-        '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣',
-        '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
-        '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
-        '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
-        '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐',
-        '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈',
-        '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾',
-        '🤖', '🎃', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿',
-        '😾', '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️',
-        '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️',
-        '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲',
-      ]
-    },
-    nature: {
-      label: '🌿 Nature',
-      emojis: [
-        '🌸', '🌺', '🌻', '🌼', '🌷', '🌹', '🥀', '🌾', '🌱', '🌿',
-        '🍀', '🍁', '🍂', '🍃', '🌳', '🌲', '🌴', '🌵', '🌊', '🌬️',
-        '🌀', '🌈', '⭐', '🌟', '✨', '⚡', '☀️', '🌤️', '⛅', '🌥️',
-        '☁️', '🌦️', '🌧️', '⛈️', '🌩️', '❄️', '☃️', '⛄', '🌙', '🌎',
-        '🌍', '🌏', '🪐', '💫', '🔥', '💧', '🌊', '🏔️', '⛰️', '🌋',
-        '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯',
-        '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒',
-        '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇',
-        '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜',
-        '🦟', '🦗', '🕷️', '🕸️', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕',
-        '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳',
-        '🐋', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🦣', '🐘',
-        '🦛', '🦏', '🐪', '🐫', '🦒', '🦘', '🦬', '🐃', '🐂', '🐄',
-        '🐎', '🐖', '🐏', '🐑', '🦙', '🐐', '🦌', '🐕', '🐩', '🦮',
-      ]
-    },
-    food: {
-      label: '🍕 Food',
-      emojis: [
-        '🍎', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒',
-        '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🥑', '🥦', '🥬', '🥒',
-        '🌶️', '🫑', '🌽', '🥕', '🧄', '🧅', '🥔', '🍠', '🥐', '🥯',
-        '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🧈', '🥞', '🧇', '🥓',
-        '🥩', '🍗', '🍖', '🌭', '🍔', '🍟', '🍕', '🥪', '🥙', '🧆',
-        '🌮', '🌯', '🫔', '🥗', '🥘', '🫕', '🥫', '🍝', '🍜', '🍲',
-        '🍛', '🍣', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥',
-        '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🥧', '🧁', '🍰',
-        '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜',
-        '🍯', '🥛', '🍼', '🫖', '☕', '🍵', '🧃', '🥤', '🧋', '🍶',
-        '🍺', '🍻', '🥂', '🍷', '🥃', '🍸', '🍹', '🧉', '🍾', '🧊',
-      ]
-    },
-    activity: {
-      label: '⚽ Activity',
-      emojis: [
-        '⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱',
-        '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳',
-        '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '🛷',
-        '⛸️', '🥌', '🎿', '⛷️', '🏂', '🪂', '🏋️', '🤼', '🤸', '🤺',
-        '🤾', '🏌️', '🏇', '🧘', '🏄', '🏊', '🤽', '🚣', '🧗', '🚴',
-        '🚵', '🤖', '🥇', '🥈', '🥉', '🏅', '🎖️', '🏆', '🎗️', '🎫',
-        '🎟️', '🎪', '🤹', '🎭', '🩰', '🎨', '🎬', '🎤', '🎧', '🎼',
-        '🎹', '🥁', '🪘', '🎷', '🎺', '🪗', '🎸', '🪕', '🎻', '🎲',
-        '♟️', '🎯', '🎳', '🎮', '🎰', '🧩', '🧸', '🪅', '🪆', '🪢',
-      ]
-    },
-    travel: {
-      label: '✈️ Travel',
-      emojis: [
-        '🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐',
-        '🛻', '🚚', '🚛', '🚜', '🦯', '🦽', '🦼', '🛴', '🚲', '🛵',
-        '🏍️', '🛺', '🚨', '🚔', '🚍', '🚘', '🚖', '🚡', '🚠', '🚟',
-        '🚃', '🚋', '🚞', '🚝', '🚄', '🚅', '🚈', '🚂', '🚆', '🚇',
-        '🚊', '🚉', '✈️', '🛫', '🛬', '🛩️', '💺', '🚁', '🛸', '🚀',
-        '🛰️', '⛵', '🚤', '🛥️', '🛳️', '⛴️', '🚢', '⚓', '⛽', '🚧',
-        '🚦', '🚥', '🚏', '🗺️', '🗿', '🗽', '🗼', '🏰', '🏯', '🏟️',
-        '🎡', '🎢', '🎠', '⛲', '⛱️', '🏖️', '🏝️', '🏜️', '🌋', '⛰️',
-        '🏔️', '🗻', '🏕️', '⛺', '🏠', '🏡', '🏘️', '🏚️', '🏗️', '🏭',
-        '🏢', '🏬', '🏣', '🏤', '🏥', '🏦', '🏨', '🏪', '🏫', '🏩',
-      ]
-    },
-    objects: {
-      label: '💼 Objects',
-      emojis: [
-        '⌚', '📱', '📲', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '🖲️', '🕹️',
-        '🗜️', '💽', '💾', '💿', '📀', '📼', '📷', '📸', '📹', '🎥',
-        '📽️', '🎞️', '📞', '☎️', '📟', '📠', '📺', '📻', '🎙️', '🎚️',
-        '🎛️', '🧭', '⏱️', '⏲️', '⏰', '🕰️', '⌛', '⏳', '📡', '🔋',
-        '🔌', '💡', '🔦', '🕯️', '🪔', '🧯', '🛢️', '💸', '💵', '💴',
-        '💶', '💷', '🏦', '💰', '💳', '💎', '⚖️', '🪜', '🧰', '🪛',
-        '🔧', '🔨', '⚒️', '🛠️', '⛏️', '🪚', '🔩', '⚙️', '🪤', '🧱',
-        '⛓️', '🧲', '🔫', '💣', '🧨', '🪓', '🔪', '🗡️', '⚔️', '🛡️',
-        '🚬', '⚰️', '🪦', '⚱️', '🏺', '🔮', '📿', '🧿', '💈', '⚗️',
-        '🔭', '🔬', '🕳️', '🩹', '🩺', '💊', '💉', '🩸', '🧬', '🦠',
-        '🧫', '🧪', '🌡️', '🧹', '🪠', '🧺', '🧻', '🚽', '🚰', '🚿',
-        '🛁', '🛀', '🧼', '🪥', '🪒', '🧽', '🧴', '🛎️', '🔑', '🗝️',
-      ]
-    },
-    symbols: {
-      label: '❤️ Symbols',
-      emojis: [
-        '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔',
-        '❤️‍🔥', '❤️‍🩹', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟',
-        '☮️', '✝️', '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️',
-        '🛐', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏',
-        '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️', '📴',
-        '📳', '🆚', '💮', '🉐', '㊙️', '㊗️', '🈴', '🈵', '🈹', '🈲',
-        '🅰️', '🅱️', '🆎', '🆑', '🅾️', '🆘', '❌', '⭕', '🛑', '⛔',
-        '📛', '🚫', '💯', '💢', '♨️', '🚷', '🚯', '🚳', '🚱', '🔞',
-        '📵', '🚭', '❗', '❕', '❓', '❔', '‼️', '⁉️', '🔅', '🔆',
-        '〽️', '⚠️', '🚸', '🔱', '⚜️', '🔰', '♻️', '✅', '🈯', '💹',
-        '❇️', '✳️', '❎', '🌐', '💠', 'Ⓜ️', '🌀', '💤', '🏧', '🚾',
-        '♿', '🅿️', '🛗', '🈳', '🈂️', '🛂', '🛃', '🛄', '🛅', '🚹',
-        '🚺', '🚼', '⚧️', '🚻', '🚮', '🎦', '📶', '🈁', '🔣', 'ℹ️',
-      ]
-    },
-    flags: {
-      label: '🏁 Flags',
-      emojis: [
-        '🏁', '🚩', '🎌', '🏴', '🏳️', '🏳️‍🌈', '🏳️‍⚧️', '🏴‍☠️', '🇦🇨', '🇦🇩',
-        '🇦🇪', '🇦🇫', '🇦🇬', '🇦🇮', '🇦🇱', '🇦🇲', '🇦🇴', '🇦🇶', '🇦🇷', '🇦🇸',
-        '🇦🇹', '🇦🇺', '🇦🇼', '🇦🇽', '🇦🇿', '🇧🇦', '🇧🇧', '🇧🇩', '🇧🇪', '🇧🇫',
-        '🇧🇬', '🇧🇭', '🇧🇮', '🇧🇯', '🇧🇱', '🇧🇲', '🇧🇳', '🇧🇴', '🇧🇶', '🇧🇷',
-        '🇧🇸', '🇧🇹', '🇧🇻', '🇧🇼', '🇧🇾', '🇧🇿', '🇨🇦', '🇨🇨', '🇨🇩', '🇨🇫',
-        '🇨🇬', '🇨🇭', '🇨🇮', '🇨🇰', '🇨🇱', '🇨🇲', '🇨🇳', '🇨🇴', '🇨🇵', '🇨🇷',
-        '🇨🇺', '🇨🇻', '🇨🇼', '🇨🇽', '🇨🇾', '🇨🇿', '🇩🇪', '🇩🇬', '🇩🇯', '🇩🇰',
-        '🇩🇲', '🇩🇴', '🇩🇿', '🇪🇦', '🇪🇨', '🇪🇪', '🇪🇬', '🇪🇭', '🇪🇷', '🇪🇸',
-        '🇪🇹', '🇪🇺', '🇫🇮', '🇫🇯', '🇫🇰', '🇫🇲', '🇫🇴', '🇫🇷', '🇬🇦', '🇬🇧',
-        '🇬🇩', '🇬🇪', '🇬🇫', '🇬🇬', '🇬🇭', '🇬🇮', '🇬🇱', '🇬🇲', '🇬🇳', '🇬🇵',
-        '🇬🇶', '🇬🇷', '🇬🇸', '🇬🇹', '🇬🇺', '🇬🇼', '🇬🇾', '🇭🇰', '🇭🇲', '🇭🇳',
-        '🇭🇷', '🇭🇹', '🇭🇺', '🇮🇨', '🇮🇩', '🇮🇪', '🇮🇱', '🇮🇲', '🇮🇳', '🇮🇴',
-        '🇮🇶', '🇮🇷', '🇮🇸', '🇮🇹', '🇯🇪', '🇯🇲', '🇯🇴', '🇯🇵', '🇰🇪', '🇰🇬',
-        '🇰🇭', '🇰🇮', '🇰🇲', '🇰🇳', '🇰🇵', '🇰🇷', '🇰🇼', '🇰🇾', '🇰🇿', '🇱🇦',
-        '🇱🇧', '🇱🇨', '🇱🇮', '🇱🇰', '🇱🇷', '🇱🇸', '🇱🇹', '🇱🇺', '🇱🇻', '🇱🇾',
-        '🇲🇦', '🇲🇨', '🇲🇩', '🇲🇪', '🇲🇫', '🇲🇬', '🇲🇭', '🇲🇰', '🇲🇱', '🇲🇲',
-        '🇲🇳', '🇲🇴', '🇲🇵', '🇲🇶', '🇲🇷', '🇲🇸', '🇲🇹', '🇲🇺', '🇲🇻', '🇲🇼',
-        '🇲🇽', '🇲🇾', '🇲🇿', '🇳🇦', '🇳🇨', '🇳🇪', '🇳🇫', '🇳🇬', '🇳🇮', '🇳🇱',
-        '🇳🇴', '🇳🇵', '🇳🇷', '🇳🇺', '🇳🇿', '🇴🇲', '🇵🇦', '🇵🇪', '🇵🇫', '🇵🇬',
-        '🇵🇭', '🇵🇰', '🇵🇱', '🇵🇲', '🇵🇳', '🇵🇷', '🇵🇸', '🇵🇹', '🇵🇼', '🇵🇾',
-      ]
-    },
-  };
-
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
-
-  return (
-    <div
-      ref={pickerRef}
-      className={`absolute top-full left-0 mt-2 ${
-        darkMode ? 'bg-[#2a2a2a]' : 'bg-white'
-      } rounded-xl shadow-2xl border ${
-        darkMode ? 'border-gray-700' : 'border-gray-200'
-      } z-50 w-[380px]`}
-    >
-      {/* Header */}
-      <div className={`flex items-center justify-between p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-        <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-          Choose an emoji
-        </span>
-        <button
-          onClick={onClose}
-          className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-        >
-          <X className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-        </button>
-      </div>
-
-      {/* Category Tabs */}
-      {(
-        <div className={`flex gap-1 px-2 py-2 border-b overflow-x-auto ${
-          darkMode ? 'border-gray-700' : 'border-gray-200'
-        }`}>
-          {Object.entries(emojiCategories).map(([key, category]) => (
-            <button
-              key={key}
-              onClick={() => setActiveCategory(key)}
-              className={`px-2 py-1 rounded text-xs whitespace-nowrap transition-colors ${
-                activeCategory === key
-                  ? darkMode 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-blue-100 text-blue-900'
-                  : darkMode 
-                    ? 'text-gray-400 hover:bg-gray-700' 
-                    : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {category.label.split(' ')[0]}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Emoji Grid */}
-      <div className="p-2">
-        <div className="grid grid-cols-9 gap-0 max-h-72 overflow-y-auto">
-          {emojiCategories[activeCategory as keyof typeof emojiCategories].emojis.map((emoji, index) => (
-            <button
-              key={index}
-              onClick={() => {
-                onSelect(emoji);
-                onClose();
-              }}
-              className={`text-3xl w-10 h-10 flex items-center justify-center rounded-md transition-all transform hover:scale-110 ${
-                darkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'
-              }`}
-              title={emoji}
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Type Change Dropdown Component
-const TypeChangeDropdown: React.FC<{
-  currentType: string;
-  darkMode: boolean;
-  onTypeChange: (type: string) => void;
-  onClose: () => void;
-}> = ({ currentType, darkMode, onTypeChange, onClose }) => {
-  const types = [
-    { value: 'text', label: 'Text', icon: <Type className="w-4 h-4" /> },
-    { value: 'number', label: 'Number', icon: <Hash className="w-4 h-4" /> },
-    { value: 'date', label: 'Date', icon: <Calendar className="w-4 h-4" /> },
-    { value: 'checkbox', label: 'Checkbox', icon: <CheckSquare className="w-4 h-4" /> },
-  ];
-
-  return (
-    <div className={`absolute top-full left-0 mt-1 ${darkMode ? 'bg-[#2a2a2a]' : 'bg-white'} rounded-lg shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} py-1 z-50 min-w-[150px]`}>
-      {types.map((type) => (
-        <button
-          key={type.value}
-          onClick={() => {
-            onTypeChange(type.value);
-            onClose();
-          }}
-          className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
-            currentType === type.value
-              ? darkMode ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-900'
-              : darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
-          }`}
-        >
-          {type.icon}
-          {type.label}
-        </button>
-      ))}
-    </div>
-  );
-};
-
 const DatabaseTable: React.FC<DatabaseTableProps> = ({
   database,
   setDatabases,
   darkMode,
 }) => {
-  const { canManageSchedules, user } = useAuth();
+  const { canManageSchedules, user, token } = useAuth();
   const { addHistory } = useHistory();
 
   // Check if user can edit (ADMIN or SUPERUSER)
@@ -550,12 +54,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState(database.description || '');
   const [showExportModal, setShowExportModal] = useState(false);
-  const [sortConfig, setSortConfig] = useState<Array<{
-    column: string;
-    direction: 'asc' | 'desc';
-  }>>([]);
+  const [sortConfig, setSortConfig] = useState<SortConfig[]>([]);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
-  const [showAddSortDropdown, setShowAddSortDropdown] = useState(false);
 
   // Inject styles for date input calendar icon
   useEffect(() => {
@@ -568,16 +68,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }
   }, []);
 
-  const { token } = useAuth();
-
-  const getAuthHeaders = () => {
-    const authToken = token || localStorage.getItem('token');
-    return {
-      'Content-Type': 'application/json',
-      ...(authToken && { 'Authorization': `Bearer ${authToken}` })
-    };
-  };
-
   const updateThisDb = async (mutator: (db: Database) => Database) => {
     const updatedDb = mutator(database);
 
@@ -586,42 +76,17 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
     // Sync with backend if database has a numeric ID (already saved)
     if (typeof updatedDb.id === 'number') {
-      try {
-        const response = await fetch(`${API_URL}/${updatedDb.id}`, {
-          method: 'PUT',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            name: updatedDb.name,
-            description: updatedDb.description,
-            icon: updatedDb.icon,
-            columns: updatedDb.columns,
-            rows: updatedDb.rows
-          })
-        });
-
-        if (response.ok) {
-          // Add to history
-          if (user) {
-            await addHistory({
-              userName: user.name,
-              userRole: user.role,
-              action: 'edit',
-              target: 'database',
-              targetName: updatedDb.name,
-              description: `${user.name} changed database "${updatedDb.name}"`
-            });
-          }
-        } else {
-          console.error('Failed to sync database with backend');
-        }
-      } catch (error) {
-        console.error('Error syncing database:', error);
-      }
+      await updateDatabase(
+        updatedDb,
+        token,
+        user ? addHistory : undefined,
+        user?.name,
+        user?.role as 'SUPERUSER' | 'ADMIN' | 'UMUM'
+      );
     }
   };
 
   const handleColumnLabelChange = (key: string, value: string) => {
-    // Block if user cannot edit
     if (!canEdit) return;
 
     updateThisDb((db) => ({
@@ -631,7 +96,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   };
 
   const handleColumnTypeChange = (key: string, type: string) => {
-    // Block if user cannot edit
     if (!canEdit) return;
 
     updateThisDb((db) => ({
@@ -648,7 +112,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   };
 
   const handleValueChange = (rowId: string, key: string, value: any) => {
-    // Block if user cannot edit
     if (!canEdit) return;
 
     updateThisDb((db) => ({
@@ -668,7 +131,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   };
 
   const handleAddProperty = (name: string, type: string) => {
-    // Block if user cannot edit
     if (!canEdit) return;
 
     const newKey = `${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
@@ -681,7 +143,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       return { ...db, columns: updatedColumns, rows: updatedRows };
     });
     setShowAddProperty(false);
-    
+
     setTimeout(() => {
       if (tableContainerRef.current && newColumnRef.current) {
         const container = tableContainerRef.current;
@@ -693,7 +155,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   };
 
   const handleDeleteProperty = (key: string) => {
-    // Block if user cannot edit
     if (!canEdit) return;
 
     setDeleteTarget({ type: 'column', id: key });
@@ -701,7 +162,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   };
 
   const handleDeleteRow = (rowId: string) => {
-    // Block if user cannot edit
     if (!canEdit) return;
 
     setDeleteTarget({ type: 'row', id: rowId });
@@ -709,7 +169,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   };
 
   const confirmDelete = () => {
-    // Block if user cannot edit
     if (!canEdit) return;
 
     if (!deleteTarget) return;
@@ -724,9 +183,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         return { ...db, columns: updatedColumns, rows: updatedRows };
       });
     } else {
-      updateThisDb((db) => ({ 
-        ...db, 
-        rows: db.rows.filter((r) => r.id !== deleteTarget.id) 
+      updateThisDb((db) => ({
+        ...db,
+        rows: db.rows.filter((r) => r.id !== deleteTarget.id)
       }));
     }
     setShowConfirmDelete(false);
@@ -734,7 +193,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   };
 
   const handleAddRow = () => {
-    // Block if user cannot edit
     if (!canEdit) {
       alert('You do not have permission to add rows. Only ADMIN and SUPERUSER can edit.');
       return;
@@ -753,99 +211,24 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }, 100);
   };
 
-  // Add sort
+  // Sort handlers using utility functions
   const handleAddSort = (columnKey: string) => {
-    // Check if column is already in sort config
-    const existingIndex = sortConfig.findIndex(s => s.column === columnKey);
-
-    if (existingIndex >= 0) {
-      // Toggle direction
-      const newSortConfig = [...sortConfig];
-      newSortConfig[existingIndex].direction =
-        newSortConfig[existingIndex].direction === 'asc' ? 'desc' : 'asc';
-      setSortConfig(newSortConfig);
-    } else {
-      // Add new sort
-      setSortConfig([...sortConfig, { column: columnKey, direction: 'asc' }]);
-    }
+    setSortConfig(addSort(sortConfig, columnKey));
   };
 
-  // Update sort direction
   const handleUpdateSortDirection = (index: number, direction: 'asc' | 'desc') => {
-    const newSortConfig = [...sortConfig];
-    newSortConfig[index].direction = direction;
-    setSortConfig(newSortConfig);
+    setSortConfig(updateSortDirection(sortConfig, index, direction));
   };
 
-  // Delete specific sort
   const handleDeleteSort = (index: number) => {
-    const newSortConfig = sortConfig.filter((_, i) => i !== index);
-    setSortConfig(newSortConfig);
+    setSortConfig(deleteSort(sortConfig, index));
   };
 
-  // Clear all sorts
   const handleClearAllSorts = () => {
-    setSortConfig([]);
-  };
-
-  // Compare function for sorting
-  const compareValues = (aValue: any, bValue: any, columnType: string, direction: 'asc' | 'desc') => {
-    if (columnType === 'number') {
-      const aNum = parseFloat(aValue?.toString() || '0') || 0;
-      const bNum = parseFloat(bValue?.toString() || '0') || 0;
-      return direction === 'asc' ? aNum - bNum : bNum - aNum;
-    }
-
-    if (columnType === 'date') {
-      const aDate = new Date(aValue?.toString() || '').getTime() || 0;
-      const bDate = new Date(bValue?.toString() || '').getTime() || 0;
-      return direction === 'asc' ? aDate - bDate : bDate - aDate;
-    }
-
-    if (columnType === 'checkbox') {
-      const aBool = aValue ? 1 : 0;
-      const bBool = bValue ? 1 : 0;
-      return direction === 'asc' ? aBool - bBool : bBool - aBool;
-    }
-
-    // Default text comparison
-    const aStr = (aValue?.toString() || '').toLowerCase();
-    const bStr = (bValue?.toString() || '').toLowerCase();
-    return direction === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
-  };
-
-  // Get sorted rows with multi-level sorting
-  const getSortedRows = () => {
-    if (sortConfig.length === 0) {
-      return database.rows;
-    }
-
-    const sortedRows = [...database.rows].sort((a, b) => {
-      // Apply sorts in order (first sort is primary, second is secondary, etc.)
-      for (const sort of sortConfig) {
-        const column = database.columns.find(col => col.key === sort.column);
-        if (!column) continue;
-
-        const aValue = a.properties[sort.column]?.value || '';
-        const bValue = b.properties[sort.column]?.value || '';
-
-        const comparison = compareValues(aValue, bValue, column.type, sort.direction);
-
-        // If values are not equal, return the comparison result
-        if (comparison !== 0) {
-          return comparison;
-        }
-        // If equal, continue to next sort level
-      }
-
-      return 0; // All sort levels are equal
-    });
-
-    return sortedRows;
+    setSortConfig(clearAllSorts());
   };
 
   const handleDatabaseNameChange = () => {
-    // Block if user cannot edit
     if (!canEdit) return;
 
     if (editedName.trim() && editedName !== database.name) {
@@ -865,10 +248,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   };
 
   const handleEmojiSelect = (emoji: string) => {
-    // Block if user cannot edit
     if (!canEdit) return;
 
-    // Add emoji to the beginning of the name
     const newName = database.icon
       ? database.name.replace(database.icon, emoji)
       : `${emoji} ${database.name}`;
@@ -877,10 +258,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   };
 
   const handleRemoveIcon = () => {
-    // Block if user cannot edit
     if (!canEdit) return;
 
-    // Remove emoji from the name
     if (database.icon) {
       const newName = database.name.replace(database.icon, '').trim();
       updateThisDb((db) => ({ ...db, name: newName, icon: undefined }));
@@ -889,7 +268,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   };
 
   const handleDescriptionChange = () => {
-    // Block if user cannot edit
     if (!canEdit) return;
 
     updateThisDb((db) => ({ ...db, description: editedDescription.trim() }));
@@ -904,12 +282,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   };
 
   const handleAddDescription = () => {
-    // Block if user cannot edit
     if (!canEdit) return;
 
     setIsEditingDescription(true);
     setEditedDescription(database.description || '');
   };
+
+  // Get sorted rows using utility function
+  const sortedRows = getSortedRows(database.rows, database.columns, sortConfig);
 
   return (
     <motion.div
@@ -1103,151 +483,18 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 <span>Sort{sortConfig.length > 0 ? ` (${sortConfig.length})` : ''}</span>
               </button>
 
-              {/* Sort Dropdown Menu - Notion Style */}
+              {/* Sort Dropdown Component */}
               {showSortDropdown && (
-                <div
-                  className={`absolute top-full mt-2 rounded-lg shadow-lg border z-50
-                    w-80 max-w-[calc(100vw-2rem)]
-                    left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0
-                    ${darkMode ? 'bg-[#2a2a2a] border-gray-700' : 'bg-white border-gray-200'}
-                  `}
-                >
-                  {/* Existing Sorts */}
-                  {sortConfig.length > 0 && (
-                    <div className="p-2">
-                      {sortConfig.map((sort, index) => {
-                        const column = database.columns.find(col => col.key === sort.column);
-                        if (!column) return null;
-
-                        return (
-                          <div
-                            key={index}
-                            className={`flex items-center gap-1 sm:gap-2 ${index < sortConfig.length - 1 ? 'mb-2' : ''} p-1.5 sm:p-2 rounded ${
-                              darkMode ? 'bg-gray-800' : 'bg-gray-50'
-                            }`}
-                          >
-                            {/* Column Selector */}
-                            <div className="relative flex-1 min-w-0">
-                              <div
-                                className={`w-full flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded border text-xs sm:text-sm ${
-                                  darkMode
-                                    ? 'bg-gray-900 border-gray-700 text-gray-300'
-                                    : 'bg-white border-gray-300 text-gray-700'
-                                }`}
-                              >
-                                <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} flex-shrink-0`}>
-                                  {propertyTypeIcons[column.type]}
-                                </span>
-                                <span className="flex-1 text-left truncate">{column.label}</span>
-                              </div>
-                            </div>
-
-                            {/* Direction Selector */}
-                            <select
-                              value={sort.direction}
-                              onChange={(e) => handleUpdateSortDirection(index, e.target.value as 'asc' | 'desc')}
-                              className={`px-2 sm:px-3 py-1.5 rounded border text-xs sm:text-sm cursor-pointer flex-shrink-0 ${
-                                darkMode
-                                  ? 'bg-gray-900 border-gray-700 text-gray-300'
-                                  : 'bg-white border-gray-300 text-gray-700'
-                              }`}
-                            >
-                              <option value="asc">Asc</option>
-                              <option value="desc">Desc</option>
-                            </select>
-
-                            {/* Delete Button */}
-                            <button
-                              onClick={() => handleDeleteSort(index)}
-                              className={`p-1.5 rounded flex-shrink-0 ${
-                                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-                              }`}
-                              title="Delete sort"
-                            >
-                              <Trash2 className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Add Sort Button */}
-                  <div className={`p-2 ${sortConfig.length > 0 ? 'border-t' : ''} ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowAddSortDropdown(!showAddSortDropdown)}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm ${
-                          darkMode
-                            ? 'hover:bg-gray-700 text-gray-300'
-                            : 'hover:bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Add sort</span>
-                      </button>
-
-                      {/* Column Selection Dropdown for Add Sort */}
-                      {showAddSortDropdown && (
-                        <div
-                          className={`absolute top-full left-0 mt-1 w-full rounded-lg shadow-lg border max-h-48 overflow-y-auto ${
-                            darkMode ? 'bg-[#2a2a2a] border-gray-700' : 'bg-white border-gray-200'
-                          }`}
-                          style={{ zIndex: 100 }}
-                        >
-                          {database.columns
-                            .filter(col => !sortConfig.find(s => s.column === col.key))
-                            .map((col) => (
-                              <button
-                                key={col.key}
-                                onClick={() => {
-                                  handleAddSort(col.key);
-                                  setShowAddSortDropdown(false);
-                                }}
-                                className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
-                                  darkMode
-                                    ? 'hover:bg-gray-700 text-gray-300'
-                                    : 'hover:bg-gray-100 text-gray-700'
-                                }`}
-                              >
-                                <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                  {propertyTypeIcons[col.type]}
-                                </span>
-                                <span>{col.label}</span>
-                              </button>
-                            ))}
-                          {database.columns.length === sortConfig.length && (
-                            <div className={`px-3 py-4 text-sm text-center ${
-                              darkMode ? 'text-gray-500' : 'text-gray-400'
-                            }`}>
-                              All columns are sorted
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Delete All Sorts */}
-                  {sortConfig.length > 0 && (
-                    <div className={`p-2 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                      <button
-                        onClick={() => {
-                          handleClearAllSorts();
-                          setShowSortDropdown(false);
-                        }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm ${
-                          darkMode
-                            ? 'hover:bg-gray-700 text-red-400'
-                            : 'hover:bg-gray-100 text-red-600'
-                        }`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span>Delete sort</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <SortDropdown
+                  darkMode={darkMode}
+                  sortConfig={sortConfig}
+                  columns={database.columns}
+                  onAddSort={handleAddSort}
+                  onUpdateDirection={handleUpdateSortDirection}
+                  onDeleteSort={handleDeleteSort}
+                  onClearAll={handleClearAllSorts}
+                  onClose={() => setShowSortDropdown(false)}
+                />
               )}
             </div>
 
@@ -1271,14 +518,18 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             <table className="w-full">
               {/* Table Header - Sticky */}
               <thead className={`sticky top-0 z-10 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}`}>
-                <tr>
+                <tr className={`border-b ${darkMode ? 'border-gray-800' : 'border-gray-200'}`}>
                   {database.columns.map((col, index) => (
                     <th
                       key={col.key}
                       ref={index === database.columns.length - 1 ? newColumnRef : null}
-                      className={`text-left py-2 font-normal`}
+                      className={`text-left py-2 font-normal ${
+                        index !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
+                      }`}
                       style={{
-                        padding: index === 0 ? '0.5rem 0.25rem 0.5rem 0.5rem' : '0.5rem 0.25rem',
+                        padding: col.type === 'date'
+                          ? (index === 0 ? '0.5rem 0.125rem 0.5rem 0.75rem' : '0.5rem 0.125rem')
+                          : (index === 0 ? '0.5rem 0.5rem 0.5rem 0.75rem' : '0.5rem 0.5rem'),
                         minWidth: 'fit-content',
                         width: 'auto',
                         whiteSpace: 'nowrap'
@@ -1308,7 +559,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             />
                           )}
                         </div>
-                        
+
                         {/* Column Label */}
                         <input
                           value={col.label}
@@ -1336,7 +587,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   ))}
                   {/* Add Property Button - Only for ADMIN/SUPERUSER */}
                   {canEdit && (
-                    <th className={`w-12 sticky right-0 z-20 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}`}>
+                    <th className={`w-12 sticky right-0 z-20 border-b ${darkMode ? 'bg-[#202020] border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
                       <button
                         onClick={() => setShowAddProperty(true)}
                         className={`p-1 rounded ${
@@ -1353,10 +604,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
               {/* Table Body */}
               <tbody className={`${darkMode ? 'divide-gray-800' : 'divide-gray-200'} divide-y`}>
-                {getSortedRows().map((row, rowIndex) => (
+                {sortedRows.map((row, rowIndex) => (
                   <tr
                     key={row.id}
-                    ref={rowIndex === getSortedRows().length - 1 ? newRowRef : null}
+                    ref={rowIndex === sortedRows.length - 1 ? newRowRef : null}
                     onMouseEnter={() => setHoveredRow(row.id)}
                     onMouseLeave={() => setHoveredRow(null)}
                     className={`group ${
@@ -1367,9 +618,13 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       const prop = row.properties[col.key];
                       if (!prop) return <td
                         key={col.key}
-                        className="py-2"
+                        className={`py-2 ${
+                          colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
+                        }`}
                         style={{
-                          padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.5rem' : '0.5rem 0.25rem',
+                          padding: col.type === 'date'
+                            ? (colIndex === 0 ? '0.5rem 0.125rem 0.5rem 0.75rem' : '0.5rem 0.125rem')
+                            : (colIndex === 0 ? '0.5rem 0.5rem 0.5rem 0.75rem' : '0.5rem 0.5rem'),
                           whiteSpace: 'nowrap'
                         }}
                       ></td>;
@@ -1377,9 +632,13 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       return (
                         <td
                           key={col.key}
-                          className="py-2"
+                          className={`py-2 ${
+                            colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
+                          }`}
                           style={{
-                            padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.5rem' : '0.5rem 0.25rem',
+                            padding: col.type === 'date'
+                              ? (colIndex === 0 ? '0.5rem 0.125rem 0.5rem 0.75rem' : '0.5rem 0.125rem')
+                              : (colIndex === 0 ? '0.5rem 0.5rem 0.5rem 0.75rem' : '0.5rem 0.5rem'),
                             whiteSpace: 'nowrap'
                           }}
                         >
