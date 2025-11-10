@@ -992,7 +992,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     >
                       <div className="flex items-center gap-2 group">
                         {/* Type Icon with Dropdown */}
-                        <div className="relative">
+                        <div className="relative z-[10000]">
                           <button
                             onClick={() => setTypeDropdownOpen(typeDropdownOpen === col.key ? null : col.key)}
                             className={`flex items-center gap-1 px-1 py-0.5 rounded ${
