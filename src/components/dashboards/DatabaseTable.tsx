@@ -474,7 +474,7 @@ const TypeChangeDropdown: React.FC<{
   ];
 
   return (
-    <div className={`absolute top-full left-0 mt-1 ${darkMode ? 'bg-[#2a2a2a]' : 'bg-white'} rounded-lg shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} py-1 z-50 min-w-[150px]`}>
+    <div className={`absolute top-full left-0 mt-1 ${darkMode ? 'bg-[#2a2a2a]' : 'bg-white'} rounded-lg shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} py-1 z-[9999] min-w-[150px]`}>
       {types.map((type) => (
         <button
           key={type.value}
@@ -969,9 +969,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
       {/* Table - Notion Style with Scroll */}
       <div className="px-8 sm:px-12 lg:px-24 pb-12">
-        <div className={`border rounded-lg overflow-hidden ${
+        <div className={`border rounded-lg ${
           darkMode ? 'border-gray-800' : 'border-gray-200'
-        }`}>
+        }`} style={{ overflow: 'visible' }}>
           {/* Scrollable container - only horizontal scroll here */}
           <div className="overflow-x-auto hide-scrollbar" ref={tableContainerRef}>
             <table className="w-full">
