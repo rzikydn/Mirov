@@ -34,6 +34,8 @@ html {
 input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0);
   transition: filter 0.3s ease;
+  margin-left: -20px;
+  cursor: pointer;
 }
 
 /* Saat elemen root memiliki class "dark" */

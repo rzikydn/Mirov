@@ -982,11 +982,12 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     <th
                       key={col.key}
                       ref={index === database.columns.length - 1 ? newColumnRef : null}
-                      className={`text-left px-4 py-2 font-normal ${
-                        index === 0 ? 'min-w-[320px]' : 'min-w-[200px]'
+                      className={`text-left py-2 font-normal ${
+                        index === 0 ? 'w-[115px] px-2' : 'min-w-[200px] px-4'
                       }`}
                     >
-                      <div className="flex items-center gap-2 group">
+                      {/* Date column optimized for compact view */}
+                      <div className={`flex items-center group ${index === 0 ? 'gap-0.5' : 'gap-2'}`}>
                         {/* Type Icon with Dropdown */}
                         <div className="relative">
                           <button
@@ -1064,12 +1065,12 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       darkMode ? 'hover:bg-[#202020]' : 'hover:bg-gray-50'
                     }`}
                   >
-                    {database.columns.map((col) => {
+                    {database.columns.map((col, colIndex) => {
                       const prop = row.properties[col.key];
-                      if (!prop) return <td key={col.key} className="px-4 py-3"></td>;
+                      if (!prop) return <td key={col.key} className={`py-3 ${colIndex === 0 ? 'px-2' : 'px-4'}`}></td>;
 
                       return (
-                        <td key={col.key} className="px-4 py-3">
+                        <td key={col.key} className={`py-3 ${colIndex === 0 ? 'px-2' : 'px-4'}`}>
                           {prop.type === 'text' && (
                             <input
                               type="text"
