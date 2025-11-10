@@ -474,7 +474,7 @@ const TypeChangeDropdown: React.FC<{
   ];
 
   return (
-    <div className={`absolute top-full left-0 mt-1 ${darkMode ? 'bg-[#2a2a2a]' : 'bg-white'} rounded-lg shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} py-1 z-[9999] min-w-[150px]`}>
+    <div className={`absolute top-full left-0 mt-1 ${darkMode ? 'bg-[#2a2a2a]' : 'bg-white'} rounded-lg shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} py-1 z-50 min-w-[150px]`}>
       {types.map((type) => (
         <button
           key={type.value}
@@ -969,9 +969,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
       {/* Table - Notion Style with Scroll */}
       <div className="px-8 sm:px-12 lg:px-24 pb-12">
-        <div className={`border rounded-lg ${
+        <div className={`border rounded-lg overflow-hidden ${
           darkMode ? 'border-gray-800' : 'border-gray-200'
-        }`} style={{ overflow: 'visible' }}>
+        }`}>
           {/* Scrollable container - only horizontal scroll here */}
           <div className="overflow-x-auto hide-scrollbar" ref={tableContainerRef}>
             <table className="w-full">
@@ -984,15 +984,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       ref={index === database.columns.length - 1 ? newColumnRef : null}
                       className={`text-left px-4 py-2 font-normal ${
                         index === 0 ? 'min-w-[320px]' : 'min-w-[200px]'
-                      } ${
-                        index === 0
-                          ? `sticky left-0 z-20 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`
-                          : ''
                       }`}
                     >
                       <div className="flex items-center gap-2 group">
                         {/* Type Icon with Dropdown */}
-                        <div className="relative z-[10000]">
+                        <div className="relative">
                           <button
                             onClick={() => setTypeDropdownOpen(typeDropdownOpen === col.key ? null : col.key)}
                             className={`flex items-center gap-1 px-1 py-0.5 rounded ${
@@ -1068,19 +1064,12 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       darkMode ? 'hover:bg-[#202020]' : 'hover:bg-gray-50'
                     }`}
                   >
-                    {database.columns.map((col, colIndex) => {
+                    {database.columns.map((col) => {
                       const prop = row.properties[col.key];
                       if (!prop) return <td key={col.key} className="px-4 py-3"></td>;
 
                       return (
-                        <td
-                          key={col.key}
-                          className={`px-4 py-3 ${
-                            colIndex === 0
-                              ? `sticky left-0 z-10 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`
-                              : ''
-                          }`}
-                        >
+                        <td key={col.key} className="px-4 py-3">
                           {prop.type === 'text' && (
                             <input
                               type="text"
