@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, MoreHorizontal, Smile, FileText, Edit3, Calendar, Hash, Type, CheckSquare, ChevronDown, X, Download } from 'lucide-react';
+import { Plus, MoreHorizontal, Smile, FileText, Edit3, Calendar, Hash, Type, CheckSquare, ChevronDown, X, Download, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 import { Database, DatabaseRow } from '../../types/database';
 import { propertyTypes } from '../../constants/dashboard';
 import AddPropertyModal from './modals/AddPropertyModal';
@@ -257,7 +257,6 @@ const EmojiPicker: React.FC<{
   onClose: () => void;
 }> = ({ darkMode, onSelect, onClose }) => {
   const [activeCategory, setActiveCategory] = useState('smileys');
-  const [searchQuery, setSearchQuery] = useState('');
   const pickerRef = useRef<HTMLDivElement>(null);
 
   const emojiCategories = {
@@ -269,6 +268,15 @@ const EmojiPicker: React.FC<{
         '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🥸', '🤩',
         '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣',
         '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
+        '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
+        '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
+        '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐',
+        '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈',
+        '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾',
+        '🤖', '🎃', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿',
+        '😾', '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️',
+        '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️',
+        '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲',
       ]
     },
     nature: {
@@ -279,6 +287,15 @@ const EmojiPicker: React.FC<{
         '🌀', '🌈', '⭐', '🌟', '✨', '⚡', '☀️', '🌤️', '⛅', '🌥️',
         '☁️', '🌦️', '🌧️', '⛈️', '🌩️', '❄️', '☃️', '⛄', '🌙', '🌎',
         '🌍', '🌏', '🪐', '💫', '🔥', '💧', '🌊', '🏔️', '⛰️', '🌋',
+        '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯',
+        '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒',
+        '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇',
+        '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜',
+        '🦟', '🦗', '🕷️', '🕸️', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕',
+        '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳',
+        '🐋', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🦣', '🐘',
+        '🦛', '🦏', '🐪', '🐫', '🦒', '🦘', '🦬', '🐃', '🐂', '🐄',
+        '🐎', '🐖', '🐏', '🐑', '🦙', '🐐', '🦌', '🐕', '🐩', '🦮',
       ]
     },
     food: {
@@ -289,6 +306,12 @@ const EmojiPicker: React.FC<{
         '🌶️', '🫑', '🌽', '🥕', '🧄', '🧅', '🥔', '🍠', '🥐', '🥯',
         '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🧈', '🥞', '🧇', '🥓',
         '🥩', '🍗', '🍖', '🌭', '🍔', '🍟', '🍕', '🥪', '🥙', '🧆',
+        '🌮', '🌯', '🫔', '🥗', '🥘', '🫕', '🥫', '🍝', '🍜', '🍲',
+        '🍛', '🍣', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥',
+        '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🥧', '🧁', '🍰',
+        '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜',
+        '🍯', '🥛', '🍼', '🫖', '☕', '🍵', '🧃', '🥤', '🧋', '🍶',
+        '🍺', '🍻', '🥂', '🍷', '🥃', '🍸', '🍹', '🧉', '🍾', '🧊',
       ]
     },
     activity: {
@@ -299,6 +322,10 @@ const EmojiPicker: React.FC<{
         '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '🛷',
         '⛸️', '🥌', '🎿', '⛷️', '🏂', '🪂', '🏋️', '🤼', '🤸', '🤺',
         '🤾', '🏌️', '🏇', '🧘', '🏄', '🏊', '🤽', '🚣', '🧗', '🚴',
+        '🚵', '🤖', '🥇', '🥈', '🥉', '🏅', '🎖️', '🏆', '🎗️', '🎫',
+        '🎟️', '🎪', '🤹', '🎭', '🩰', '🎨', '🎬', '🎤', '🎧', '🎼',
+        '🎹', '🥁', '🪘', '🎷', '🎺', '🪗', '🎸', '🪕', '🎻', '🎲',
+        '♟️', '🎯', '🎳', '🎮', '🎰', '🧩', '🧸', '🪅', '🪆', '🪢',
       ]
     },
     travel: {
@@ -309,6 +336,11 @@ const EmojiPicker: React.FC<{
         '🏍️', '🛺', '🚨', '🚔', '🚍', '🚘', '🚖', '🚡', '🚠', '🚟',
         '🚃', '🚋', '🚞', '🚝', '🚄', '🚅', '🚈', '🚂', '🚆', '🚇',
         '🚊', '🚉', '✈️', '🛫', '🛬', '🛩️', '💺', '🚁', '🛸', '🚀',
+        '🛰️', '⛵', '🚤', '🛥️', '🛳️', '⛴️', '🚢', '⚓', '⛽', '🚧',
+        '🚦', '🚥', '🚏', '🗺️', '🗿', '🗽', '🗼', '🏰', '🏯', '🏟️',
+        '🎡', '🎢', '🎠', '⛲', '⛱️', '🏖️', '🏝️', '🏜️', '🌋', '⛰️',
+        '🏔️', '🗻', '🏕️', '⛺', '🏠', '🏡', '🏘️', '🏚️', '🏗️', '🏭',
+        '🏢', '🏬', '🏣', '🏤', '🏥', '🏦', '🏨', '🏪', '🏫', '🏩',
       ]
     },
     objects: {
@@ -319,6 +351,13 @@ const EmojiPicker: React.FC<{
         '📽️', '🎞️', '📞', '☎️', '📟', '📠', '📺', '📻', '🎙️', '🎚️',
         '🎛️', '🧭', '⏱️', '⏲️', '⏰', '🕰️', '⌛', '⏳', '📡', '🔋',
         '🔌', '💡', '🔦', '🕯️', '🪔', '🧯', '🛢️', '💸', '💵', '💴',
+        '💶', '💷', '🏦', '💰', '💳', '💎', '⚖️', '🪜', '🧰', '🪛',
+        '🔧', '🔨', '⚒️', '🛠️', '⛏️', '🪚', '🔩', '⚙️', '🪤', '🧱',
+        '⛓️', '🧲', '🔫', '💣', '🧨', '🪓', '🔪', '🗡️', '⚔️', '🛡️',
+        '🚬', '⚰️', '🪦', '⚱️', '🏺', '🔮', '📿', '🧿', '💈', '⚗️',
+        '🔭', '🔬', '🕳️', '🩹', '🩺', '💊', '💉', '🩸', '🧬', '🦠',
+        '🧫', '🧪', '🌡️', '🧹', '🪠', '🧺', '🧻', '🚽', '🚰', '🚿',
+        '🛁', '🛀', '🧼', '🪥', '🪒', '🧽', '🧴', '🛎️', '🔑', '🗝️',
       ]
     },
     symbols: {
@@ -329,6 +368,14 @@ const EmojiPicker: React.FC<{
         '☮️', '✝️', '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️',
         '🛐', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏',
         '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️', '📴',
+        '📳', '🆚', '💮', '🉐', '㊙️', '㊗️', '🈴', '🈵', '🈹', '🈲',
+        '🅰️', '🅱️', '🆎', '🆑', '🅾️', '🆘', '❌', '⭕', '🛑', '⛔',
+        '📛', '🚫', '💯', '💢', '♨️', '🚷', '🚯', '🚳', '🚱', '🔞',
+        '📵', '🚭', '❗', '❕', '❓', '❔', '‼️', '⁉️', '🔅', '🔆',
+        '〽️', '⚠️', '🚸', '🔱', '⚜️', '🔰', '♻️', '✅', '🈯', '💹',
+        '❇️', '✳️', '❎', '🌐', '💠', 'Ⓜ️', '🌀', '💤', '🏧', '🚾',
+        '♿', '🅿️', '🛗', '🈳', '🈂️', '🛂', '🛃', '🛄', '🛅', '🚹',
+        '🚺', '🚼', '⚧️', '🚻', '🚮', '🎦', '📶', '🈁', '🔣', 'ℹ️',
       ]
     },
     flags: {
@@ -339,20 +386,25 @@ const EmojiPicker: React.FC<{
         '🇦🇹', '🇦🇺', '🇦🇼', '🇦🇽', '🇦🇿', '🇧🇦', '🇧🇧', '🇧🇩', '🇧🇪', '🇧🇫',
         '🇧🇬', '🇧🇭', '🇧🇮', '🇧🇯', '🇧🇱', '🇧🇲', '🇧🇳', '🇧🇴', '🇧🇶', '🇧🇷',
         '🇧🇸', '🇧🇹', '🇧🇻', '🇧🇼', '🇧🇾', '🇧🇿', '🇨🇦', '🇨🇨', '🇨🇩', '🇨🇫',
+        '🇨🇬', '🇨🇭', '🇨🇮', '🇨🇰', '🇨🇱', '🇨🇲', '🇨🇳', '🇨🇴', '🇨🇵', '🇨🇷',
+        '🇨🇺', '🇨🇻', '🇨🇼', '🇨🇽', '🇨🇾', '🇨🇿', '🇩🇪', '🇩🇬', '🇩🇯', '🇩🇰',
+        '🇩🇲', '🇩🇴', '🇩🇿', '🇪🇦', '🇪🇨', '🇪🇪', '🇪🇬', '🇪🇭', '🇪🇷', '🇪🇸',
+        '🇪🇹', '🇪🇺', '🇫🇮', '🇫🇯', '🇫🇰', '🇫🇲', '🇫🇴', '🇫🇷', '🇬🇦', '🇬🇧',
+        '🇬🇩', '🇬🇪', '🇬🇫', '🇬🇬', '🇬🇭', '🇬🇮', '🇬🇱', '🇬🇲', '🇬🇳', '🇬🇵',
+        '🇬🇶', '🇬🇷', '🇬🇸', '🇬🇹', '🇬🇺', '🇬🇼', '🇬🇾', '🇭🇰', '🇭🇲', '🇭🇳',
+        '🇭🇷', '🇭🇹', '🇭🇺', '🇮🇨', '🇮🇩', '🇮🇪', '🇮🇱', '🇮🇲', '🇮🇳', '🇮🇴',
+        '🇮🇶', '🇮🇷', '🇮🇸', '🇮🇹', '🇯🇪', '🇯🇲', '🇯🇴', '🇯🇵', '🇰🇪', '🇰🇬',
+        '🇰🇭', '🇰🇮', '🇰🇲', '🇰🇳', '🇰🇵', '🇰🇷', '🇰🇼', '🇰🇾', '🇰🇿', '🇱🇦',
+        '🇱🇧', '🇱🇨', '🇱🇮', '🇱🇰', '🇱🇷', '🇱🇸', '🇱🇹', '🇱🇺', '🇱🇻', '🇱🇾',
+        '🇲🇦', '🇲🇨', '🇲🇩', '🇲🇪', '🇲🇫', '🇲🇬', '🇲🇭', '🇲🇰', '🇲🇱', '🇲🇲',
+        '🇲🇳', '🇲🇴', '🇲🇵', '🇲🇶', '🇲🇷', '🇲🇸', '🇲🇹', '🇲🇺', '🇲🇻', '🇲🇼',
+        '🇲🇽', '🇲🇾', '🇲🇿', '🇳🇦', '🇳🇨', '🇳🇪', '🇳🇫', '🇳🇬', '🇳🇮', '🇳🇱',
+        '🇳🇴', '🇳🇵', '🇳🇷', '🇳🇺', '🇳🇿', '🇴🇲', '🇵🇦', '🇵🇪', '🇵🇫', '🇵🇬',
+        '🇵🇭', '🇵🇰', '🇵🇱', '🇵🇲', '🇵🇳', '🇵🇷', '🇵🇸', '🇵🇹', '🇵🇼', '🇵🇾',
       ]
     },
   };
 
-  const filteredEmojis = () => {
-    if (!searchQuery) {
-      return emojiCategories[activeCategory as keyof typeof emojiCategories].emojis;
-    }
-    
-    // Search across all categories
-    return Object.values(emojiCategories)
-      .flatMap(cat => cat.emojis)
-      .filter(emoji => emoji.includes(searchQuery));
-  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -370,9 +422,9 @@ const EmojiPicker: React.FC<{
       ref={pickerRef}
       className={`absolute top-full left-0 mt-2 ${
         darkMode ? 'bg-[#2a2a2a]' : 'bg-white'
-      } rounded-lg shadow-xl border ${
+      } rounded-xl shadow-2xl border ${
         darkMode ? 'border-gray-700' : 'border-gray-200'
-      } z-50 w-80`}
+      } z-50 w-[380px]`}
     >
       {/* Header */}
       <div className={`flex items-center justify-between p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
@@ -387,23 +439,8 @@ const EmojiPicker: React.FC<{
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className={`p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-        <input
-          type="text"
-          placeholder="Search emoji..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className={`w-full px-3 py-2 rounded text-sm ${
-            darkMode 
-              ? 'bg-[#1a1a1a] text-gray-300 placeholder-gray-500 border-gray-700' 
-              : 'bg-gray-50 text-gray-900 placeholder-gray-400 border-gray-200'
-          } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-        />
-      </div>
-
       {/* Category Tabs */}
-      {!searchQuery && (
+      {(
         <div className={`flex gap-1 px-2 py-2 border-b overflow-x-auto ${
           darkMode ? 'border-gray-700' : 'border-gray-200'
         }`}>
@@ -428,17 +465,17 @@ const EmojiPicker: React.FC<{
       )}
 
       {/* Emoji Grid */}
-      <div className="p-3">
-        <div className="grid grid-cols-8 gap-1 max-h-64 overflow-y-auto">
-          {filteredEmojis().map((emoji, index) => (
+      <div className="p-2">
+        <div className="grid grid-cols-9 gap-0 max-h-72 overflow-y-auto">
+          {emojiCategories[activeCategory as keyof typeof emojiCategories].emojis.map((emoji, index) => (
             <button
               key={index}
               onClick={() => {
                 onSelect(emoji);
                 onClose();
               }}
-              className={`text-2xl p-2 rounded hover:bg-opacity-80 transition-all ${
-                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+              className={`text-3xl w-10 h-10 flex items-center justify-center rounded-md transition-all transform hover:scale-110 ${
+                darkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'
               }`}
               title={emoji}
             >
@@ -446,14 +483,6 @@ const EmojiPicker: React.FC<{
             </button>
           ))}
         </div>
-        
-        {filteredEmojis().length === 0 && (
-          <div className={`text-center py-8 text-sm ${
-            darkMode ? 'text-gray-500' : 'text-gray-400'
-          }`}>
-            No emoji found
-          </div>
-        )}
       </div>
     </div>
   );
@@ -521,6 +550,12 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState(database.description || '');
   const [showExportModal, setShowExportModal] = useState(false);
+  const [sortConfig, setSortConfig] = useState<Array<{
+    column: string;
+    direction: 'asc' | 'desc';
+  }>>([]);
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [showAddSortDropdown, setShowAddSortDropdown] = useState(false);
 
   // Inject styles for date input calendar icon
   useEffect(() => {
@@ -716,6 +751,97 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     setTimeout(() => {
       newRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
+  };
+
+  // Add sort
+  const handleAddSort = (columnKey: string) => {
+    // Check if column is already in sort config
+    const existingIndex = sortConfig.findIndex(s => s.column === columnKey);
+
+    if (existingIndex >= 0) {
+      // Toggle direction
+      const newSortConfig = [...sortConfig];
+      newSortConfig[existingIndex].direction =
+        newSortConfig[existingIndex].direction === 'asc' ? 'desc' : 'asc';
+      setSortConfig(newSortConfig);
+    } else {
+      // Add new sort
+      setSortConfig([...sortConfig, { column: columnKey, direction: 'asc' }]);
+    }
+  };
+
+  // Update sort direction
+  const handleUpdateSortDirection = (index: number, direction: 'asc' | 'desc') => {
+    const newSortConfig = [...sortConfig];
+    newSortConfig[index].direction = direction;
+    setSortConfig(newSortConfig);
+  };
+
+  // Delete specific sort
+  const handleDeleteSort = (index: number) => {
+    const newSortConfig = sortConfig.filter((_, i) => i !== index);
+    setSortConfig(newSortConfig);
+  };
+
+  // Clear all sorts
+  const handleClearAllSorts = () => {
+    setSortConfig([]);
+  };
+
+  // Compare function for sorting
+  const compareValues = (aValue: any, bValue: any, columnType: string, direction: 'asc' | 'desc') => {
+    if (columnType === 'number') {
+      const aNum = parseFloat(aValue?.toString() || '0') || 0;
+      const bNum = parseFloat(bValue?.toString() || '0') || 0;
+      return direction === 'asc' ? aNum - bNum : bNum - aNum;
+    }
+
+    if (columnType === 'date') {
+      const aDate = new Date(aValue?.toString() || '').getTime() || 0;
+      const bDate = new Date(bValue?.toString() || '').getTime() || 0;
+      return direction === 'asc' ? aDate - bDate : bDate - aDate;
+    }
+
+    if (columnType === 'checkbox') {
+      const aBool = aValue ? 1 : 0;
+      const bBool = bValue ? 1 : 0;
+      return direction === 'asc' ? aBool - bBool : bBool - aBool;
+    }
+
+    // Default text comparison
+    const aStr = (aValue?.toString() || '').toLowerCase();
+    const bStr = (bValue?.toString() || '').toLowerCase();
+    return direction === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+  };
+
+  // Get sorted rows with multi-level sorting
+  const getSortedRows = () => {
+    if (sortConfig.length === 0) {
+      return database.rows;
+    }
+
+    const sortedRows = [...database.rows].sort((a, b) => {
+      // Apply sorts in order (first sort is primary, second is secondary, etc.)
+      for (const sort of sortConfig) {
+        const column = database.columns.find(col => col.key === sort.column);
+        if (!column) continue;
+
+        const aValue = a.properties[sort.column]?.value || '';
+        const bValue = b.properties[sort.column]?.value || '';
+
+        const comparison = compareValues(aValue, bValue, column.type, sort.direction);
+
+        // If values are not equal, return the comparison result
+        if (comparison !== 0) {
+          return comparison;
+        }
+        // If equal, continue to next sort level
+      }
+
+      return 0; // All sort levels are equal
+    });
+
+    return sortedRows;
   };
 
   const handleDatabaseNameChange = () => {
@@ -958,12 +1084,180 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             </span>
           </div>
 
-          <button
-            onClick={handleAddRow}
-            className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium"
-          >
-            + New Rows
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Sort Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowSortDropdown(!showSortDropdown)}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded text-sm font-medium border ${
+                  sortConfig.length > 0
+                    ? darkMode
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-blue-600 text-white border-blue-600'
+                    : darkMode
+                      ? 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <ArrowUpDown className="w-4 h-4" />
+                <span>Sort{sortConfig.length > 0 ? ` (${sortConfig.length})` : ''}</span>
+              </button>
+
+              {/* Sort Dropdown Menu - Notion Style */}
+              {showSortDropdown && (
+                <div
+                  className={`absolute top-full mt-2 rounded-lg shadow-lg border z-50
+                    w-80 max-w-[calc(100vw-2rem)]
+                    left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0
+                    ${darkMode ? 'bg-[#2a2a2a] border-gray-700' : 'bg-white border-gray-200'}
+                  `}
+                >
+                  {/* Existing Sorts */}
+                  {sortConfig.length > 0 && (
+                    <div className="p-2">
+                      {sortConfig.map((sort, index) => {
+                        const column = database.columns.find(col => col.key === sort.column);
+                        if (!column) return null;
+
+                        return (
+                          <div
+                            key={index}
+                            className={`flex items-center gap-1 sm:gap-2 ${index < sortConfig.length - 1 ? 'mb-2' : ''} p-1.5 sm:p-2 rounded ${
+                              darkMode ? 'bg-gray-800' : 'bg-gray-50'
+                            }`}
+                          >
+                            {/* Column Selector */}
+                            <div className="relative flex-1 min-w-0">
+                              <div
+                                className={`w-full flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded border text-xs sm:text-sm ${
+                                  darkMode
+                                    ? 'bg-gray-900 border-gray-700 text-gray-300'
+                                    : 'bg-white border-gray-300 text-gray-700'
+                                }`}
+                              >
+                                <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} flex-shrink-0`}>
+                                  {propertyTypeIcons[column.type]}
+                                </span>
+                                <span className="flex-1 text-left truncate">{column.label}</span>
+                              </div>
+                            </div>
+
+                            {/* Direction Selector */}
+                            <select
+                              value={sort.direction}
+                              onChange={(e) => handleUpdateSortDirection(index, e.target.value as 'asc' | 'desc')}
+                              className={`px-2 sm:px-3 py-1.5 rounded border text-xs sm:text-sm cursor-pointer flex-shrink-0 ${
+                                darkMode
+                                  ? 'bg-gray-900 border-gray-700 text-gray-300'
+                                  : 'bg-white border-gray-300 text-gray-700'
+                              }`}
+                            >
+                              <option value="asc">Asc</option>
+                              <option value="desc">Desc</option>
+                            </select>
+
+                            {/* Delete Button */}
+                            <button
+                              onClick={() => handleDeleteSort(index)}
+                              className={`p-1.5 rounded flex-shrink-0 ${
+                                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+                              }`}
+                              title="Delete sort"
+                            >
+                              <Trash2 className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Add Sort Button */}
+                  <div className={`p-2 ${sortConfig.length > 0 ? 'border-t' : ''} ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowAddSortDropdown(!showAddSortDropdown)}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm ${
+                          darkMode
+                            ? 'hover:bg-gray-700 text-gray-300'
+                            : 'hover:bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Add sort</span>
+                      </button>
+
+                      {/* Column Selection Dropdown for Add Sort */}
+                      {showAddSortDropdown && (
+                        <div
+                          className={`absolute top-full left-0 mt-1 w-full rounded-lg shadow-lg border max-h-48 overflow-y-auto ${
+                            darkMode ? 'bg-[#2a2a2a] border-gray-700' : 'bg-white border-gray-200'
+                          }`}
+                          style={{ zIndex: 100 }}
+                        >
+                          {database.columns
+                            .filter(col => !sortConfig.find(s => s.column === col.key))
+                            .map((col) => (
+                              <button
+                                key={col.key}
+                                onClick={() => {
+                                  handleAddSort(col.key);
+                                  setShowAddSortDropdown(false);
+                                }}
+                                className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
+                                  darkMode
+                                    ? 'hover:bg-gray-700 text-gray-300'
+                                    : 'hover:bg-gray-100 text-gray-700'
+                                }`}
+                              >
+                                <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                  {propertyTypeIcons[col.type]}
+                                </span>
+                                <span>{col.label}</span>
+                              </button>
+                            ))}
+                          {database.columns.length === sortConfig.length && (
+                            <div className={`px-3 py-4 text-sm text-center ${
+                              darkMode ? 'text-gray-500' : 'text-gray-400'
+                            }`}>
+                              All columns are sorted
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Delete All Sorts */}
+                  {sortConfig.length > 0 && (
+                    <div className={`p-2 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <button
+                        onClick={() => {
+                          handleClearAllSorts();
+                          setShowSortDropdown(false);
+                        }}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm ${
+                          darkMode
+                            ? 'hover:bg-gray-700 text-red-400'
+                            : 'hover:bg-gray-100 text-red-600'
+                        }`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete sort</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleAddRow}
+              className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium"
+            >
+              + New Rows
+            </button>
+          </div>
         </div>
       </div>
 
@@ -982,13 +1276,12 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     <th
                       key={col.key}
                       ref={index === database.columns.length - 1 ? newColumnRef : null}
-                      className={`text-left py-2 font-normal ${
-                        index === 0 ? 'w-[115px]' : 'min-w-[85px]'
-                      }`}
+                      className={`text-left py-2 font-normal`}
                       style={{
-                        padding: index === 0 ? '0.5rem 0.125rem 0.5rem 0.5rem' : '0.5rem 0.125rem',
-                        minWidth: index === 0 ? '115px' : '85px',
-                        width: index === 0 ? '115px' : 'auto'
+                        padding: index === 0 ? '0.5rem 0.25rem 0.5rem 0.5rem' : '0.5rem 0.25rem',
+                        minWidth: 'fit-content',
+                        width: 'auto',
+                        whiteSpace: 'nowrap'
                       }}
                     >
                       {/* Date column optimized for compact view */}
@@ -1043,7 +1336,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   ))}
                   {/* Add Property Button - Only for ADMIN/SUPERUSER */}
                   {canEdit && (
-                    <th className="w-12 sticky right-0">
+                    <th className={`w-12 sticky right-0 z-20 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}`}>
                       <button
                         onClick={() => setShowAddProperty(true)}
                         className={`p-1 rounded ${
@@ -1060,10 +1353,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
               {/* Table Body */}
               <tbody className={`${darkMode ? 'divide-gray-800' : 'divide-gray-200'} divide-y`}>
-                {database.rows.map((row, rowIndex) => (
+                {getSortedRows().map((row, rowIndex) => (
                   <tr
                     key={row.id}
-                    ref={rowIndex === database.rows.length - 1 ? newRowRef : null}
+                    ref={rowIndex === getSortedRows().length - 1 ? newRowRef : null}
                     onMouseEnter={() => setHoveredRow(row.id)}
                     onMouseLeave={() => setHoveredRow(null)}
                     className={`group ${
@@ -1075,14 +1368,20 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       if (!prop) return <td
                         key={col.key}
                         className="py-2"
-                        style={{ padding: colIndex === 0 ? '0.5rem 0.125rem 0.5rem 0.5rem' : '0.5rem 0.125rem' }}
+                        style={{
+                          padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.5rem' : '0.5rem 0.25rem',
+                          whiteSpace: 'nowrap'
+                        }}
                       ></td>;
 
                       return (
                         <td
                           key={col.key}
                           className="py-2"
-                          style={{ padding: colIndex === 0 ? '0.5rem 0.125rem 0.5rem 0.5rem' : '0.5rem 0.125rem' }}
+                          style={{
+                            padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.5rem' : '0.5rem 0.25rem',
+                            whiteSpace: 'nowrap'
+                          }}
                         >
                           {prop.type === 'text' && (
                             <input
@@ -1090,11 +1389,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                               value={prop.value}
                               onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.value)}
                               disabled={!canEdit}
-                              placeholder="Empty"
+                              placeholder=""
                               className={`w-full text-sm ${
                                 darkMode
-                                  ? 'bg-transparent text-gray-300 placeholder-gray-600'
-                                  : 'bg-transparent text-gray-900 placeholder-gray-400'
+                                  ? 'bg-transparent text-gray-300'
+                                  : 'bg-transparent text-gray-900'
                               } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                             />
                           )}
@@ -1104,11 +1403,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                               value={prop.value}
                               onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.valueAsNumber)}
                               disabled={!canEdit}
-                              placeholder="0"
+                              placeholder=""
                               className={`w-full text-sm ${
                                 darkMode
-                                  ? 'bg-transparent text-gray-300 placeholder-gray-600'
-                                  : 'bg-transparent text-gray-900 placeholder-gray-400'
+                                  ? 'bg-transparent text-gray-300'
+                                  : 'bg-transparent text-gray-900'
                               } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                             />
                           )}
