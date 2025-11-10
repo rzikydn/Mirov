@@ -1110,6 +1110,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                   ? 'bg-transparent text-gray-300 dark-mode'
                                   : 'bg-transparent text-gray-900'
                               } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                              style={{ paddingRight: 0, maxWidth: '110px' }}
                             />
                           )}
                           {prop.type === 'checkbox' && (
