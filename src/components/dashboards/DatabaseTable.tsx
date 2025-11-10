@@ -983,11 +983,16 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       key={col.key}
                       ref={index === database.columns.length - 1 ? newColumnRef : null}
                       className={`text-left py-2 font-normal ${
-                        index === 0 ? 'w-[115px] px-2' : 'min-w-[200px] px-4'
+                        index === 0 ? 'w-[115px]' : 'min-w-[85px]'
                       }`}
+                      style={{
+                        padding: index === 0 ? '0.5rem 0.125rem 0.5rem 0.5rem' : '0.5rem 0.125rem',
+                        minWidth: index === 0 ? '115px' : '85px',
+                        width: index === 0 ? '115px' : 'auto'
+                      }}
                     >
                       {/* Date column optimized for compact view */}
-                      <div className={`flex items-center group ${index === 0 ? 'gap-0.5' : 'gap-2'}`}>
+                      <div className={`flex items-center group ${index === 0 ? 'gap-0' : 'gap-0.5'}`}>
                         {/* Type Icon with Dropdown */}
                         <div className="relative">
                           <button
@@ -1067,10 +1072,18 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   >
                     {database.columns.map((col, colIndex) => {
                       const prop = row.properties[col.key];
-                      if (!prop) return <td key={col.key} className={`py-3 ${colIndex === 0 ? 'px-2' : 'px-4'}`}></td>;
+                      if (!prop) return <td
+                        key={col.key}
+                        className="py-2"
+                        style={{ padding: colIndex === 0 ? '0.5rem 0.125rem 0.5rem 0.5rem' : '0.5rem 0.125rem' }}
+                      ></td>;
 
                       return (
-                        <td key={col.key} className={`py-3 ${colIndex === 0 ? 'px-2' : 'px-4'}`}>
+                        <td
+                          key={col.key}
+                          className="py-2"
+                          style={{ padding: colIndex === 0 ? '0.5rem 0.125rem 0.5rem 0.5rem' : '0.5rem 0.125rem' }}
+                        >
                           {prop.type === 'text' && (
                             <input
                               type="text"

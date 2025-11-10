@@ -11,7 +11,7 @@
 }
 
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
 /* 👇 Tambahkan bagian ini */
@@ -60,4 +60,41 @@ table input[type="date"]::-webkit-calendar-picker-indicator {
 
 .hide-scrollbar::-webkit-scrollbar {
   display: none;  /* Chrome, Safari, Opera */
+}
+
+/* 📊 Compact table spacing - remove all cell spacing */
+table {
+  border-spacing: 0;
+  border-collapse: collapse;
+}
+
+/* 🚀 Disable smooth scroll for table containers (instant scroll) */
+.overflow-x-auto {
+  scroll-behavior: auto !important;
+  -webkit-overflow-scrolling: auto !important;
+}
+
+/* 🚫 Remove all transitions and transforms from table elements */
+table,
+table *,
+.overflow-x-auto,
+.overflow-x-auto * {
+  transition: none !important;
+  animation: none !important;
+  will-change: auto !important;
+}
+
+/* 🎯 Optimize sticky positioning and scrolling performance */
+table thead {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+table,
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000px;
+  -webkit-perspective: 1000px;
 }
