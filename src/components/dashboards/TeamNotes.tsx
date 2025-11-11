@@ -479,7 +479,16 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
             <textarea
               value={newNoteText}
               onChange={(e) => setNewNoteText(e.target.value)}
-              placeholder="Write your note here..."
+              onKeyDown={(e) => {
+                // Ctrl/Cmd + Enter to save
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                  e.preventDefault();
+                  if (newNoteText && newNoteText.trim()) {
+                    editingNote ? saveEdit() : addNote();
+                  }
+                }
+              }}
+              placeholder="Write your note here... (Ctrl+Enter to save)"
               autoFocus
               rows={6}
               className={`w-full px-4 py-3 rounded-lg border ${

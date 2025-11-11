@@ -40,6 +40,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   // Check if user can edit (ADMIN or SUPERUSER)
   const canEdit = canManageSchedules();
 
+  // Check if user can manage columns (SUPERUSER only)
+  const canManageColumns = user?.role === 'SUPERUSER';
+
   const [showAddProperty, setShowAddProperty] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'row' | 'column'; id: string } | null>(null);
@@ -510,7 +513,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
       {/* Table - Notion Style with Scroll */}
       <div className="px-8 sm:px-12 lg:px-24 pb-12">
-        <div className={`border rounded-lg overflow-hidden ${
+        <div className={`border rounded-lg ${
           darkMode ? 'border-gray-800' : 'border-gray-200'
         }`}>
           {/* Scrollable container - only horizontal scroll here */}
@@ -528,7 +531,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       }`}
                       style={{
                         padding: col.type === 'date'
-                          ? (index === 0 ? '0.5rem 0.125rem 0.5rem 0.75rem' : '0.5rem 0.125rem')
+                          ? (index === 0 ? '0.5rem 0rem 0.5rem 0.75rem' : '0.5rem 0rem')
                           : (index === 0 ? '0.5rem 0.5rem 0.5rem 0.75rem' : '0.5rem 0.5rem'),
                         minWidth: 'fit-content',
                         width: 'auto',
@@ -537,20 +540,26 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     >
                       {/* Date column optimized for compact view */}
                       <div className={`flex items-center group ${index === 0 ? 'gap-0' : 'gap-0.5'}`}>
-                        {/* Type Icon with Dropdown */}
+                        {/* Type Icon with Dropdown - Only SUPERUSER can change */}
                         <div className="relative">
                           <button
-                            onClick={() => setTypeDropdownOpen(typeDropdownOpen === col.key ? null : col.key)}
+                            onClick={() => canManageColumns && setTypeDropdownOpen(typeDropdownOpen === col.key ? null : col.key)}
+                            disabled={!canManageColumns}
                             className={`flex items-center gap-1 px-1 py-0.5 rounded ${
-                              darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+                              canManageColumns
+                                ? (darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200')
+                                : 'cursor-not-allowed opacity-60'
                             }`}
+                            title={canManageColumns ? 'Change column type' : 'Only SUPERUSER can change column type'}
                           >
                             <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                               {propertyTypeIcons[col.type] || propertyTypeIcons.text}
                             </span>
-                            <ChevronDown className={`w-3 h-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                            {canManageColumns && (
+                              <ChevronDown className={`w-3 h-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                            )}
                           </button>
-                          {typeDropdownOpen === col.key && (
+                          {typeDropdownOpen === col.key && canManageColumns && (
                             <TypeChangeDropdown
                               currentType={col.type}
                               darkMode={darkMode}
@@ -560,24 +569,26 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                           )}
                         </div>
 
-                        {/* Column Label */}
+                        {/* Column Label - Only SUPERUSER can edit */}
                         <input
                           value={col.label}
-                          onChange={(e) => canEdit && handleColumnLabelChange(col.key, e.target.value)}
-                          disabled={!canEdit}
+                          onChange={(e) => canManageColumns && handleColumnLabelChange(col.key, e.target.value)}
+                          disabled={!canManageColumns}
                           className={`text-sm font-medium ${
                             darkMode ? 'text-gray-300 bg-transparent' : 'text-gray-700 bg-transparent'
-                          } border-0 focus:outline-none px-0 py-0 flex-1 ${!canEdit ? 'cursor-not-allowed' : ''}`}
+                          } border-0 focus:outline-none px-0 py-0 flex-1 ${!canManageColumns ? 'cursor-not-allowed' : ''}`}
                           placeholder="Name"
+                          title={canManageColumns ? 'Edit column name' : 'Only SUPERUSER can edit column name'}
                         />
 
-                        {/* Delete Button - Only for ADMIN/SUPERUSER */}
-                        {canEdit && (
+                        {/* Delete Button - Only for SUPERUSER */}
+                        {canManageColumns && (
                           <button
                             onClick={() => handleDeleteProperty(col.key)}
                             className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity ${
                               darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
                             }`}
+                            title="Delete column (SUPERUSER only)"
                           >
                             <MoreHorizontal className={`w-3 h-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
                           </button>
@@ -623,7 +634,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         }`}
                         style={{
                           padding: col.type === 'date'
-                            ? (colIndex === 0 ? '0.5rem 0.125rem 0.5rem 0.75rem' : '0.5rem 0.125rem')
+                            ? (colIndex === 0 ? '0.5rem 0rem 0.5rem 0.75rem' : '0.5rem 0rem')
                             : (colIndex === 0 ? '0.5rem 0.5rem 0.5rem 0.75rem' : '0.5rem 0.5rem'),
                           whiteSpace: 'nowrap'
                         }}
@@ -637,7 +648,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                           }`}
                           style={{
                             padding: col.type === 'date'
-                              ? (colIndex === 0 ? '0.5rem 0.125rem 0.5rem 0.75rem' : '0.5rem 0.125rem')
+                              ? (colIndex === 0 ? '0.5rem 0rem 0.5rem 0.75rem' : '0.5rem 0rem')
                               : (colIndex === 0 ? '0.5rem 0.5rem 0.5rem 0.75rem' : '0.5rem 0.5rem'),
                             whiteSpace: 'nowrap'
                           }}
@@ -681,7 +692,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                   ? 'bg-transparent text-gray-300 dark-mode'
                                   : 'bg-transparent text-gray-900'
                               } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
-                              style={{ paddingRight: 0, maxWidth: '110px' }}
                             />
                           )}
                           {prop.type === 'checkbox' && (

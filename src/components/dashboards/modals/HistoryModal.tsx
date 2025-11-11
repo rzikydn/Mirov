@@ -345,6 +345,10 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
                           </>
                         )}
                       </p>
+                      {/* Description - Show what was changed/deleted */}
+                      <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'} italic`}>
+                        {entry.description}
+                      </p>
                       <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
                         {getTimeAgo(entry.createdAt)}
                       </p>

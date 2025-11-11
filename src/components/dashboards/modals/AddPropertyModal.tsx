@@ -48,12 +48,18 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
             <h3 className="text-lg font-semibold mb-3">Add Property</h3>
             <input
               type="text"
-              placeholder="Property name"
+              placeholder="Property name (Press Enter to add)"
               className={`w-full mb-3 border rounded px-3 py-2 ${
                 darkMode ? 'bg-gray-700 border-gray-600 text-white' : ''
               }`}
               value={propertyName}
               onChange={(e) => setPropertyName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAdd();
+                }
+              }}
             />
             <select
               className={`w-full mb-3 border rounded px-3 py-2 ${

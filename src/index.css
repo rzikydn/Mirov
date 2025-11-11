@@ -33,7 +33,8 @@ html {
 /* 🌙 Ubah warna ikon kalender saat dark mode aktif */
 table input[type="date"] {
   padding-right: 0 !important;
-  max-width: 110px !important;
+  padding-left: 0 !important;
+  max-width: 95px !important;
 }
 
 table input[type="date"]::-webkit-calendar-picker-indicator {
