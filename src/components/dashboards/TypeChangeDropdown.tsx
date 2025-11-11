@@ -25,7 +25,7 @@ const TypeChangeDropdown: React.FC<TypeChangeDropdownProps> = ({
   ];
 
   return (
-    <div className={`absolute top-full left-0 mt-1 ${darkMode ? 'bg-[#2a2a2a]' : 'bg-white'} rounded-lg shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} py-1 z-[9999] min-w-[150px]`}>
+    <div className={`absolute top-full left-0 mt-1 ${darkMode ? 'bg-[#2a2a2a]' : 'bg-white'} rounded-lg shadow-xl border ${darkMode ? 'border-gray-700' : 'border-gray-200'} py-1 min-w-[150px]`} style={{ zIndex: 10000 }}>
       {types.map((type) => (
         <button
           key={type.value}

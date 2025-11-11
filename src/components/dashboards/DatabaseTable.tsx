@@ -739,9 +739,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         width: `${columnWidths[col.key] || 150}px`,
                         maxWidth: `${columnWidths[col.key] || 150}px`,
                         whiteSpace: 'nowrap',
-                        overflow: 'hidden',
+                        overflow: typeDropdownOpen === col.key ? 'visible' : 'hidden',
                         textOverflow: 'ellipsis',
-                        zIndex: index === 0 ? 101 : 100,
+                        zIndex: typeDropdownOpen === col.key ? 200 : (index === 0 ? 101 : 100),
                         ...(index === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                       }}
                     >
