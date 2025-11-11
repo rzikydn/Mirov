@@ -59,9 +59,12 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [editedDescription, setEditedDescription] = useState(database.description || '');
   const [showExportModal, setShowExportModal] = useState(false);
   const [sortConfig, setSortConfig] = useState<SortConfig[]>(() => {
-    // Set default sort to first column, ascending
+    // Set default sort to first column
+    // If first column is date type, sort descending; otherwise ascending
     if (database.columns.length > 0) {
-      return [{ column: database.columns[0].key, direction: 'asc' }];
+      const firstColumn = database.columns[0];
+      const direction = firstColumn.type === 'date' ? 'desc' : 'asc';
+      return [{ column: firstColumn.key, direction }];
     }
     return [];
   });

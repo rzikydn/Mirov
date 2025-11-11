@@ -22,14 +22,11 @@ interface ColoredNote extends Note {
   updatedAt?: string; // Field dari backend API
 }
 
-// Pastel colors like in the image
+// Post-it colors: Red, Yellow, Green
 const noteColors = [
-  '#FFD89B', // Yellow/Orange
-  '#FFA896', // Coral/Salmon
-  '#C4F5A4', // Light Green
-  '#B5A4F5', // Light Purple
-  '#A4E5F5', // Light Blue
-  '#FFB8D1', // Light Pink
+  '#FFA896', // Red
+  '#FFD89B', // Yellow
+  '#C4F5A4', // Green
 ];
 
 // ⭐ FUNGSI BARU: Format tanggal ke bahasa Indonesia
