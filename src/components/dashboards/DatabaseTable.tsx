@@ -660,7 +660,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowSortDropdown(!showSortDropdown)}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded text-sm font-medium border ${
+                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 rounded text-xs sm:text-sm font-medium border ${
                   sortConfig.length > 0
                     ? darkMode
                       ? 'bg-blue-600 text-white border-blue-600'
@@ -670,8 +670,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                 }`}
               >
-                <ArrowUpDown className="w-4 h-4" />
-                <span>Sort{sortConfig.length > 0 ? ` (${sortConfig.length})` : ''}</span>
+                <ArrowUpDown className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Sort{sortConfig.length > 0 ? ` (${sortConfig.length})` : ''}</span>
+                <span className="sm:hidden">{sortConfig.length > 0 ? `(${sortConfig.length})` : ''}</span>
               </button>
 
               {/* Sort Dropdown Component */}
@@ -689,26 +690,30 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               )}
             </div>
 
-            <button
-              onClick={handleAddRow}
-              className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium"
-            >
-              + New Rows
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => setShowAddProperty(true)}
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs sm:text-sm font-medium"
+              >
+                <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Add Property</span>
+                <span className="sm:hidden">Add</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Table - Notion Style with Scroll */}
       <div className="px-8 sm:px-12 lg:px-24 pb-12">
-        <div className={`border rounded-lg ${
+        <div className={`border rounded-lg overflow-hidden ${
           darkMode ? 'border-gray-800' : 'border-gray-200'
         }`}>
-          {/* Scrollable container - only horizontal scroll here */}
-          <div className="overflow-x-auto hide-scrollbar" ref={tableContainerRef}>
-            <table className="w-full">
+          {/* Scrollable container - both horizontal and vertical scroll */}
+          <div className="overflow-auto hide-scrollbar max-h-[calc(100vh-300px)]" ref={tableContainerRef}>
+            <table className="relative" style={{ width: 'max-content', minWidth: '100%' }}>
               {/* Table Header - Sticky */}
-              <thead className={`sticky top-0 z-10 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}`}>
+              <thead className={`sticky top-0 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}`} style={{ zIndex: 100 }}>
                 <tr className={`border-b ${darkMode ? 'border-gray-800' : 'border-gray-200'}`}>
                   {database.columns.map((col, index) => (
                     <th
@@ -716,14 +721,15 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       ref={index === database.columns.length - 1 ? newColumnRef : null}
                       className={`text-left py-2 font-normal relative ${
                         index !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
-                      }`}
+                      } ${index === 0 ? `sticky left-0 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}` : ''}`}
                       style={{
                         padding: index === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
                         minWidth: 'fit-content',
                         width: `${columnWidths[col.key] || 150}px`,
                         maxWidth: `${columnWidths[col.key] || 150}px`,
                         whiteSpace: 'nowrap',
-                        position: 'relative'
+                        zIndex: index === 0 ? 101 : 100,
+                        ...(index === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                       }}
                     >
                       {/* Date column optimized for compact view */}
@@ -783,30 +789,18 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         )}
                       </div>
 
-                      {/* Column Resize Handle */}
-                      <div
-                        onMouseDown={(e) => handleResizeStart(e, col.key)}
-                        className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 ${
-                          resizingColumn?.key === col.key ? 'bg-blue-500' : ''
-                        }`}
-                        style={{ zIndex: 30 }}
-                      />
+                      {/* Column Resize Handle - Only show on non-last column */}
+                      {index !== database.columns.length - 1 && (
+                        <div
+                          onMouseDown={(e) => handleResizeStart(e, col.key)}
+                          className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 ${
+                            resizingColumn?.key === col.key ? 'bg-blue-500' : ''
+                          }`}
+                          style={{ zIndex: 30, marginRight: '-0.5px' }}
+                        />
+                      )}
                     </th>
                   ))}
-                  {/* Add Property Button - Only for ADMIN/SUPERUSER */}
-                  {canEdit && (
-                    <th className={`w-12 sticky right-0 z-20 border-b ${darkMode ? 'bg-[#202020] border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
-                      <button
-                        onClick={() => setShowAddProperty(true)}
-                        className={`p-1 rounded ${
-                          darkMode ? 'hover:bg-gray-700 text-gray-500' : 'hover:bg-gray-200 text-gray-400'
-                        }`}
-                        title="Add property"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </th>
-                  )}
                 </tr>
               </thead>
 
@@ -828,28 +822,45 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         key={col.key}
                         className={`py-2 ${
                           colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
-                        }`}
+                        } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''}`}
                         style={{
                           padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
                           width: `${columnWidths[col.key] || 150}px`,
                           maxWidth: `${columnWidths[col.key] || 150}px`,
-                          whiteSpace: 'nowrap'
+                          whiteSpace: 'nowrap',
+                          zIndex: colIndex === 0 ? 50 : 1,
+                          ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                         }}
                       ></td>;
 
                       return (
                         <td
                           key={col.key}
-                          className={`py-2 ${
+                          className={`py-2 relative ${
                             colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
-                          }`}
+                          } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''}`}
                           style={{
                             padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
                             width: `${columnWidths[col.key] || 150}px`,
                             maxWidth: `${columnWidths[col.key] || 150}px`,
-                            whiteSpace: 'nowrap'
+                            whiteSpace: 'nowrap',
+                            zIndex: colIndex === 0 ? 50 : 1,
+                            ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                           }}
                         >
+                          {/* Delete Row Button - Only show on first column when row is hovered */}
+                          {colIndex === 0 && canEdit && hoveredRow === row.id && (
+                            <button
+                              onClick={() => handleDeleteRow(row.id)}
+                              className={`absolute left-1 top-1/2 -translate-y-1/2 p-1 rounded ${
+                                darkMode ? 'bg-gray-800 hover:bg-red-600' : 'bg-gray-100 hover:bg-red-500'
+                              } transition-colors`}
+                              title="Delete row"
+                              style={{ zIndex: 60 }}
+                            >
+                              <MoreHorizontal className={`w-3 h-3 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                            </button>
+                          )}
                           {prop.type === 'text' && (
                             <input
                               type="text"
@@ -911,45 +922,25 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         </td>
                       );
                     })}
-                    <td className="px-4 py-3 sticky right-0">
-                      {canEdit && hoveredRow === row.id && (
-                        <button
-                          onClick={() => handleDeleteRow(row.id)}
-                          className={`p-1 rounded ${
-                            darkMode ? 'hover:bg-gray-700 text-gray-500' : 'hover:bg-gray-200 text-gray-400'
-                          }`}
-                        >
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-                      )}
-                    </td>
                     </tr>
                 ))}
-
-                {/* New Page Row - Only for ADMIN/SUPERUSER */}
-                <tr className={darkMode ? 'hover:bg-[#202020]' : 'hover:bg-gray-50'}>
-                  <td colSpan={database.columns.length + 1} className="px-4 py-3">
-                    {canEdit ? (
-                      <button
-                        onClick={handleAddRow}
-                        className={`flex items-center gap-2 text-sm ${
-                          darkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'
-                        }`}
-                      >
-                        <Plus className="w-4 h-4" />
-                        New rows
-                      </button>
-                    ) : (
-                      <span className={`text-sm italic ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
-                        View only - No edit permission
-                      </span>
-                    )}
-                  </td>
-                </tr>
               </tbody>
             </table>
           </div>
         </div>
+
+        {/* New Row Button - Outside table */}
+        {canEdit && (
+          <button
+            onClick={handleAddRow}
+            className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm mt-4 px-3 sm:px-4 py-2 rounded ${
+              darkMode ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-800' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+            } transition-colors`}
+          >
+            <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+            New rows
+          </button>
+        )}
       </div>
 
       {/* Modals */}
