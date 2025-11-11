@@ -711,7 +711,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         }`}>
           {/* Scrollable container - both horizontal and vertical scroll */}
           <div className="overflow-auto hide-scrollbar max-h-[calc(100vh-300px)]" ref={tableContainerRef}>
-            <table className="relative" style={{ width: 'max-content', minWidth: '100%' }}>
+            <table className="relative border-collapse" style={{
+              minWidth: '100%',
+              tableLayout: 'fixed'
+            }}>
               {/* Table Header - Sticky */}
               <thead className={`sticky top-0 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}`} style={{ zIndex: 100 }}>
                 <tr className={`border-b ${darkMode ? 'border-gray-800' : 'border-gray-200'}`}>
@@ -724,8 +727,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       } ${index === 0 ? `sticky left-0 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}` : ''}`}
                       style={{
                         padding: index === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
-                        minWidth: 'fit-content',
                         width: `${columnWidths[col.key] || 150}px`,
+                        minWidth: `${columnWidths[col.key] || 150}px`,
                         maxWidth: `${columnWidths[col.key] || 150}px`,
                         whiteSpace: 'nowrap',
                         zIndex: index === 0 ? 101 : 100,
@@ -826,6 +829,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         style={{
                           padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
                           width: `${columnWidths[col.key] || 150}px`,
+                          minWidth: `${columnWidths[col.key] || 150}px`,
                           maxWidth: `${columnWidths[col.key] || 150}px`,
                           whiteSpace: 'nowrap',
                           zIndex: colIndex === 0 ? 50 : 1,
@@ -842,6 +846,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                           style={{
                             padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
                             width: `${columnWidths[col.key] || 150}px`,
+                            minWidth: `${columnWidths[col.key] || 150}px`,
                             maxWidth: `${columnWidths[col.key] || 150}px`,
                             whiteSpace: 'nowrap',
                             zIndex: colIndex === 0 ? 50 : 1,
