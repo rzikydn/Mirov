@@ -33,19 +33,21 @@ html {
 /* 🌙 Ubah warna ikon kalender saat dark mode aktif */
 table input[type="date"] {
   padding-right: 0 !important;
-  padding-left: 0 !important;
-  max-width: 95px !important;
+  padding-left: 4px !important;
+  max-width: 120px !important;
+  min-width: 120px !important;
 }
 
 table input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0);
   transition: filter 0.3s ease;
-  margin-left: -80px !important;
-  margin-right: 0 !important;
+  margin-left: 6px !important;
+  margin-right: 4px !important;
   padding: 0 !important;
   cursor: pointer;
   width: 16px !important;
   height: 16px !important;
+  flex-shrink: 0;
 }
 
 /* Saat elemen root memiliki class "dark" */
