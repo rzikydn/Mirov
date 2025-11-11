@@ -34,8 +34,7 @@ html {
 table input[type="date"] {
   padding-right: 0 !important;
   padding-left: 4px !important;
-  max-width: 120px !important;
-  min-width: 120px !important;
+  width: 100% !important;
 }
 
 table input[type="date"]::-webkit-calendar-picker-indicator {

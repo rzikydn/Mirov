@@ -14,6 +14,7 @@ import SortDropdown from './SortDropdown';
 import AddPropertyModal from './modals/AddPropertyModal';
 import DeleteModal from './modals/DeleteModal';
 import ExportModal from './modals/ExportModal';
+import DateInput from './DateInput';
 
 // Import constants
 import { propertyTypeIcons } from '../../constants/propertyTypeIcons';
@@ -57,9 +58,24 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState(database.description || '');
   const [showExportModal, setShowExportModal] = useState(false);
-  const [sortConfig, setSortConfig] = useState<SortConfig[]>([]);
+  const [sortConfig, setSortConfig] = useState<SortConfig[]>(() => {
+    // Set default sort to first column, ascending
+    if (database.columns.length > 0) {
+      return [{ column: database.columns[0].key, direction: 'asc' }];
+    }
+    return [];
+  });
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [editingCell, setEditingCell] = useState<{ rowId: string; key: string; oldValue: any } | null>(null);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    // Initialize default widths for each column
+    const widths: Record<string, number> = {};
+    database.columns.forEach((col) => {
+      widths[col.key] = col.type === 'date' ? 180 : 150;
+    });
+    return widths;
+  });
+  const [resizingColumn, setResizingColumn] = useState<{ key: string; startX: number; startWidth: number } | null>(null);
 
   // Inject styles for date input calendar icon
   useEffect(() => {
@@ -71,6 +87,50 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       document.head.appendChild(style);
     }
   }, []);
+
+  // Handle column resize
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (resizingColumn) {
+        const diff = e.clientX - resizingColumn.startX;
+        const newWidth = Math.max(80, resizingColumn.startWidth + diff);
+        setColumnWidths(prev => ({
+          ...prev,
+          [resizingColumn.key]: newWidth
+        }));
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (resizingColumn) {
+        setResizingColumn(null);
+      }
+    };
+
+    if (resizingColumn) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [resizingColumn]);
+
+  const handleResizeStart = (e: React.MouseEvent, columnKey: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setResizingColumn({
+      key: columnKey,
+      startX: e.clientX,
+      startWidth: columnWidths[columnKey] || 150
+    });
+  };
 
   const updateThisDb = async (mutator: (db: Database) => Database) => {
     const updatedDb = mutator(database);
@@ -651,16 +711,16 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     <th
                       key={col.key}
                       ref={index === database.columns.length - 1 ? newColumnRef : null}
-                      className={`text-left py-2 font-normal ${
+                      className={`text-left py-2 font-normal relative ${
                         index !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
                       }`}
                       style={{
-                        padding: col.type === 'date'
-                          ? (index === 0 ? '0.5rem 0rem 0.5rem 0.75rem' : '0.5rem 0rem')
-                          : (index === 0 ? '0.5rem 0.5rem 0.5rem 0.75rem' : '0.5rem 0.5rem'),
+                        padding: index === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
                         minWidth: 'fit-content',
-                        width: 'auto',
-                        whiteSpace: 'nowrap'
+                        width: `${columnWidths[col.key] || 150}px`,
+                        maxWidth: `${columnWidths[col.key] || 150}px`,
+                        whiteSpace: 'nowrap',
+                        position: 'relative'
                       }}
                     >
                       {/* Date column optimized for compact view */}
@@ -719,6 +779,15 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                           </button>
                         )}
                       </div>
+
+                      {/* Column Resize Handle */}
+                      <div
+                        onMouseDown={(e) => handleResizeStart(e, col.key)}
+                        className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 ${
+                          resizingColumn?.key === col.key ? 'bg-blue-500' : ''
+                        }`}
+                        style={{ zIndex: 30 }}
+                      />
                     </th>
                   ))}
                   {/* Add Property Button - Only for ADMIN/SUPERUSER */}
@@ -758,9 +827,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                           colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
                         }`}
                         style={{
-                          padding: col.type === 'date'
-                            ? (colIndex === 0 ? '0.5rem 0rem 0.5rem 0.75rem' : '0.5rem 0rem')
-                            : (colIndex === 0 ? '0.5rem 0.5rem 0.5rem 0.75rem' : '0.5rem 0.5rem'),
+                          padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
+                          width: `${columnWidths[col.key] || 150}px`,
+                          maxWidth: `${columnWidths[col.key] || 150}px`,
                           whiteSpace: 'nowrap'
                         }}
                       ></td>;
@@ -772,9 +841,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
                           }`}
                           style={{
-                            padding: col.type === 'date'
-                              ? (colIndex === 0 ? '0.5rem 0rem 0.5rem 0.75rem' : '0.5rem 0rem')
-                              : (colIndex === 0 ? '0.5rem 0.5rem 0.5rem 0.75rem' : '0.5rem 0.5rem'),
+                            padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
+                            width: `${columnWidths[col.key] || 150}px`,
+                            maxWidth: `${columnWidths[col.key] || 150}px`,
                             whiteSpace: 'nowrap'
                           }}
                         >
@@ -811,18 +880,13 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             />
                           )}
                           {prop.type === 'date' && (
-                            <input
-                              type="date"
+                            <DateInput
                               value={prop.value}
+                              onChange={(value) => canEdit && handleValueChange(row.id, col.key, value)}
                               onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
-                              onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.value)}
-                              onBlur={(e) => handleCellBlur(row.id, col.key, e.target.value)}
+                              onBlur={(value) => handleCellBlur(row.id, col.key, value)}
                               disabled={!canEdit}
-                              className={`w-full text-sm ${
-                                darkMode
-                                  ? 'bg-transparent text-gray-300 dark-mode'
-                                  : 'bg-transparent text-gray-900'
-                              } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                              darkMode={darkMode}
                             />
                           )}
                           {prop.type === 'checkbox' && (
