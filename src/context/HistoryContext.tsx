@@ -6,7 +6,7 @@ export interface HistoryEntry {
   id: number;
   userName: string;
   userRole: 'SUPERUSER' | 'ADMIN' | 'UMUM';
-  action: 'create' | 'edit' | 'delete'; // Lowercase for consistency in UI
+  action: 'create' | 'edit' | 'delete' | 'added'; // Lowercase for consistency in UI
   target: 'note' | 'database' | 'schedule'; // Lowercase for consistency in UI
   targetName?: string;
   createdAt: Date;

@@ -211,7 +211,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       await addHistory({
         userName: user.name,
         userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
-        action: 'edit',
+        action: 'added',
         target: 'database',
         targetName: database.name,
         description: `${user.name} added new column "${name}" (type: ${type}) to database "${database.name}"`
@@ -314,7 +314,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       await addHistory({
         userName: user.name,
         userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
-        action: 'edit',
+        action: 'added',
         target: 'database',
         targetName: database.name,
         description: `${user.name} added a new row to database "${database.name}"`

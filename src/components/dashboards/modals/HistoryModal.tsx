@@ -163,10 +163,12 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
     }
   };
 
-  const getActionColor = (action: 'create' | 'edit' | 'delete') => {
+  const getActionColor = (action: 'create' | 'edit' | 'delete' | 'added') => {
     switch (action) {
       case 'create':
         return darkMode ? 'text-green-400' : 'text-green-600';
+      case 'added':
+        return darkMode ? 'text-purple-400' : 'text-purple-600';
       case 'edit':
         return darkMode ? 'text-blue-400' : 'text-blue-600';
       case 'delete':
@@ -174,7 +176,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
     }
   };
 
-  const getActionBadgeClasses = (action: 'create' | 'edit' | 'delete', entry?: HistoryEntry) => {
+  const getActionBadgeClasses = (action: 'create' | 'edit' | 'delete' | 'added', entry?: HistoryEntry) => {
     const baseClasses = 'inline-flex px-2 py-0.5 rounded-full text-xs font-semibold';
 
     // Special styling for favorite actions (yellow)
@@ -190,6 +192,8 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
     switch (action) {
       case 'create':
         return `${baseClasses} ${darkMode ? 'bg-green-900/50 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-200'}`;
+      case 'added':
+        return `${baseClasses} ${darkMode ? 'bg-purple-900/50 text-purple-300 border border-purple-700' : 'bg-purple-100 text-purple-700 border border-purple-200'}`;
       case 'edit':
         return `${baseClasses} ${darkMode ? 'bg-blue-900/50 text-blue-300 border border-blue-700' : 'bg-blue-100 text-blue-700 border border-blue-200'}`;
       case 'delete':
@@ -197,7 +201,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
     }
   };
 
-  const getActionText = (action: 'create' | 'edit' | 'delete', entry?: HistoryEntry) => {
+  const getActionText = (action: 'create' | 'edit' | 'delete' | 'added', entry?: HistoryEntry) => {
     // Special text for favorite actions
     if (entry && isFavoriteAction(entry)) {
       return 'Favorit';
@@ -210,6 +214,8 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
 
     switch (action) {
       case 'create':
+        return 'Created';
+      case 'added':
         return 'Added';
       case 'edit':
         return 'Changed';

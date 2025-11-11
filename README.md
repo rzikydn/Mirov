@@ -7,10 +7,19 @@ Sistem manajemen internal yang aman dan modern untuk mengelola jadwal, catatan, 
 ### Core Features
 - **Authentication & Authorization**: Login sistem dengan JWT dan role-based access (SUPERUSER, ADMIN, UMUM)
 - **Schedule Management**: Kelola jadwal meeting, event, dan kegiatan tim
-- **Team Notes**: Sistem catatan kolaboratif dengan warna custom
-- **Database Manager**: Kelola database internal dengan interface yang mudah
+- **Team Notes**: Sistem catatan kolaboratif dengan warna custom dan keyboard shortcuts (Ctrl+Enter)
+- **Database Manager**: Kelola database internal dengan interface Notion-style yang powerful
+  - Support multiple column types (Text, Number, Date, Checkbox)
+  - Multi-level sorting untuk organize data
+  - Export to JSON & Excel (XLSX) dengan formatting
+  - Real-time sync dengan backend
+  - Sticky first column untuk navigasi mudah
+  - Bulk delete untuk history management
 - **History & Audit Trail**: Tracking semua aktivitas user dengan detail lengkap (khusus ADMIN & SUPERUSER)
+  - Detailed activity logging (Added, Changed, Deleted)
+  - Mencatat setiap perubahan column, row, dan cell values
 - **Dark Mode**: Tema gelap untuk kenyamanan mata
+- **Responsive Design**: Optimized untuk desktop dan mobile (iOS/Android)
 
 ### Security Features
 - **Rate Limiting**: Pembatasan request per IP address
@@ -38,24 +47,145 @@ Sistem manajemen internal yang aman dan modern untuk mengelola jadwal, catatan, 
 - **express-rate-limit** untuk security
 - **helmet** untuk HTTP security headers
 
+## Architecture
+
+### System Architecture
+```
+┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+│                 │         │                 │         │                 │
+│  React Frontend │◄───────►│  Express API    │◄───────►│  PostgreSQL DB  │
+│  (Vite + TS)    │  REST   │  (Node.js + TS) │  Prisma │                 │
+│                 │         │                 │         │                 │
+└─────────────────┘         └─────────────────┘         └─────────────────┘
+        │                           │
+        │                           │
+        ▼                           ▼
+  Context API              JWT Authentication
+  State Management         Rate Limiting
+  Dark Mode                Helmet Security
+```
+
+### Data Flow
+1. **User Action** → Component triggers action
+2. **Context/State** → Update local state via Context API
+3. **API Request** → Send request to backend with JWT token
+4. **Authentication** → Middleware verifies token and role
+5. **Database Operation** → Prisma ORM queries PostgreSQL
+6. **Response** → Data sent back to frontend
+7. **History Logging** → Activity recorded in history table
+8. **UI Update** → Component re-renders with new data
+
 ## Project Structure
 
 ```
 Mirov/
-├── src/                    # Frontend (React + TypeScript)
-│   ├── components/         # React components
-│   ├── assets/            # Static assets
-│   ├── lib/               # Utility libraries
-│   └── App.tsx            # Main app component
-├── server/                # Backend (Express + TypeScript)
+├── src/                           # Frontend (React + TypeScript)
+│   ├── components/
+│   │   ├── auth/                  # Login, registration components
+│   │   ├── dashboards/            # Main dashboard components
+│   │   │   ├── modals/            # Modal components (History, Export, etc)
+│   │   │   ├── DatabaseTable.tsx  # Database manager (767 lines)
+│   │   │   ├── TeamNotes.tsx      # Team notes with favorites
+│   │   │   ├── Sidebar.tsx        # Navigation sidebar
+│   │   │   ├── EmojiPicker.tsx    # Emoji picker for database icons
+│   │   │   ├── TypeChangeDropdown.tsx  # Column type selector
+│   │   │   └── SortDropdown.tsx   # Multi-level sort dropdown
+│   │   └── layout/                # Layout components
+│   ├── context/
+│   │   ├── AuthContext.tsx        # Authentication state
+│   │   └── HistoryContext.tsx     # History/audit trail state
+│   ├── constants/
+│   │   ├── emojis.ts              # 140+ emojis organized by category
+│   │   ├── propertyTypeIcons.tsx  # Icons for column types
+│   │   └── dashboard.ts           # Dashboard constants
+│   ├── utils/
+│   │   ├── sortingUtils.ts        # Multi-level sorting logic
+│   │   ├── exportUtils.ts         # JSON & Excel export functions
+│   │   └── databaseUtils.ts       # Database operations helpers
+│   ├── styles/
+│   │   └── dateInputStyles.ts     # Date input dark mode styles
+│   ├── types/
+│   │   └── database.ts            # TypeScript interfaces
+│   ├── assets/                    # Static assets (images, icons)
+│   ├── index.css                  # Global styles (Tailwind + custom)
+│   ├── App.tsx                    # Main app component with routing
+│   └── main.tsx                   # React entry point
+├── server/                        # Backend (Express + TypeScript)
 │   ├── src/
-│   │   ├── controllers/   # Request handlers
-│   │   ├── middleware/    # Express middleware
-│   │   ├── routes/        # API routes
-│   │   └── utils/         # Utility functions
-│   └── prisma/           # Database schema & migrations
-├── docs/                  # Documentation
-└── README.md             # This file
+│   │   ├── controllers/
+│   │   │   ├── authController.ts        # Login, register, profile
+│   │   │   ├── scheduleController.ts    # Schedule CRUD
+│   │   │   ├── noteController.ts        # Notes CRUD with favorites
+│   │   │   ├── databaseController.ts    # Database CRUD
+│   │   │   └── historyController.ts     # History & audit trail
+│   │   ├── middleware/
+│   │   │   ├── authMiddleware.ts        # JWT verification
+│   │   │   ├── roleMiddleware.ts        # RBAC enforcement
+│   │   │   └── rateLimitMiddleware.ts   # Rate limiting
+│   │   ├── routes/
+│   │   │   ├── auth.ts            # Auth routes
+│   │   │   ├── schedules.ts       # Schedule routes
+│   │   │   ├── notes.ts           # Notes routes
+│   │   │   ├── databases.ts       # Database routes
+│   │   │   └── history.ts         # History routes
+│   │   ├── utils/
+│   │   │   ├── jwt.ts             # JWT token utilities
+│   │   │   └── password.ts        # Password hashing
+│   │   └── index.ts               # Express app setup
+│   ├── prisma/
+│   │   ├── schema.prisma          # Database schema
+│   │   └── seed.ts                # Seed data (8 default users)
+│   ├── .env                       # Environment variables
+│   └── package.json
+├── docs/                          # Documentation
+│   ├── KREDENSIAL-USER.md         # User credentials
+│   ├── SECURITY-AUDIT.md          # Security audit report
+│   ├── FAVORITE-NOTES.md          # Favorite notes documentation
+│   ├── TROUBLESHOOTING.md         # Common issues & solutions
+│   └── API.http                   # API testing examples
+├── .env                           # Frontend environment variables
+├── package.json
+├── vite.config.ts                 # Vite configuration
+├── tailwind.config.js             # Tailwind CSS configuration
+├── tsconfig.json                  # TypeScript configuration
+└── README.md                      # This file (you are here)
+```
+
+### Component Hierarchy (Frontend)
+```
+App.tsx
+├── AuthContext.Provider
+│   └── HistoryContext.Provider
+│       ├── /login → Login Component
+│       └── /dashboard → Dashboard
+│           ├── Sidebar
+│           │   ├── Navigation Links
+│           │   └── Database List
+│           ├── Header
+│           │   ├── Dark Mode Toggle
+│           │   ├── History Button
+│           │   └── User Profile
+│           ├── Main Content
+│           │   ├── Schedule → ScheduleManager
+│           │   ├── Notes → TeamNotes
+│           │   │   ├── Note Cards
+│           │   │   ├── Color Picker
+│           │   │   └── Favorite Stars
+│           │   └── Database → DatabaseTable
+│           │       ├── Table Header (sticky)
+│           │       ├── Column Headers
+│           │       │   ├── TypeChangeDropdown
+│           │       │   └── Column Name Input
+│           │       ├── Table Body
+│           │       │   └── Cell Inputs (Text/Number/Date/Checkbox)
+│           │       ├── Sort Button → SortDropdown
+│           │       ├── Export Button → ExportModal
+│           │       └── EmojiPicker (for icon selection)
+│           └── Modals (conditional rendering)
+│               ├── HistoryModal
+│               ├── ExportModal
+│               ├── AddPropertyModal
+│               └── DeleteModal
 ```
 
 ## Installation
@@ -178,9 +308,22 @@ Lihat [docs/KREDENSIAL-USER.md](docs/KREDENSIAL-USER.md) untuk detail lengkap.
 | Edit Note | ✅ | ✅ | ✅ (own only) |
 | Delete Note | ✅ | ✅ | ✅ (own only) |
 | **Favorite Notes ⭐** | ✅ | ✅ | ❌ |
+| **Databases** | | | |
+| View Databases | ✅ | ✅ | ✅ |
+| Create Database | ✅ | ✅ | ❌ |
+| Edit Database Content | ✅ | ✅ | ❌ |
+| Edit Database Structure | ✅ | ❌ | ❌ |
+| Delete Database | ✅ | ❌ | ❌ |
+| Add/Delete Columns | ✅ | ❌ | ❌ |
+| Change Column Types | ✅ | ❌ | ❌ |
+| Rename Columns | ✅ | ❌ | ❌ |
+| Add/Delete Rows | ✅ | ✅ | ❌ |
+| Edit Cell Values | ✅ | ✅ | ❌ |
+| Export Database | ✅ | ✅ | ✅ |
 | **History & Audit** | | | |
 | View History | ✅ | ✅ | ❌ |
 | Delete History | ✅ | ❌ | ❌ |
+| Bulk Delete History | ✅ | ❌ | ❌ |
 | **User Management** | | | |
 | Manage Users | ✅ | ❌ | ❌ |
 
@@ -217,9 +360,68 @@ Lihat [docs/KREDENSIAL-USER.md](docs/KREDENSIAL-USER.md) untuk detail lengkap.
 }
 ```
 
+### Databases
+- `GET /api/databases` - Get all databases
+- `POST /api/databases` - Create database (ADMIN/SUPERUSER)
+- `PUT /api/databases/:id` - Update database
+- `DELETE /api/databases/:id` - Delete database (SUPERUSER only)
+
+**Database Structure:**
+```json
+{
+  "id": 1,
+  "name": "🏦 PROGRAM UKMR",
+  "description": "Database untuk tracking program UKMR",
+  "icon": "🏦",
+  "columns": [
+    {
+      "key": "tanggal-123456",
+      "label": "TANGGAL",
+      "type": "date"
+    },
+    {
+      "key": "pic-123457",
+      "label": "PIC",
+      "type": "text"
+    }
+  ],
+  "rows": [
+    {
+      "id": "row-123458",
+      "properties": {
+        "tanggal-123456": {
+          "value": "2025-01-15",
+          "type": "date"
+        },
+        "pic-123457": {
+          "value": "Amin",
+          "type": "text"
+        }
+      }
+    }
+  ]
+}
+```
+
 ### History
 - `GET /api/history` - Get audit trail
-- `DELETE /api/history/:id` - Delete history entry (ADMIN/SUPERUSER only)
+- `POST /api/history` - Add history entry
+- `DELETE /api/history/:id` - Delete history entry (SUPERUSER only)
+- `POST /api/history/bulk-delete` - Bulk delete history (SUPERUSER only)
+
+**History Entry Structure:**
+```json
+{
+  "id": 1,
+  "userName": "Amin",
+  "userRole": "ADMIN",
+  "action": "added" | "edit" | "delete" | "create",
+  "target": "database" | "note" | "schedule",
+  "targetName": "🏦 PROGRAM UKMR",
+  "description": "Amin added new column 'Priority' (type: text) to database '🏦 PROGRAM UKMR'",
+  "createdAt": "2025-01-11T..."
+}
+```
 
 Lihat [docs/API.http](docs/API.http) untuk contoh request lengkap.
 
@@ -298,6 +500,67 @@ If you discover a security vulnerability:
 3. Provide detailed information about the vulnerability
 4. Allow time for fix before public disclosure
 
+## Keyboard Shortcuts
+
+### Team Notes
+- `Ctrl + Enter` atau `Cmd + Enter` - Save note (saat mengetik di textarea)
+
+### Database Manager
+- `Enter` - Save saat menambah property/column baru (di modal Add Property)
+
+### General
+- Semua user dapat menggunakan keyboard shortcuts untuk mempercepat workflow
+
+## Database Manager - Detailed Features
+
+### Column Types
+1. **Text** - Text bebas, cocok untuk nama, deskripsi, dll
+2. **Number** - Angka, cocok untuk jumlah, harga, score, dll
+3. **Date** - Tanggal dengan date picker, cocok untuk deadline, event date, dll
+4. **Checkbox** - True/False, cocok untuk status completion, approval, dll
+
+### Sorting Features
+- **Multi-level sorting**: Sort berdasarkan multiple columns sekaligus
+- **Ascending/Descending**: Pilih urutan naik atau turun per column
+- **Priority-based**: Column pertama dalam sort list memiliki prioritas tertinggi
+- **Visual indicators**: Badge menunjukkan urutan sort (1, 2, 3, ...)
+
+### Export Features
+1. **JSON Export**
+   - Export seluruh database structure dan data
+   - Format JSON standard untuk integrasi dengan sistem lain
+   - Includes: columns definition, rows data, metadata
+
+2. **Excel (XLSX) Export**
+   - Export dengan formatting professional
+   - Header dengan bold dan colored background
+   - Auto-width columns untuk readability
+   - Support untuk semua column types
+   - File naming: `[DatabaseName]_[Timestamp].xlsx`
+
+### History Tracking
+Setiap perubahan pada database dicatat dengan detail:
+- **Added** (Purple badge): Menambah column baru, row baru
+- **Changed** (Blue badge): Edit nama database, column, cell value
+- **Deleted** (Red badge): Hapus column, row
+
+**Contoh History Entry:**
+- "Amin added new column 'Priority' (type: text) to database '🏦 PROGRAM UKMR'"
+- "Amin updated 'Status' in row 3 from 'Pending' to 'Completed' in database '🏦 PROGRAM UKMR'"
+- "Amin deleted column 'Old Field' from database '🏦 PROGRAM UKMR'"
+
+### Permission System (Database)
+- **SUPERUSER**: Full control - manage structure, content, delete
+- **ADMIN**: Edit content only - add/delete rows, edit cell values
+- **UMUM**: View only - can view dan export database
+
+### Mobile Optimization
+- Responsive table dengan horizontal scroll
+- Sticky first column untuk navigasi mudah
+- Touch-friendly buttons dan inputs
+- Optimized date picker untuk mobile devices
+- Compact date column dengan proper icon spacing
+
 ## Development
 
 ### Frontend Scripts
@@ -358,10 +621,134 @@ Dokumentasi lengkap tersedia di folder [docs/](docs/):
 
 This project is private and proprietary. All rights reserved.
 
+## Known Issues & Workarounds
+
+### Frontend
+1. **Date Input pada Mobile**
+   - Issue: Icon kalender overlap dengan text tanggal
+   - Status: ✅ Fixed - Icon diposisikan dengan proper spacing
+   - Workaround: Sudah tidak diperlukan
+
+2. **Type Dropdown Terpotong**
+   - Issue: Dropdown type saat membuat database table terpotong
+   - Status: ✅ Fixed - Menggunakan z-index tinggi dan removed overflow-hidden
+   - Workaround: Sudah tidak diperlukan
+
+### Backend
+1. **No Known Critical Issues**
+   - Backend berjalan stabil dengan proper error handling
+
+### General
+1. **Performance dengan Data Besar**
+   - Concern: Database table dengan 100+ rows mungkin perlu pagination
+   - Status: Monitoring - Belum menjadi issue aktual
+   - Recommendation: Implement virtual scrolling jika data melebihi 200 rows
+
+## Future Improvements & Roadmap
+
+### Version 1.1.0 (Planned)
+- [ ] CSRF Protection implementation
+- [ ] Input sanitization dengan DOMPurify
+- [ ] Database table pagination untuk large datasets
+- [ ] Column filtering & search
+- [ ] Database templates untuk quick start
+- [ ] Bulk operations untuk rows (copy, move, delete multiple)
+
+### Version 1.2.0 (Future)
+- [ ] Real-time collaboration (WebSocket)
+- [ ] Comment system untuk database cells
+- [ ] File attachment support
+- [ ] Advanced formula calculations
+- [ ] API rate limiting per user (bukan per IP)
+- [ ] Two-factor authentication (2FA)
+
+### Version 2.0.0 (Long-term)
+- [ ] Mobile native app (React Native)
+- [ ] Offline mode dengan sync
+- [ ] Advanced reporting & analytics
+- [ ] Integration dengan third-party tools (Slack, Teams, etc)
+- [ ] Custom workflows & automation
+- [ ] AI-powered insights
+
+## Maintenance & Updates
+
+### Regular Tasks
+1. **Weekly**
+   - Check application logs untuk errors
+   - Monitor database performance
+   - Review security alerts
+
+2. **Monthly**
+   - Run `npm audit` dan fix vulnerabilities
+   - Update dependencies (`npm update`)
+   - Review and cleanup old history entries
+   - Database backup verification
+
+3. **Quarterly**
+   - Security audit full system
+   - Performance optimization review
+   - User feedback review & implementation
+   - Documentation updates
+
+### Backup Strategy
+- **Database**: Auto-backup daily via Railway/hosting provider
+- **Code**: Version controlled via Git
+- **Environment Variables**: Documented secara terpisah (tidak di Git)
+- **Recovery Time Objective (RTO)**: < 4 hours
+- **Recovery Point Objective (RPO)**: < 24 hours
+
+## Changelog
+
+### [Current] - 2025-01-11
+#### Added
+- Database Manager dengan Notion-style interface
+- Multi-level sorting untuk database tables
+- Export to JSON & Excel (XLSX) dengan formatting
+- Detailed history tracking (Added, Changed, Deleted actions)
+- Keyboard shortcuts (Enter untuk save di modals, Ctrl+Enter untuk notes)
+- Bulk delete history (SUPERUSER only)
+- Mobile optimization untuk date picker
+- Sticky first column untuk better navigation
+
+#### Fixed
+- Date input icon positioning pada mobile devices
+- Type dropdown terpotong issue
+- Permission system untuk database operations
+- History detail descriptions untuk setiap action
+
+#### Changed
+- DatabaseTable.tsx refactored dari 1519 lines menjadi 767 lines (49.5% reduction)
+- History action types: menambahkan "added" untuk distinction
+- Sidebar width dikurangi 25% untuk more content space
+
+### [1.0.0] - 2025-01-04
+#### Initial Release
+- Authentication system dengan JWT
+- Role-Based Access Control (RBAC)
+- Schedule Management
+- Team Notes dengan favorite feature
+- History & Audit Trail
+- Dark Mode
+- Security features (Rate Limiting, Helmet, Password Hashing)
+
 ## Support
 
 Jika ada pertanyaan atau issue, silakan hubungi tim IT kantor atau buat issue di repository ini.
 
+### Contact Information
+- **Technical Support**: it-support@mirov.internal
+- **Security Issues**: security@mirov.internal
+- **Feature Requests**: product@mirov.internal
+
+### Useful Links
+- [Documentation](docs/)
+- [API Reference](docs/API.http)
+- [Security Audit](docs/SECURITY-AUDIT.md)
+- [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
+
 ---
 
-Made with by Team Mirov
+**Made with ❤️ by Team Mirov**
+
+Last Updated: January 11, 2025
+Version: 1.1.0 (In Development)
