@@ -79,6 +79,16 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     return widths;
   });
   const [resizingColumn, setResizingColumn] = useState<{ key: string; startX: number; startWidth: number } | null>(null);
+  const [tableWidth, setTableWidth] = useState<number>(0);
+
+  // Calculate table width
+  useEffect(() => {
+    if (database.columns.length > 0) {
+      const totalWidth = database.columns.reduce((sum, col) => sum + (columnWidths[col.key] || 150), 0);
+      const containerWidth = tableContainerRef.current?.offsetWidth || 0;
+      setTableWidth(Math.max(totalWidth, containerWidth));
+    }
+  }, [columnWidths, database.columns]);
 
   // Inject styles for date input calendar icon
   useEffect(() => {
@@ -96,7 +106,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       if (resizingColumn) {
         const diff = e.clientX - resizingColumn.startX;
-        const newWidth = Math.max(80, resizingColumn.startWidth + diff);
+        const newWidth = Math.max(40, resizingColumn.startWidth + diff);
         setColumnWidths(prev => ({
           ...prev,
           [resizingColumn.key]: newWidth
@@ -706,14 +716,13 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
       {/* Table - Notion Style with Scroll */}
       <div className="px-8 sm:px-12 lg:px-24 pb-12">
-        <div className={`border rounded-lg overflow-hidden ${
+        <div className={`border rounded-lg ${
           darkMode ? 'border-gray-800' : 'border-gray-200'
         }`}>
           {/* Scrollable container - both horizontal and vertical scroll */}
           <div className="overflow-auto hide-scrollbar max-h-[calc(100vh-300px)]" ref={tableContainerRef}>
-            <table className="relative border-collapse" style={{
-              minWidth: '100%',
-              tableLayout: 'fixed'
+            <table className="border-collapse" style={{
+              width: tableWidth > 0 ? `${tableWidth}px` : '100%'
             }}>
               {/* Table Header - Sticky */}
               <thead className={`sticky top-0 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}`} style={{ zIndex: 100 }}>
@@ -728,9 +737,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       style={{
                         padding: index === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
                         width: `${columnWidths[col.key] || 150}px`,
-                        minWidth: `${columnWidths[col.key] || 150}px`,
                         maxWidth: `${columnWidths[col.key] || 150}px`,
                         whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                         zIndex: index === 0 ? 101 : 100,
                         ...(index === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                       }}
@@ -792,7 +802,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         )}
                       </div>
 
-                      {/* Column Resize Handle - Only show on non-last column */}
+                      {/* Column Resize Handle - Show on all columns except last */}
                       {index !== database.columns.length - 1 && (
                         <div
                           onMouseDown={(e) => handleResizeStart(e, col.key)}
@@ -829,9 +839,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         style={{
                           padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
                           width: `${columnWidths[col.key] || 150}px`,
-                          minWidth: `${columnWidths[col.key] || 150}px`,
                           maxWidth: `${columnWidths[col.key] || 150}px`,
                           whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
                           zIndex: colIndex === 0 ? 50 : 1,
                           ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                         }}
@@ -846,9 +857,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                           style={{
                             padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
                             width: `${columnWidths[col.key] || 150}px`,
-                            minWidth: `${columnWidths[col.key] || 150}px`,
                             maxWidth: `${columnWidths[col.key] || 150}px`,
                             whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
                             zIndex: colIndex === 0 ? 50 : 1,
                             ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                           }}
