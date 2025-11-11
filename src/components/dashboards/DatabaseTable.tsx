@@ -59,6 +59,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [showExportModal, setShowExportModal] = useState(false);
   const [sortConfig, setSortConfig] = useState<SortConfig[]>([]);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [editingCell, setEditingCell] = useState<{ rowId: string; key: string; oldValue: any } | null>(null);
 
   // Inject styles for date input calendar icon
   useEffect(() => {
@@ -78,30 +79,50 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     setDatabases((prev) => prev.map((d) => (d.id === database.id ? updatedDb : d)));
 
     // Sync with backend if database has a numeric ID (already saved)
+    // Note: We don't pass addHistory here anymore because we handle specific history entries in each handler
     if (typeof updatedDb.id === 'number') {
       await updateDatabase(
         updatedDb,
         token,
-        user ? addHistory : undefined,
+        undefined, // Don't use generic history
         user?.name,
         user?.role as 'SUPERUSER' | 'ADMIN' | 'UMUM'
       );
     }
   };
 
-  const handleColumnLabelChange = (key: string, value: string) => {
+  const handleColumnLabelChange = async (key: string, value: string) => {
     if (!canEdit) return;
 
-    updateThisDb((db) => ({
+    const oldColumn = database.columns.find(c => c.key === key);
+    const oldLabel = oldColumn?.label || '';
+
+    await updateThisDb((db) => ({
       ...db,
       columns: db.columns.map((c) => (c.key === key ? { ...c, label: value } : c))
     }));
+
+    // Add specific history entry if column name actually changed
+    if (oldLabel !== value && value.trim() && user) {
+      await addHistory({
+        userName: user.name,
+        userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
+        action: 'edit',
+        target: 'database',
+        targetName: database.name,
+        description: `${user.name} renamed column "${oldLabel}" to "${value}" in database "${database.name}"`
+      });
+    }
   };
 
-  const handleColumnTypeChange = (key: string, type: string) => {
+  const handleColumnTypeChange = async (key: string, type: string) => {
     if (!canEdit) return;
 
-    updateThisDb((db) => ({
+    const column = database.columns.find(c => c.key === key);
+    const oldType = column?.type || '';
+    const columnLabel = column?.label || '';
+
+    await updateThisDb((db) => ({
       ...db,
       columns: db.columns.map((c) => (c.key === key ? { ...c, type } : c)),
       rows: db.rows.map((row) => ({
@@ -112,6 +133,45 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         },
       })),
     }));
+
+    // Add specific history entry
+    if (oldType !== type && user) {
+      await addHistory({
+        userName: user.name,
+        userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
+        action: 'edit',
+        target: 'database',
+        targetName: database.name,
+        description: `${user.name} changed column "${columnLabel}" type from "${oldType}" to "${type}" in database "${database.name}"`
+      });
+    }
+  };
+
+  const handleCellFocus = (rowId: string, key: string, currentValue: any) => {
+    // Store the initial value when user starts editing
+    setEditingCell({ rowId, key, oldValue: currentValue });
+  };
+
+  const handleCellBlur = async (rowId: string, key: string, newValue: any) => {
+    // When user finishes editing, check if value changed and add history
+    if (editingCell && editingCell.rowId === rowId && editingCell.key === key) {
+      const oldValue = editingCell.oldValue;
+      if (oldValue !== newValue && user) {
+        const column = database.columns.find(c => c.key === key);
+        const columnLabel = column?.label || '';
+        const rowIndex = database.rows.findIndex(r => r.id === rowId) + 1;
+
+        await addHistory({
+          userName: user.name,
+          userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
+          action: 'edit',
+          target: 'database',
+          targetName: database.name,
+          description: `${user.name} updated "${columnLabel}" in row ${rowIndex} from "${oldValue || '(empty)'}" to "${newValue || '(empty)'}" in database "${database.name}"`
+        });
+      }
+      setEditingCell(null);
+    }
   };
 
   const handleValueChange = (rowId: string, key: string, value: any) => {
@@ -133,11 +193,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }));
   };
 
-  const handleAddProperty = (name: string, type: string) => {
+  const handleAddProperty = async (name: string, type: string) => {
     if (!canEdit) return;
 
     const newKey = `${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
-    updateThisDb((db) => {
+    await updateThisDb((db) => {
       const updatedColumns = [...db.columns, { key: newKey, label: name, type }];
       const updatedRows = db.rows.map((row) => ({
         ...row,
@@ -145,6 +205,19 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       }));
       return { ...db, columns: updatedColumns, rows: updatedRows };
     });
+
+    // Add specific history entry
+    if (user) {
+      await addHistory({
+        userName: user.name,
+        userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
+        action: 'edit',
+        target: 'database',
+        targetName: database.name,
+        description: `${user.name} added new column "${name}" (type: ${type}) to database "${database.name}"`
+      });
+    }
+
     setShowAddProperty(false);
 
     setTimeout(() => {
@@ -171,12 +244,15 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     setShowConfirmDelete(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!canEdit) return;
 
     if (!deleteTarget) return;
     if (deleteTarget.type === 'column') {
-      updateThisDb((db) => {
+      const column = database.columns.find(c => c.key === deleteTarget.id);
+      const columnLabel = column?.label || '';
+
+      await updateThisDb((db) => {
         const updatedColumns = db.columns.filter((c) => c.key !== deleteTarget.id);
         const updatedRows = db.rows.map((row) => {
           const newProps = { ...row.properties };
@@ -185,17 +261,41 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         });
         return { ...db, columns: updatedColumns, rows: updatedRows };
       });
+
+      // Add specific history entry for column deletion
+      if (user) {
+        await addHistory({
+          userName: user.name,
+          userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
+          action: 'delete',
+          target: 'database',
+          targetName: database.name,
+          description: `${user.name} deleted column "${columnLabel}" from database "${database.name}"`
+        });
+      }
     } else {
-      updateThisDb((db) => ({
+      await updateThisDb((db) => ({
         ...db,
         rows: db.rows.filter((r) => r.id !== deleteTarget.id)
       }));
+
+      // Add specific history entry for row deletion
+      if (user) {
+        await addHistory({
+          userName: user.name,
+          userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
+          action: 'delete',
+          target: 'database',
+          targetName: database.name,
+          description: `${user.name} deleted a row from database "${database.name}"`
+        });
+      }
     }
     setShowConfirmDelete(false);
     setDeleteTarget(null);
   };
 
-  const handleAddRow = () => {
+  const handleAddRow = async () => {
     if (!canEdit) {
       alert('You do not have permission to add rows. Only ADMIN and SUPERUSER can edit.');
       return;
@@ -207,7 +307,19 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         database.columns.map((col) => [col.key, { value: '', type: col.type }])
       ),
     };
-    updateThisDb((db) => ({ ...db, rows: [...db.rows, newRow] }));
+    await updateThisDb((db) => ({ ...db, rows: [...db.rows, newRow] }));
+
+    // Add specific history entry
+    if (user) {
+      await addHistory({
+        userName: user.name,
+        userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
+        action: 'edit',
+        target: 'database',
+        targetName: database.name,
+        description: `${user.name} added a new row to database "${database.name}"`
+      });
+    }
 
     setTimeout(() => {
       newRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -231,11 +343,24 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     setSortConfig(clearAllSorts());
   };
 
-  const handleDatabaseNameChange = () => {
+  const handleDatabaseNameChange = async () => {
     if (!canEdit) return;
 
     if (editedName.trim() && editedName !== database.name) {
-      updateThisDb((db) => ({ ...db, name: editedName.trim() }));
+      const oldName = database.name;
+      await updateThisDb((db) => ({ ...db, name: editedName.trim() }));
+
+      // Add specific history entry
+      if (user) {
+        await addHistory({
+          userName: user.name,
+          userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
+          action: 'edit',
+          target: 'database',
+          targetName: editedName.trim(),
+          description: `${user.name} renamed database from "${oldName}" to "${editedName.trim()}"`
+        });
+      }
     } else {
       setEditedName(database.name);
     }
@@ -657,7 +782,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             <input
                               type="text"
                               value={prop.value}
+                              onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
                               onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.value)}
+                              onBlur={(e) => handleCellBlur(row.id, col.key, e.target.value)}
                               disabled={!canEdit}
                               placeholder=""
                               className={`w-full text-sm ${
@@ -671,7 +798,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             <input
                               type="number"
                               value={prop.value}
+                              onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
                               onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.valueAsNumber)}
+                              onBlur={(e) => handleCellBlur(row.id, col.key, e.target.valueAsNumber)}
                               disabled={!canEdit}
                               placeholder=""
                               className={`w-full text-sm ${
@@ -685,7 +814,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             <input
                               type="date"
                               value={prop.value}
+                              onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
                               onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.value)}
+                              onBlur={(e) => handleCellBlur(row.id, col.key, e.target.value)}
                               disabled={!canEdit}
                               className={`w-full text-sm ${
                                 darkMode
@@ -698,7 +829,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             <input
                               type="checkbox"
                               checked={!!prop.value}
-                              onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.checked)}
+                              onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
+                              onChange={(e) => {
+                                if (canEdit) {
+                                  handleValueChange(row.id, col.key, e.target.checked);
+                                  // For checkbox, trigger blur immediately after change
+                                  handleCellBlur(row.id, col.key, e.target.checked);
+                                }
+                              }}
                               disabled={!canEdit}
                               className={`w-4 h-4 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                             />
