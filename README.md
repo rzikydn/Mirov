@@ -6,20 +6,32 @@ Sistem manajemen internal yang aman dan modern untuk mengelola jadwal, catatan, 
 
 ### Core Features
 - **Authentication & Authorization**: Login sistem dengan JWT dan role-based access (SUPERUSER, ADMIN, UMUM)
+  - Protected routes dengan automatic redirect
+  - Browser back/forward button protection
+  - Session validation on navigation
 - **Schedule Management**: Kelola jadwal meeting, event, dan kegiatan tim
 - **Team Notes**: Sistem catatan kolaboratif dengan warna custom dan keyboard shortcuts (Ctrl+Enter)
+  - Support 3 warna post-it: Red, Yellow, Green (cycling order)
+  - Favorite notes feature (⭐ ADMIN & SUPERUSER only)
 - **Database Manager**: Kelola database internal dengan interface Notion-style yang powerful
   - Support multiple column types (Text, Number, Date, Checkbox)
-  - Multi-level sorting untuk organize data
+  - Multi-level sorting dengan default descending untuk date columns
+  - Flexible column resize (minimum 40px width)
+  - Freeze first column untuk navigasi mudah
+  - Freeze header (sticky header) saat scroll vertical
   - Export to JSON & Excel (XLSX) dengan formatting
   - Real-time sync dengan backend
-  - Sticky first column untuk navigasi mudah
-  - Bulk delete untuk history management
+  - Auto-create 4 default rows untuk database baru
+  - Dynamic table width calculation (no empty space)
 - **History & Audit Trail**: Tracking semua aktivitas user dengan detail lengkap (khusus ADMIN & SUPERUSER)
-  - Detailed activity logging (Added, Changed, Deleted)
-  - Mencatat setiap perubahan column, row, dan cell values
+  - Detailed activity logging (Create, Edit, Delete)
+  - Smart history tracking - hanya mencatat perubahan final (tidak per keystroke)
+  - Visual row position tracking dengan identifier kolom pertama
+  - History format: "User updated 'Column' in row X (FirstColumn: 'Value') from 'old' to 'new'"
+  - Add Property action tracking
+  - Bulk delete untuk history management (SUPERUSER only)
 - **Dark Mode**: Tema gelap untuk kenyamanan mata
-- **Responsive Design**: Optimized untuk desktop dan mobile (iOS/Android)
+- **Responsive Design**: Optimized untuk desktop, tablet, dan mobile (iOS/Android)
 
 ### Security Features
 - **Rate Limiting**: Pembatasan request per IP address
@@ -29,6 +41,10 @@ Sistem manajemen internal yang aman dan modern untuk mengelola jadwal, catatan, 
 - **Role-Based Access Control (RBAC)**: Granular permissions per role
 - **SQL Injection Prevention**: Prisma ORM dengan prepared statements
 - **XSS Protection**: React auto-escaping dan CSP headers
+- **Browser Navigation Protection**: Prevents unauthorized access via browser back/forward buttons
+  - Automatic session validation on popstate events
+  - Replace history instead of push to prevent back button bypass
+  - Token verification on every navigation event
 
 ## Tech Stack
 
@@ -524,6 +540,19 @@ If you discover a security vulnerability:
 - **Ascending/Descending**: Pilih urutan naik atau turun per column
 - **Priority-based**: Column pertama dalam sort list memiliki prioritas tertinggi
 - **Visual indicators**: Badge menunjukkan urutan sort (1, 2, 3, ...)
+- **Smart defaults**: Date columns automatically sort in descending order (newest first)
+
+### Table UI Features
+- **Freeze First Column**: First column stays visible when scrolling horizontally with sticky positioning
+- **Freeze Header**: Column headers stay visible when scrolling vertically (sticky header)
+- **Flexible Column Resize**: Resize columns independently (minimum 40px width)
+  - Drag column border to resize
+  - Only affects the specific column being resized (Excel-like behavior)
+  - Preserves other column widths
+- **Dynamic Table Width**: Auto-adjusts to content with JavaScript calculation, eliminates empty space
+- **Z-Index Hierarchy**: Smart z-index management ensures dropdowns appear above table content
+- **Responsive Buttons**: Mobile-optimized button sizes and layout (compact on small screens)
+- **Auto 4 Default Rows**: New databases automatically create 4 rows to prevent dropdown cutoff
 
 ### Export Features
 1. **JSON Export**
@@ -544,9 +573,21 @@ Setiap perubahan pada database dicatat dengan detail:
 - **Changed** (Blue badge): Edit nama database, column, cell value
 - **Deleted** (Red badge): Hapus column, row
 
+**Smart History Features:**
+- **Focus/Blur Pattern**: Hanya mencatat perubahan final (tidak per keystroke)
+  - Column rename: Recorded on blur, bukan setiap huruf diketik
+  - Cell edit: Recorded on blur setelah selesai edit
+- **Visual Row Position**: Menggunakan sorted row position (bukan array index)
+  - Menampilkan nomor baris yang benar sesuai tampilan user
+  - Include first column value sebagai identifier: "row 3 (Name: 'John')"
+- **Detailed Descriptions**: Clear, descriptive history messages
+  - Column operations: "added new column 'Priority' (type: text)"
+  - Cell updates: "updated 'Status' in row 3 (Name: 'John') from 'Pending' to 'Completed'"
+  - Add Property tracking: Mencatat penambahan column dengan error handling
+
 **Contoh History Entry:**
 - "Amin added new column 'Priority' (type: text) to database '🏦 PROGRAM UKMR'"
-- "Amin updated 'Status' in row 3 from 'Pending' to 'Completed' in database '🏦 PROGRAM UKMR'"
+- "Amin updated 'Status' in row 3 (Name: 'John') from 'Pending' to 'Completed' in database '🏦 PROGRAM UKMR'"
 - "Amin deleted column 'Old Field' from database '🏦 PROGRAM UKMR'"
 
 ### Permission System (Database)
@@ -631,7 +672,43 @@ This project is private and proprietary. All rights reserved.
 
 2. **Type Dropdown Terpotong**
    - Issue: Dropdown type saat membuat database table terpotong
-   - Status: ✅ Fixed - Menggunakan z-index tinggi dan removed overflow-hidden
+   - Status: ✅ Fixed - Menggunakan z-index 10000 dan dynamic overflow
+   - Workaround: Sudah tidak diperlukan
+
+3. **Empty Space di Pojok Kanan Table**
+   - Issue: White space area di right corner database table
+   - Status: ✅ Fixed - Dynamic table width calculation dengan JavaScript state
+   - Solution: `Math.max(totalWidth, containerWidth)` ensures no empty space
+   - Workaround: Sudah tidak diperlukan
+
+4. **Column Resize Affecting Other Columns**
+   - Issue: Resize satu kolom membuat kolom lain ikut bergerak
+   - Status: ✅ Fixed - Changed minWidth to maxWidth, reduced min to 40px
+   - Solution: Excel-like behavior - hanya kolom yang di-drag yang berubah
+   - Workaround: Sudah tidak diperlukan
+
+5. **History Recording Per Keystroke**
+   - Issue: Column rename mencatat setiap huruf yang diketik
+   - Status: ✅ Fixed - Implemented focus/blur pattern
+   - Solution: Save initial value on focus, record only final value on blur
+   - Workaround: Sudah tidak diperlukan
+
+6. **Incorrect Row Numbers in History**
+   - Issue: History menunjukkan nomor baris yang salah (tidak sesuai tampilan)
+   - Status: ✅ Fixed - Using getSortedRows() for visual position
+   - Solution: Track visual row position instead of array index
+   - Workaround: Sudah tidak diperlukan
+
+7. **Add Property Not Tracked**
+   - Issue: Add Property action tidak tercatat di history
+   - Status: ✅ Fixed - Added await and try-catch error handling
+   - Solution: Ensure database update completes before history recording
+   - Workaround: Sudah tidak diperlukan
+
+8. **Browser Back Button Bypass Auth**
+   - Issue: User bisa back ke dashboard tanpa logout dengan browser button
+   - Status: ✅ Fixed - Added popstate event listeners
+   - Solution: Validate token on every popstate event, use replace: true
    - Workaround: Sudah tidak diperlukan
 
 ### Backend
@@ -699,7 +776,46 @@ This project is private and proprietary. All rights reserved.
 
 ## Changelog
 
-### [Current] - 2025-01-11
+### [Current] - 2025-01-12
+#### Added
+- **Browser Navigation Protection**: Popstate event listeners untuk prevent auth bypass
+  - Token validation on browser back/forward navigation
+  - Replace history instead of push to prevent back button bypass
+- **Smart History Tracking**: Focus/blur pattern untuk prevent per-keystroke recording
+  - Visual row position tracking dengan sorted rows
+  - Row identifier menggunakan first column value
+  - Add Property action tracking dengan error handling
+- **Table UI Enhancements**:
+  - Freeze first column (sticky positioning dengan z-index hierarchy)
+  - Freeze header (sticky header saat vertical scroll)
+  - Flexible column resize (minimum 40px, Excel-like behavior)
+  - Dynamic table width calculation (eliminates empty space)
+  - Auto 4 default rows untuk new databases
+  - Z-index management untuk dropdown visibility
+
+#### Fixed
+- **Empty space at right corner** of database table (multiple iterations)
+  - Solution: Dynamic width calculation dengan `Math.max(totalWidth, containerWidth)`
+- **Column resize affecting other columns**
+  - Solution: Changed minWidth to maxWidth, reduced minimum to 40px
+- **History recording per keystroke** untuk column rename
+  - Solution: Implemented focus/blur pattern
+- **Incorrect row numbers in history** (showing array index instead of visual position)
+  - Solution: Using getSortedRows() for accurate row position
+- **Add Property not tracked** in history
+  - Solution: Await database update, added try-catch error handling
+- **Browser back button bypassing auth**
+  - Solution: Popstate event listeners dengan token validation
+- **Type dropdown covered by table**
+  - Solution: Z-index 10000 and dynamic overflow management
+- **Date columns default sort** to descending automatically
+
+#### Changed
+- Team Notes post-it colors: Reduced dari 6 colors to 3 (Red, Yellow, Green)
+- Button layout: Responsive sizes untuk mobile (sm: breakpoints)
+- Column resize minimum: Reduced dari 80px to 40px untuk flexibility
+
+### [1.1.0] - 2025-01-11
 #### Added
 - Database Manager dengan Notion-style interface
 - Multi-level sorting untuk database tables
@@ -750,5 +866,5 @@ Jika ada pertanyaan atau issue, silakan hubungi tim IT kantor atau buat issue di
 
 **Made with ❤️ by Team Mirov**
 
-Last Updated: January 11, 2025
-Version: 1.1.0 (In Development)
+Last Updated: January 12, 2025
+Version: 1.2.0 (In Development)
