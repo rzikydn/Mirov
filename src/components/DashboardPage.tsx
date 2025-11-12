@@ -90,7 +90,9 @@ export default function DashboardPage() {
           columns: [{ key: colKey, label: 'Name', type: 'text' }],
           rows: [
             { id: `row-1-${Date.now()}`, properties: { [colKey]: { value: '', type: 'text' } } },
-            { id: `row-2-${Date.now()}`, properties: { [colKey]: { value: '', type: 'text' } } },
+            { id: `row-2-${Date.now() + 1}`, properties: { [colKey]: { value: '', type: 'text' } } },
+            { id: `row-3-${Date.now() + 2}`, properties: { [colKey]: { value: '', type: 'text' } } },
+            { id: `row-4-${Date.now() + 3}`, properties: { [colKey]: { value: '', type: 'text' } } },
           ]
         })
       });
