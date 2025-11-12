@@ -28,8 +28,15 @@ export default function AuthPage() {
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load saved email only (NOT password for security)
+  // Check if user is already logged in, redirect to dashboard
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+
+    // Load saved email only (NOT password for security)
     const savedEmail = localStorage.getItem('rememberedEmail');
     const wasRemembered = localStorage.getItem('rememberMe') === 'true';
 
@@ -40,7 +47,18 @@ export default function AuthPage() {
       }));
       setRememberMe(true);
     }
-  }, []);
+
+    // Listen for popstate (browser back/forward) and recheck auth
+    const handlePopState = () => {
+      const currentToken = localStorage.getItem('token');
+      if (currentToken) {
+        navigate('/dashboard', { replace: true });
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navigate]);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};

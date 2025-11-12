@@ -31,16 +31,27 @@ export default function DashboardPage() {
 
     if (!token || !storedUser) {
       // Belum login → kembali ke halaman auth
-      navigate('/auth');
+      navigate('/auth', { replace: true });
     } else {
       try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
       } catch (error) {
         console.error('❌ Error parsing user:', error);
-        navigate('/auth');
+        navigate('/auth', { replace: true });
       }
     }
+
+    // Listen for popstate (browser back/forward) and recheck auth
+    const handlePopState = () => {
+      const currentToken = localStorage.getItem('token');
+      if (!currentToken) {
+        navigate('/auth', { replace: true });
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, [navigate]);
 
   // 🧱 Fetch databases from backend
