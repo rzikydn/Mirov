@@ -70,6 +70,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   });
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [editingCell, setEditingCell] = useState<{ rowId: string; key: string; oldValue: any } | null>(null);
+  const [editingColumnLabel, setEditingColumnLabel] = useState<{ key: string; oldLabel: string } | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
     // Initialize default widths for each column
     const widths: Record<string, number> = {};
@@ -164,27 +165,38 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }
   };
 
-  const handleColumnLabelChange = async (key: string, value: string) => {
+  const handleColumnLabelFocus = (key: string) => {
+    const column = database.columns.find(c => c.key === key);
+    if (column) {
+      setEditingColumnLabel({ key, oldLabel: column.label });
+    }
+  };
+
+  const handleColumnLabelChange = (key: string, value: string) => {
     if (!canEdit) return;
 
-    const oldColumn = database.columns.find(c => c.key === key);
-    const oldLabel = oldColumn?.label || '';
-
-    await updateThisDb((db) => ({
+    // Just update the value without adding history
+    updateThisDb((db) => ({
       ...db,
       columns: db.columns.map((c) => (c.key === key ? { ...c, label: value } : c))
     }));
+  };
 
-    // Add specific history entry if column name actually changed
-    if (oldLabel !== value && value.trim() && user) {
-      await addHistory({
-        userName: user.name,
-        userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
-        action: 'edit',
-        target: 'database',
-        targetName: database.name,
-        description: `${user.name} renamed column "${oldLabel}" to "${value}" in database "${database.name}"`
-      });
+  const handleColumnLabelBlur = async (key: string, newLabel: string) => {
+    // Add history only when finished editing
+    if (editingColumnLabel && editingColumnLabel.key === key) {
+      const oldLabel = editingColumnLabel.oldLabel;
+      if (oldLabel !== newLabel && newLabel.trim() && user) {
+        await addHistory({
+          userName: user.name,
+          userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
+          action: 'edit',
+          target: 'database',
+          targetName: database.name,
+          description: `${user.name} renamed column "${oldLabel}" to "${newLabel}" in database "${database.name}"`
+        });
+      }
+      setEditingColumnLabel(null);
     }
   };
 
@@ -232,7 +244,21 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       if (oldValue !== newValue && user) {
         const column = database.columns.find(c => c.key === key);
         const columnLabel = column?.label || '';
-        const rowIndex = database.rows.findIndex(r => r.id === rowId) + 1;
+
+        // Get sorted rows to find the correct visual position
+        const sortedRows = getSortedRows(database.rows, database.columns, sortConfig);
+        const visualRowIndex = sortedRows.findIndex(r => r.id === rowId) + 1;
+
+        // Get first column value for better identification
+        const row = database.rows.find(r => r.id === rowId);
+        const firstColumnKey = database.columns[0]?.key;
+        const firstColumnValue = row?.properties[firstColumnKey]?.value || '';
+        const firstColumnLabel = database.columns[0]?.label || '';
+
+        // Create detailed description
+        const rowIdentifier = firstColumnValue
+          ? `row ${visualRowIndex} (${firstColumnLabel}: "${firstColumnValue}")`
+          : `row ${visualRowIndex}`;
 
         await addHistory({
           userName: user.name,
@@ -240,7 +266,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           action: 'edit',
           target: 'database',
           targetName: database.name,
-          description: `${user.name} updated "${columnLabel}" in row ${rowIndex} from "${oldValue || '(empty)'}" to "${newValue || '(empty)'}" in database "${database.name}"`
+          description: `${user.name} updated "${columnLabel}" in ${rowIdentifier} from "${oldValue || '(empty)'}" to "${newValue || '(empty)'}" in database "${database.name}"`
         });
       }
       setEditingCell(null);
@@ -270,6 +296,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     if (!canEdit) return;
 
     const newKey = `${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
+
+    // Update database first
     await updateThisDb((db) => {
       const updatedColumns = [...db.columns, { key: newKey, label: name, type }];
       const updatedRows = db.rows.map((row) => ({
@@ -279,16 +307,20 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       return { ...db, columns: updatedColumns, rows: updatedRows };
     });
 
-    // Add specific history entry
+    // Then add history entry after database is updated
     if (user) {
-      await addHistory({
-        userName: user.name,
-        userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
-        action: 'added',
-        target: 'database',
-        targetName: database.name,
-        description: `${user.name} added new column "${name}" (type: ${type}) to database "${database.name}"`
-      });
+      try {
+        await addHistory({
+          userName: user.name,
+          userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
+          action: 'create',
+          target: 'database',
+          targetName: database.name,
+          description: `${user.name} added new column "${name}" (type: ${type}) to database "${database.name}"`
+        });
+      } catch (error) {
+        console.error('Error adding history:', error);
+      }
     }
 
     setShowAddProperty(false);
@@ -779,7 +811,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         {/* Column Label - Only SUPERUSER can edit */}
                         <input
                           value={col.label}
+                          onFocus={() => canManageColumns && handleColumnLabelFocus(col.key)}
                           onChange={(e) => canManageColumns && handleColumnLabelChange(col.key, e.target.value)}
+                          onBlur={(e) => canManageColumns && handleColumnLabelBlur(col.key, e.target.value)}
                           disabled={!canManageColumns}
                           className={`text-sm font-medium ${
                             darkMode ? 'text-gray-300 bg-transparent' : 'text-gray-700 bg-transparent'
