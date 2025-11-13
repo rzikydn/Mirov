@@ -116,7 +116,7 @@ const SortDropdown: React.FC<SortDropdownProps> = ({
           {/* Column Selection Dropdown for Add Sort */}
           {showAddSortDropdown && (
             <div
-              className={`absolute top-full left-0 mt-1 w-full rounded-lg shadow-lg border max-h-48 overflow-y-auto ${
+              className={`absolute top-full left-0 mt-1 w-full rounded-lg shadow-lg border max-h-48 overflow-y-auto custom-scrollbar ${
                 darkMode ? 'bg-[#2a2a2a] border-gray-700' : 'bg-white border-gray-200'
               }`}
               style={{ zIndex: 100 }}

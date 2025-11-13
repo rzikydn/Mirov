@@ -255,14 +255,14 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
           {canDelete && history.length > 0 && (
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={selectedIds.size === history.length && history.length > 0}
                     onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="custom-checkbox"
                   />
-                  <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <span className={`text-sm font-medium transition-colors ${darkMode ? 'text-gray-300 group-hover:text-white' : 'text-gray-700 group-hover:text-gray-900'}`}>
                     Select All ({selectedIds.size}/{history.length})
                   </span>
                 </label>
@@ -288,7 +288,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
           {history.length === 0 ? (
             <div className="text-center py-12">
               <Clock className={`w-12 h-12 mx-auto mb-4 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
@@ -302,15 +302,20 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
                 <motion.div
                   key={entry.id}
                   initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`group relative p-4 rounded-lg border transition-colors ${
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                    scale: selectedIds.has(entry.id) ? 1.01 : 1
+                  }}
+                  transition={{ duration: 0.2 }}
+                  className={`group relative p-4 rounded-lg border transition-all duration-200 ${
                     selectedIds.has(entry.id)
                       ? darkMode
-                        ? 'bg-blue-900/20 border-blue-700'
-                        : 'bg-blue-50 border-blue-300'
+                        ? 'bg-blue-900/20 border-blue-600 shadow-lg shadow-blue-900/20'
+                        : 'bg-blue-50 border-blue-400 shadow-lg shadow-blue-200/50'
                       : darkMode
-                      ? 'bg-gray-800/50 border-gray-700'
-                      : 'bg-gray-50 border-gray-200'
+                      ? 'bg-gray-800/50 border-gray-700 hover:bg-gray-800/70'
+                      : 'bg-gray-50 border-gray-200 hover:bg-gray-100/70'
                   } ${deletingId === entry.id || isDeleting ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                   <div className="flex items-start gap-3">
@@ -321,7 +326,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
                         checked={selectedIds.has(entry.id)}
                         onChange={() => toggleSelect(entry.id)}
                         disabled={isDeleting}
-                        className="w-4 h-4 mt-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="custom-checkbox mt-2.5"
                       />
                     )}
                     <div className={`p-2 rounded-lg ${

@@ -73,7 +73,7 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ darkMode, onSelect, onClose }
 
       {/* Emoji Grid */}
       <div className="p-2">
-        <div className="grid grid-cols-9 gap-0 max-h-72 overflow-y-auto">
+        <div className="grid grid-cols-9 gap-0 max-h-72 overflow-y-auto custom-scrollbar">
           {emojiCategories[activeCategory as keyof typeof emojiCategories].emojis.map((emoji, index) => (
             <button
               key={index}

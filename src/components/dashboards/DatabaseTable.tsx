@@ -102,21 +102,38 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }
   }, []);
 
-  // Handle column resize
+  // Handle column resize with smooth animation and damping
   useEffect(() => {
+    let animationFrameId: number | null = null;
+    const smoothingFactor = 0.3; // Lower = smoother (range: 0.1 - 0.5)
+
     const handleMouseMove = (e: MouseEvent) => {
       if (resizingColumn) {
+        // Calculate target width directly from mouse position
         const diff = e.clientX - resizingColumn.startX;
-        const newWidth = Math.max(40, resizingColumn.startWidth + diff);
-        setColumnWidths(prev => ({
-          ...prev,
-          [resizingColumn.key]: newWidth
-        }));
+        const targetWidth = Math.max(40, resizingColumn.startWidth + diff);
+
+        // Get current width from state
+        setColumnWidths(prev => {
+          const currentWidth = prev[resizingColumn.key] || resizingColumn.startWidth;
+
+          // Apply lerp smoothing: gradually move towards target
+          const difference = targetWidth - currentWidth;
+          const newWidth = currentWidth + difference * smoothingFactor;
+
+          return {
+            ...prev,
+            [resizingColumn.key]: Math.round(newWidth)
+          };
+        });
       }
     };
 
     const handleMouseUp = () => {
       if (resizingColumn) {
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
         setResizingColumn(null);
       }
     };
@@ -126,13 +143,18 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       document.addEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
+      document.body.classList.add('resizing-column');
     }
 
     return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      document.body.classList.remove('resizing-column');
     };
   }, [resizingColumn]);
 
@@ -840,10 +862,17 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       {index !== database.columns.length - 1 && (
                         <div
                           onMouseDown={(e) => handleResizeStart(e, col.key)}
-                          className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 ${
-                            resizingColumn?.key === col.key ? 'bg-blue-500' : ''
+                          className={`resize-handle absolute right-0 top-0 bottom-0 cursor-col-resize ${
+                            resizingColumn?.key === col.key
+                              ? 'w-1 bg-blue-500 opacity-100'
+                              : 'w-1 hover:bg-blue-400 hover:opacity-80 opacity-0'
                           }`}
-                          style={{ zIndex: 30, marginRight: '-0.5px' }}
+                          style={{
+                            zIndex: 30,
+                            marginRight: '-0.5px',
+                            transition: 'background-color 0.2s ease, opacity 0.2s ease, width 0.1s ease'
+                          }}
+                          title="Drag to resize column"
                         />
                       )}
                     </th>
@@ -967,7 +996,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                 }
                               }}
                               disabled={!canEdit}
-                              className={`w-4 h-4 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                              className={`custom-checkbox ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                             />
                           )}
                         </td>

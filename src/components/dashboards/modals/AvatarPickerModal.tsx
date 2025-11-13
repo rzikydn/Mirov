@@ -95,7 +95,7 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({
         </div>
 
         {/* Avatar Grid */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
           <div className="grid grid-cols-4 gap-4">
             {avatarOptions.map((avatar) => (
               <button

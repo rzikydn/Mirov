@@ -76,14 +76,46 @@ table {
   -webkit-overflow-scrolling: auto !important;
 }
 
-/* 🚫 Remove all transitions and transforms from table elements */
+/* 🚫 Remove all transitions and transforms from table elements (except resize handle) */
 table,
-table *,
+table *:not(.resize-handle),
 .overflow-x-auto,
 .overflow-x-auto * {
   transition: none !important;
   animation: none !important;
   will-change: auto !important;
+}
+
+/* 🎨 Smooth column resize styles */
+.resize-handle {
+  transition: background-color 0.2s ease, opacity 0.2s ease, width 0.1s ease !important;
+}
+
+/* Visual feedback saat resize aktif */
+body.resizing-column {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+body.resizing-column * {
+  cursor: col-resize !important;
+  pointer-events: none;
+}
+
+body.resizing-column .resize-handle {
+  pointer-events: auto;
+}
+
+/* Smooth width transition untuk column yang di-resize - only when actively resizing */
+body.resizing-column table th,
+body.resizing-column table td {
+  transition: width 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Remove transition when not resizing for instant scroll */
+body:not(.resizing-column) table th,
+body:not(.resizing-column) table td {
+  transition: none !important;
 }
 
 /* 🎯 Optimize sticky positioning and scrolling performance */
@@ -99,4 +131,101 @@ table,
   -webkit-backface-visibility: hidden;
   perspective: 1000px;
   -webkit-perspective: 1000px;
+}
+
+/* 🎨 Modern Custom Scrollbar - Light Mode */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5); /* gray-400 with opacity */
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.7); /* gray-500 with opacity */
+}
+
+/* Firefox scrollbar - Light Mode */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+/* 🌙 Modern Custom Scrollbar - Dark Mode */
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.6); /* gray-600 with opacity */
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.8); /* gray-500 with opacity */
+}
+
+/* Firefox scrollbar - Dark Mode */
+.dark .custom-scrollbar {
+  scrollbar-color: rgba(75, 85, 99, 0.6) transparent;
+}
+
+/* 🎯 Modern Custom Checkbox - Light Mode */
+.custom-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #d1d5db; /* gray-300 */
+  border-radius: 6px;
+  background-color: white;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.custom-checkbox:hover {
+  border-color: #3b82f6; /* blue-500 */
+  background-color: #eff6ff; /* blue-50 */
+}
+
+.custom-checkbox:checked {
+  background-color: #3b82f6; /* blue-500 */
+  border-color: #3b82f6;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='white'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
+  background-size: 12px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.custom-checkbox:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+.custom-checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 🌙 Modern Custom Checkbox - Dark Mode */
+.dark .custom-checkbox {
+  border-color: #4b5563; /* gray-600 */
+  background-color: #374151; /* gray-700 */
+}
+
+.dark .custom-checkbox:hover {
+  border-color: #60a5fa; /* blue-400 */
+  background-color: #1e3a8a; /* blue-900 */
+}
+
+.dark .custom-checkbox:checked {
+  background-color: #3b82f6; /* blue-500 */
+  border-color: #3b82f6;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23e5e7eb'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
 }
