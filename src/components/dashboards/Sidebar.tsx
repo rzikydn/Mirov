@@ -58,7 +58,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [deleteDbId, setDeleteDbId] = useState<string | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true); // Default collapsed on desktop
   const { history } = useHistory();
 
   const handleDeleteClick = (e: React.MouseEvent, dbId: string) => {
@@ -102,8 +102,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             } border-r h-full flex flex-col ${isOpen ? 'shadow-xl' : ''}`}
           >
             <div className="p-3 flex flex-col flex-1 overflow-y-auto custom-scrollbar">
-              <div className={`flex items-center mb-6 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-                <div className={`flex items-center gap-3 ${isCollapsed ? 'flex-col' : 'flex-1'}`}>
+              <div className={`flex items-center mb-6 ${isCollapsed && window.innerWidth >= 1024 ? 'justify-center' : 'justify-between'}`}>
+                <div className={`flex items-center gap-3 ${isCollapsed && window.innerWidth >= 1024 ? 'flex-col' : 'flex-1'}`}>
                   {/* Mirov Logo */}
                   <svg className="w-10 h-10 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 2L2 7L12 12L22 7L12 2Z" fill={darkMode ? '#60A5FA' : '#2563EB'} />
@@ -112,7 +112,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   </svg>
 
                   {/* Mirov Text - Hidden when collapsed on desktop */}
-                  {!isCollapsed && (
+                  {!(isCollapsed && window.innerWidth >= 1024) && (
                     <span className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                       Mirov
                     </span>
@@ -132,15 +132,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
 
                 {/* Close button - Mobile only */}
-                {!isCollapsed && (
-                  <button
-                    className={`lg:hidden p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                    onClick={() => setIsOpen(false)}
-                    aria-label="Close menu"
-                  >
-                    <X className={`w-5 h-5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} />
-                  </button>
-                )}
+                <button
+                  className={`lg:hidden p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                  onClick={() => setIsOpen(false)}
+                  aria-label="Close menu"
+                >
+                  <X className={`w-5 h-5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} />
+                </button>
               </div>
 
               <nav className="space-y-1 mb-4">
@@ -152,7 +150,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       onSelectDatabase(null);
                       setIsOpen(false);
                     }}
-                    className={`w-full ${isCollapsed ? 'flex justify-center' : 'text-left'} px-2 py-1.5 rounded-lg transition-colors duration-150 text-sm ${
+                    className={`w-full ${isCollapsed && window.innerWidth >= 1024 ? 'flex justify-center' : 'text-left'} px-2 py-1.5 rounded-lg transition-colors duration-150 text-sm ${
                       selectedMenu === item.id && !selectedDatabase
                         ? darkMode
                           ? 'bg-blue-900 text-blue-300'
@@ -161,9 +159,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                         ? 'text-gray-300 hover:bg-gray-700 hover:text-blue-300'
                         : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
                     }`}
-                    title={isCollapsed ? item.name : undefined}
+                    title={isCollapsed && window.innerWidth >= 1024 ? item.name : undefined}
                   >
-                    {isCollapsed ? (
+                    {isCollapsed && window.innerWidth >= 1024 ? (
                       <StickyNote className="w-5 h-5" />
                     ) : (
                       item.name
@@ -173,7 +171,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               </nav>
 
               <div className="mb-3 flex-1">
-                {!isCollapsed ? (
+                {!(isCollapsed && window.innerWidth >= 1024) ? (
                   <>
                     <div className="flex items-center justify-between mb-3 mt-2">
                       <span className={`text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -275,10 +273,10 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className={`border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} pt-2 space-y-1`}>
                 {/* User Profile Display */}
                 {user && (
-                  <div className={`${isCollapsed ? 'flex justify-center' : 'px-2'} py-2 mb-1 rounded-lg ${
+                  <div className={`${isCollapsed && window.innerWidth >= 1024 ? 'flex justify-center' : 'px-2'} py-2 mb-1 rounded-lg ${
                     darkMode ? 'bg-gray-700/50' : 'bg-gray-100'
                   }`}>
-                    {isCollapsed ? (
+                    {isCollapsed && window.innerWidth >= 1024 ? (
                       <div
                         className={`w-8 h-8 rounded-full flex items-center justify-center ${
                           darkMode ? 'bg-blue-600' : 'bg-blue-500'
@@ -315,15 +313,15 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {user && user.role !== 'UMUM' && (
                   <button
                     onClick={() => setShowHistory(true)}
-                    className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
+                    className={`w-full flex items-center ${isCollapsed && window.innerWidth >= 1024 ? 'justify-center' : 'gap-2'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
                       darkMode
                         ? 'text-gray-300 hover:bg-gray-700'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
-                    title={isCollapsed ? 'History' : undefined}
+                    title={isCollapsed && window.innerWidth >= 1024 ? 'History' : undefined}
                   >
                     <Clock className="w-4 h-4" />
-                    {!isCollapsed && (
+                    {!(isCollapsed && window.innerWidth >= 1024) && (
                       <>
                         <span className="font-medium">History</span>
                         {history.length > 0 && (
@@ -341,14 +339,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {/* Dark Mode Toggle */}
                 <button
                   onClick={toggleDarkMode}
-                  className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
+                  className={`w-full flex items-center ${isCollapsed && window.innerWidth >= 1024 ? 'justify-center' : 'justify-between'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
                     darkMode
                       ? 'text-gray-300 hover:bg-gray-700'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
-                  title={isCollapsed ? (darkMode ? 'Light mode' : 'Dark mode') : undefined}
+                  title={isCollapsed && window.innerWidth >= 1024 ? (darkMode ? 'Light mode' : 'Dark mode') : undefined}
                 >
-                  {isCollapsed ? (
+                  {isCollapsed && window.innerWidth >= 1024 ? (
                     darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />
                   ) : (
                     <>
@@ -380,15 +378,15 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {/* Logout Button */}
                 <button
                   onClick={() => setShowLogoutConfirm(true)}
-                  className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
+                  className={`w-full flex items-center ${isCollapsed && window.innerWidth >= 1024 ? 'justify-center' : 'gap-2'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
                     darkMode
                       ? 'text-gray-300 hover:bg-red-900 hover:text-red-300'
                       : 'text-gray-700 hover:bg-red-50 hover:text-red-600'
                   }`}
-                  title={isCollapsed ? 'Logout' : undefined}
+                  title={isCollapsed && window.innerWidth >= 1024 ? 'Logout' : undefined}
                 >
                   <Home className="w-4 h-4" />
-                  {!isCollapsed && <span className="font-medium">Logout</span>}
+                  {!(isCollapsed && window.innerWidth >= 1024) && <span className="font-medium">Logout</span>}
                 </button>
               </div>
             </div>

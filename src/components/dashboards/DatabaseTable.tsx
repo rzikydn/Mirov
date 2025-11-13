@@ -556,17 +556,18 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       {/* Header - Notion Style */}
       <div className="px-8 sm:px-12 lg:px-24 pt-12 pb-4">
         {/* Action Buttons */}
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6">
           {canEdit && (
             <div className="relative">
               <button
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
+                className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                   darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                <Smile className="w-4 h-4" />
-                {database.icon ? 'Change icon' : 'Add icon'}
+                <Smile className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden xs:inline">{database.icon ? 'Change icon' : 'Add icon'}</span>
+                <span className="xs:hidden">Icon</span>
               </button>
               {showEmojiPicker && (
                 <EmojiPicker
@@ -581,24 +582,25 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           {canEdit && !database.description && (
             <button
               onClick={handleAddDescription}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
+              className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                 darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
-              <FileText className="w-4 h-4" />
-              Add description
+              <FileText className="w-4 h-4 flex-shrink-0" />
+              <span className="hidden xs:inline">Add description</span>
+              <span className="xs:hidden">Description</span>
             </button>
           )}
 
           {/* Export Button */}
           <button
             onClick={() => setShowExportModal(true)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
+            className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
               darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
-            <Download className="w-4 h-4" />
-            Export
+            <Download className="w-4 h-4 flex-shrink-0" />
+            <span>Export</span>
           </button>
         </div>
 
@@ -612,7 +614,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               onBlur={handleDatabaseNameChange}
               onKeyDown={handleNameKeyPress}
               autoFocus
-              className={`text-4xl font-bold w-full ${
+              className={`text-2xl sm:text-3xl lg:text-4xl font-bold w-full ${
                 darkMode ? 'bg-[#191919] text-white' : 'bg-white text-gray-900'
               } border-0 focus:outline-none p-0`}
               placeholder="Untitled"
@@ -621,7 +623,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             <div className="flex items-center gap-3 group">
               <h1
                 onClick={() => canEdit && setIsEditingName(true)}
-                className={`text-4xl font-bold ${canEdit ? 'cursor-text' : 'cursor-default'} ${
+                className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${canEdit ? 'cursor-text' : 'cursor-default'} ${
                   darkMode ? 'text-white' : 'text-gray-900'
                 }`}
               >
