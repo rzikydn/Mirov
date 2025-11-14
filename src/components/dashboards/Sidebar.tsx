@@ -15,6 +15,7 @@ import {
   Menu,
   StickyNote,
   Database as DatabaseIcon,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
 import { Database } from '../../types/database';
 import { menuItems } from '../../constants/dashboard';
@@ -167,7 +168,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     title={isCollapsed && window.innerWidth >= 1024 ? item.name : undefined}
                   >
                     {isCollapsed && window.innerWidth >= 1024 ? (
-                      <StickyNote className="w-5 h-5" />
+                      item.id === '1' ? <StickyNote className="w-5 h-5" /> : <CalendarIcon className="w-5 h-5" />
                     ) : (
                       item.name
                     )}

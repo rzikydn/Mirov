@@ -29,10 +29,11 @@ interface UserData {
 }
 
 const newUsers: UserData[] = [
-  // SUPERUSER (3 users)
+  // SUPERUSER (4 users)
   { email: 'usertaufan', password: 'taufan123', name: 'Taufan', role: 'SUPERUSER' },
   { email: 'userhans', password: 'hans123', name: 'Hans', role: 'SUPERUSER' },
   { email: 'userjelly', password: 'jelly123', name: 'Jelly', role: 'SUPERUSER' },
+  { email: 'userdev', password: 'dev123', name: 'Developer', role: 'SUPERUSER' },
 
   // ADMIN (4 users)
   { email: 'adminagung', password: 'agung123', name: 'Agung', role: 'ADMIN' },

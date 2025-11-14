@@ -100,4 +100,5 @@ enum HistoryTarget {
   NOTE
   DATABASE
   SCHEDULE
+  CALENDAR
 }

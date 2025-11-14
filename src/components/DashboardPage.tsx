@@ -5,6 +5,7 @@ import Sidebar from './dashboards/Sidebar';
 import Header from './dashboards/Header';
 import DatabaseTable from './dashboards/DatabaseTable';
 import TeamNotes from './dashboards/TeamNotes';
+import Calendar from './dashboards/Calendar';
 import { Database } from '../types/database';
 import { menuItems } from '../constants/dashboard';
 import { useDarkMode } from '../hooks/useDarkMode';
@@ -202,13 +203,19 @@ export default function DashboardPage() {
         <main className={`flex-1 relative overflow-hidden ${darkMode ? 'bg-gray-900' : 'bg-slate-100'}`}>
           <AnimatePresence mode="wait">
             {!selectedDatabase ? (
-              <TeamNotes key="notes" darkMode={darkMode} />
+              selectedMenu === '1' ? (
+                <TeamNotes key="notes" darkMode={darkMode} />
+              ) : selectedMenu === '2' ? (
+                <Calendar key="calendar" darkMode={darkMode} />
+              ) : (
+                <TeamNotes key="notes" darkMode={darkMode} />
+              )
             ) : currentDb ? (
-              <DatabaseTable 
-                key={currentDb.id} 
-                database={currentDb} 
-                setDatabases={setDatabases} 
-                darkMode={darkMode} 
+              <DatabaseTable
+                key={currentDb.id}
+                database={currentDb}
+                setDatabases={setDatabases}
+                darkMode={darkMode}
               />
             ) : (
               <motion.div key="empty" className="p-6">
