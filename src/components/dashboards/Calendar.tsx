@@ -93,14 +93,19 @@ const Calendar: React.FC<CalendarProps> = ({ darkMode }) => {
       });
     };
 
-    await addHistory({
-      userName: user.name || 'Unknown User',
-      userRole: user.role || 'UMUM',
-      action: 'create',
-      target: 'calendar',
-      targetName: title,
-      description: `Created calendar event "${title}" on ${formatDate(date)}${description ? ` - ${description}` : ''}`
-    });
+    try {
+      await addHistory({
+        userName: user.name || 'Unknown User',
+        userRole: user.role || 'UMUM',
+        action: 'create',
+        target: 'calendar',
+        targetName: title,
+        description: `Created calendar event "${title}" on ${formatDate(date)}${description ? ` - ${description}` : ''}`
+      });
+      console.log('✅ Calendar event history added successfully');
+    } catch (error) {
+      console.error('❌ Failed to add calendar event to history:', error);
+    }
   };
 
   const handleDeleteEvent = async (eventId: string) => {
@@ -120,14 +125,19 @@ const Calendar: React.FC<CalendarProps> = ({ darkMode }) => {
       });
     };
 
-    await addHistory({
-      userName: user.name || 'Unknown User',
-      userRole: user.role || 'UMUM',
-      action: 'delete',
-      target: 'calendar',
-      targetName: eventToDelete.title,
-      description: `Deleted calendar event "${eventToDelete.title}" from ${formatDate(eventToDelete.date)}`
-    });
+    try {
+      await addHistory({
+        userName: user.name || 'Unknown User',
+        userRole: user.role || 'UMUM',
+        action: 'delete',
+        target: 'calendar',
+        targetName: eventToDelete.title,
+        description: `Deleted calendar event "${eventToDelete.title}" from ${formatDate(eventToDelete.date)}`
+      });
+      console.log('✅ Calendar event deletion history added successfully');
+    } catch (error) {
+      console.error('❌ Failed to add calendar deletion to history:', error);
+    }
   };
 
   const handleDayClick = (day: number) => {
@@ -325,7 +335,7 @@ const Calendar: React.FC<CalendarProps> = ({ darkMode }) => {
       </div>
 
       {/* Calendar Grid */}
-      <div className={`flex-1 ${darkMode ? 'bg-[#1a1f2e]' : 'bg-gray-50'} p-2 lg:p-3 overflow-hidden`}>
+      <div className={`flex-1 ${darkMode ? 'bg-[#0f1419]' : 'bg-white'} p-2 lg:p-3 overflow-hidden`}>
         <div className={`${darkMode ? 'bg-[#0f1419]' : 'bg-white'} rounded-lg lg:rounded-xl border ${darkMode ? 'border-[#1e2530]' : 'border-gray-200'} h-full flex flex-col overflow-hidden`}>
           <div className="overflow-auto custom-scrollbar flex-1">
             {/* Day Headers */}
