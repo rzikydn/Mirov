@@ -97,12 +97,13 @@ const Sidebar: React.FC<SidebarProps> = ({
               damping: 30,
               mass: 0.8
             }}
-            className={`fixed lg:static z-40 inset-0 lg:inset-auto ${
+            className={`fixed lg:static z-40 top-0 left-0 lg:inset-auto ${
               darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
             } border-r flex flex-col ${isOpen ? 'shadow-xl' : ''}`}
             style={{
-              height: window.innerWidth < 1024 ? '100dvh' : 'auto',
-              paddingBottom: window.innerWidth < 1024 ? 'env(safe-area-inset-bottom)' : '0'
+              height: window.innerWidth < 1024 ? '100svh' : 'auto',
+              maxHeight: window.innerWidth < 1024 ? '100svh' : 'none',
+              bottom: window.innerWidth < 1024 ? 0 : 'auto'
             }}
           >
             <div className="p-3 flex flex-col flex-1 overflow-y-auto custom-scrollbar">
