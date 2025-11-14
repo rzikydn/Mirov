@@ -190,7 +190,7 @@ const Calendar: React.FC<CalendarProps> = ({ darkMode }) => {
   const nextMonthDays = totalCells - currentMonthCells;
 
   return (
-    <div className={`flex-1 flex flex-col ${darkMode ? 'bg-[#1a1f2e]' : 'bg-gray-50'} overflow-hidden`}>
+    <div className={`flex-1 flex flex-col ${darkMode ? 'bg-[#0f1419]' : 'bg-white'} overflow-hidden`}>
       {/* Header */}
       <div className={`${darkMode ? 'bg-[#0f1419]' : 'bg-white'} px-3 lg:px-6 py-3 lg:py-4`}>
         {/* Mobile Layout */}
