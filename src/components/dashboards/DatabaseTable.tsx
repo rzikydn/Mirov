@@ -554,58 +554,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       className={`h-full overflow-auto hide-scrollbar ${darkMode ? 'bg-[#191919]' : 'bg-white'}`}
     >
       {/* Header - Notion Style */}
-      <div className="px-8 sm:px-12 lg:px-24 pt-12 pb-4">
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6">
-          {canEdit && (
-            <div className="relative">
-              <button
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
-                  darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <Smile className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden xs:inline">{database.icon ? 'Change icon' : 'Add icon'}</span>
-                <span className="xs:hidden">Icon</span>
-              </button>
-              {showEmojiPicker && (
-                <EmojiPicker
-                  darkMode={darkMode}
-                  onSelect={handleEmojiSelect}
-                  onClose={() => setShowEmojiPicker(false)}
-                />
-              )}
-            </div>
-          )}
-
-          {canEdit && !database.description && (
-            <button
-              onClick={handleAddDescription}
-              className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
-                darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <FileText className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden xs:inline">Add description</span>
-              <span className="xs:hidden">Description</span>
-            </button>
-          )}
-
-          {/* Export Button */}
-          <button
-            onClick={() => setShowExportModal(true)}
-            className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
-              darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Download className="w-4 h-4 flex-shrink-0" />
-            <span>Export</span>
-          </button>
-        </div>
-
+      <div className="px-8 sm:px-12 lg:px-24 pt-6 pb-4">
         {/* Title Section */}
-        <div className="mb-8">
+        <div className="mb-6">
           {/* Title with Icon (Inline) */}
           {isEditingName ? (
             <input
@@ -620,93 +571,145 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               placeholder="Untitled"
             />
           ) : (
-            <div className="flex items-center gap-3 group">
-              <h1
-                onClick={() => canEdit && setIsEditingName(true)}
-                className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${canEdit ? 'cursor-text' : 'cursor-default'} ${
-                  darkMode ? 'text-white' : 'text-gray-900'
-                }`}
-              >
-                {database.name}
-              </h1>
-              {canEdit && (
-                <button
-                  onClick={() => setIsEditingName(true)}
-                  className={`opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded ${
-                    darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+            <>
+              {/* Title Row */}
+              <div className="flex items-center gap-3 group">
+                <h1
+                  onClick={() => canEdit && setIsEditingName(true)}
+                  className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${canEdit ? 'cursor-text' : 'cursor-default'} ${
+                    darkMode ? 'text-white' : 'text-gray-900'
                   }`}
-                  title="Edit title"
                 >
-                  <Edit3 className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-                </button>
-              )}
-              {canEdit && database.icon && (
-                <button
-                  onClick={handleRemoveIcon}
-                  className={`opacity-0 group-hover:opacity-100 p-1.5 rounded transition-opacity ${
-                    darkMode ? 'hover:bg-gray-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
-                  }`}
-                  title="Remove icon"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Description Section */}
-          {(database.description || isEditingDescription) && (
-            <div className="mt-4">
-              {isEditingDescription ? (
-                <textarea
-                  value={editedDescription}
-                  onChange={(e) => setEditedDescription(e.target.value)}
-                  onBlur={handleDescriptionChange}
-                  onKeyDown={handleDescriptionKeyPress}
-                  autoFocus
-                  placeholder="Add a description..."
-                  rows={3}
-                  className={`w-full text-base ${
-                    darkMode ? 'bg-[#191919] text-gray-400' : 'bg-white text-gray-600'
-                  } border-0 focus:outline-none p-0 resize-none`}
-                />
-              ) : (
-                <div className="flex items-start gap-3 group">
-                  <p
-                    onClick={() => {
-                      if (canEdit) {
-                        setIsEditingDescription(true);
-                        setEditedDescription(database.description || '');
-                      }
-                    }}
-                    className={`text-base ${canEdit ? 'cursor-text' : 'cursor-default'} ${
-                      darkMode ? 'text-gray-400' : 'text-gray-600'
+                  {database.name}
+                </h1>
+                {canEdit && (
+                  <button
+                    onClick={() => setIsEditingName(true)}
+                    className={`opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded ${
+                      darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
                     }`}
+                    title="Edit title"
                   >
-                    {database.description}
-                  </p>
-                  {canEdit && (
-                    <button
-                      onClick={() => {
-                        setIsEditingDescription(true);
-                        setEditedDescription(database.description || '');
-                      }}
-                      className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${
-                        darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
-                      }`}
-                      title="Edit description"
-                    >
-                      <Edit3 className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-                    </button>
+                    <Edit3 className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                  </button>
+                )}
+                {canEdit && database.icon && (
+                  <button
+                    onClick={handleRemoveIcon}
+                    className={`opacity-0 group-hover:opacity-100 p-1.5 rounded transition-opacity ${
+                      darkMode ? 'hover:bg-gray-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
+                    }`}
+                    title="Remove icon"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Description Section - Right after title */}
+              {(database.description || isEditingDescription) && (
+                <div className="mt-3">
+                  {isEditingDescription ? (
+                    <textarea
+                      value={editedDescription}
+                      onChange={(e) => setEditedDescription(e.target.value)}
+                      onBlur={handleDescriptionChange}
+                      onKeyDown={handleDescriptionKeyPress}
+                      autoFocus
+                      placeholder="Add a description..."
+                      rows={3}
+                      className={`w-full text-base ${
+                        darkMode ? 'bg-[#191919] text-gray-400' : 'bg-white text-gray-600'
+                      } border-0 focus:outline-none p-0 resize-none`}
+                    />
+                  ) : (
+                    <div className="flex items-start gap-3 group">
+                      <p
+                        onClick={() => {
+                          if (canEdit) {
+                            setIsEditingDescription(true);
+                            setEditedDescription(database.description || '');
+                          }
+                        }}
+                        className={`text-base ${canEdit ? 'cursor-text' : 'cursor-default'} ${
+                          darkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}
+                      >
+                        {database.description}
+                      </p>
+                      {canEdit && (
+                        <button
+                          onClick={() => {
+                            setIsEditingDescription(true);
+                            setEditedDescription(database.description || '');
+                          }}
+                          className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${
+                            darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+                          }`}
+                          title="Edit description"
+                        >
+                          <Edit3 className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
-            </div>
+
+              {/* Action Buttons - Below description */}
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                {canEdit && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                        darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Smile className="w-4 h-4 flex-shrink-0" />
+                      <span className="hidden xs:inline">{database.icon ? 'Change icon' : 'Add icon'}</span>
+                      <span className="xs:hidden">Icon</span>
+                    </button>
+                    {showEmojiPicker && (
+                      <EmojiPicker
+                        darkMode={darkMode}
+                        onSelect={handleEmojiSelect}
+                        onClose={() => setShowEmojiPicker(false)}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {canEdit && !database.description && (
+                  <button
+                    onClick={handleAddDescription}
+                    className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                      darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <FileText className="w-4 h-4 flex-shrink-0" />
+                    <span className="hidden xs:inline">Add description</span>
+                    <span className="xs:hidden">Description</span>
+                  </button>
+                )}
+
+                {/* Export Button */}
+                <button
+                  onClick={() => setShowExportModal(true)}
+                  className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                    darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <Download className="w-4 h-4 flex-shrink-0" />
+                  <span>Export</span>
+                </button>
+              </div>
+            </>
           )}
         </div>
 
         {/* Table Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3 mt-2">
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded ${
             darkMode ? 'bg-gray-800' : 'bg-gray-100'
           }`}>
