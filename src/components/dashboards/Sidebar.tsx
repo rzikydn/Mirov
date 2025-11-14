@@ -99,7 +99,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             }}
             className={`fixed lg:static z-40 top-0 left-0 ${
               darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-            } border-r h-full flex flex-col ${isOpen ? 'shadow-xl' : ''}`}
+            } border-r h-screen flex flex-col ${isOpen ? 'shadow-xl' : ''}`}
           >
             <div className="p-3 flex flex-col flex-1 overflow-y-auto custom-scrollbar">
               <div className={`flex items-center mb-6 ${isCollapsed && window.innerWidth >= 1024 ? 'justify-center' : 'justify-between'}`}>
