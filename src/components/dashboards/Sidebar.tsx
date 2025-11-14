@@ -23,6 +23,7 @@ import DeleteModal from './modals/DeleteModal';
 import LogoutModal from './modals/LogoutModal';
 import HistoryModal from './modals/HistoryModal';
 import { useHistory } from '../../context/HistoryContext';
+import BsmrLogo from '../BsmrLogo';
 
 interface SidebarProps {
   databases: Database[];
@@ -110,19 +111,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="p-3 flex flex-col flex-1 overflow-y-auto custom-scrollbar">
               <div className={`flex items-center mb-6 ${isCollapsed && window.innerWidth >= 1024 ? 'justify-center' : 'justify-between'}`}>
                 <div className={`flex items-center gap-3 ${isCollapsed && window.innerWidth >= 1024 ? 'flex-col' : 'flex-1'}`}>
-                  {/* Mirov Logo */}
-                  <svg className="w-10 h-10 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2L2 7L12 12L22 7L12 2Z" fill={darkMode ? '#60A5FA' : '#2563EB'} />
-                    <path d="M2 17L12 22L22 17" fill={darkMode ? '#3B82F6' : '#3B82F6'} opacity="0.7" />
-                    <path d="M2 12L12 17L22 12" fill={darkMode ? '#60A5FA' : '#2563EB'} opacity="0.85" />
-                  </svg>
-
-                  {/* Mirov Text - Hidden when collapsed on desktop */}
-                  {!(isCollapsed && window.innerWidth >= 1024) && (
-                    <span className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      Mirov
-                    </span>
-                  )}
+                  {/* BSMR Logo */}
+                  <BsmrLogo
+                    collapsed={isCollapsed && window.innerWidth >= 1024}
+                    darkMode={darkMode}
+                  />
 
                   {/* Toggle button - Desktop only */}
                   <button
