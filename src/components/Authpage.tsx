@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import BsmrLogoSvg from '../assets/bsmr-logo.svg';
 
 interface FormData {
   email: string;
@@ -19,7 +20,6 @@ export default function AuthPage() {
   const navigate = useNavigate();
 
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: ''
@@ -34,18 +34,6 @@ export default function AuthPage() {
     if (token) {
       navigate('/dashboard', { replace: true });
       return;
-    }
-
-    // Load saved email only (NOT password for security)
-    const savedEmail = localStorage.getItem('rememberedEmail');
-    const wasRemembered = localStorage.getItem('rememberMe') === 'true';
-
-    if (wasRemembered && savedEmail) {
-      setFormData(prev => ({
-        ...prev,
-        email: savedEmail
-      }));
-      setRememberMe(true);
     }
 
     // Listen for popstate (browser back/forward) and recheck auth
@@ -114,18 +102,6 @@ export default function AuthPage() {
       localStorage.setItem("token", tokenData);
       localStorage.setItem("user", JSON.stringify(userData));
 
-      // Handle Remember Me (save email only, NOT password for security)
-      if (rememberMe) {
-        localStorage.setItem('rememberedEmail', formData.email);
-        localStorage.setItem('rememberMe', 'true');
-      } else {
-        localStorage.removeItem('rememberedEmail');
-        localStorage.removeItem('rememberMe');
-      }
-
-      // Clear any old password storage (security cleanup)
-      localStorage.removeItem('rememberedPassword');
-
       setTimeout(() => {
         navigate("/dashboard");
       }, 800);
@@ -145,15 +121,6 @@ export default function AuthPage() {
     }
   };
 
-  // Mirov Logo SVG
-  const LogoSVG = (
-    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none">
-      <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#2563EB" />
-      <path d="M2 17L12 22L22 17" fill="#3B82F6" opacity="0.7" />
-      <path d="M2 12L12 17L22 12" fill="#2563EB" opacity="0.85" />
-    </svg>
-  );
-
   return (
     <div className="min-h-screen flex bg-gray-100">
       {/* Left Side - Form */}
@@ -165,9 +132,12 @@ export default function AuthPage() {
           className="w-full max-w-md"
         >
           {/* Logo */}
-          <div className="flex items-center gap-2 mb-12">
-            {LogoSVG}
-            <span className="text-xl font-bold text-gray-900">Mirov</span>
+          <div className="mb-12">
+            <img
+              src={BsmrLogoSvg}
+              alt="BSMR Logo"
+              className="h-16 w-auto object-contain"
+            />
           </div>
 
           {/* Header */}
@@ -233,21 +203,6 @@ export default function AuthPage() {
               )}
             </div>
 
-            {/* Remember Me */}
-            <div className="flex items-center">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-600">
-                  Remember me
-                </span>
-              </label>
-            </div>
-
             {/* Error/Success Message */}
             <AnimatePresence>
               {message && (
@@ -282,11 +237,6 @@ export default function AuthPage() {
               )}
             </button>
           </form>
-
-          {/* Footer */}
-          <p className="text-center text-xs text-gray-500 mt-12">
-            2025 Mirov, All right Reserved
-          </p>
         </motion.div>
       </div>
 
