@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
 import NewEventModal from './modals/NewEventModal';
 import EventDetailSidebar from './EventDetailSidebar';
 import { useHistory } from '../../context/HistoryContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface CalendarEvent {
   id: string;
@@ -24,6 +25,12 @@ const Calendar: React.FC<CalendarProps> = ({ darkMode }) => {
   const [showEventSidebar, setShowEventSidebar] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const { addHistory } = useHistory();
+  const { user } = useAuth();
+
+  // Permission checks
+  const canCreate = user && (user.role === 'SUPERUSER' || user.role === 'ADMIN');
+  const canDelete = user && user.role === 'SUPERUSER';
+  const canView = true; // All users can view
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -141,8 +148,10 @@ const Calendar: React.FC<CalendarProps> = ({ darkMode }) => {
       // Show sidebar with event details
       setShowEventSidebar(true);
     } else {
-      // Show modal to add new event
-      setShowNewEventModal(true);
+      // Show modal to add new event only if user has permission
+      if (canCreate) {
+        setShowNewEventModal(true);
+      }
     }
   };
 
@@ -173,92 +182,163 @@ const Calendar: React.FC<CalendarProps> = ({ darkMode }) => {
   return (
     <div className={`flex-1 flex flex-col ${darkMode ? 'bg-[#1a1f2e]' : 'bg-gray-50'} overflow-hidden`}>
       {/* Header */}
-      <div className={`${darkMode ? 'bg-[#0f1419]' : 'bg-white'} px-6 py-4 flex items-center justify-between`}>
-        {/* Left: Date Display */}
-        <div className="flex items-center gap-4">
-          <div className={`${darkMode ? 'bg-[#2a3142]' : 'bg-gray-100'} rounded-xl px-4 py-3`}>
-            <div className={`text-[11px] ${darkMode ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wide font-semibold`}>
-              {monthNames[month].slice(0, 3)}
+      <div className={`${darkMode ? 'bg-[#0f1419]' : 'bg-white'} px-3 lg:px-6 py-3 lg:py-4`}>
+        {/* Mobile Layout */}
+        <div className="lg:hidden space-y-3">
+          {/* Top Row: Date Box and Month/Year */}
+          <div className="flex items-center gap-3">
+            <div className={`${darkMode ? 'bg-[#2a3142]' : 'bg-gray-100'} rounded-lg px-3 py-2`}>
+              <div className={`text-[10px] ${darkMode ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wide font-semibold`}>
+                {monthNames[month].slice(0, 3)}
+              </div>
+              <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} leading-none mt-1`}>
+                {new Date().getDate()}
+              </div>
             </div>
-            <div className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} leading-none mt-1`}>
-              {new Date().getDate()}
+            <div className="flex-1 min-w-0">
+              <h1 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-gray-900'} truncate`}>
+                {monthNames[month]}, {year}
+              </h1>
             </div>
           </div>
-          <div>
-            <h1 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              {monthNames[month]}, {year}
-            </h1>
-            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
-              {monthNames[currentDate.getMonth()]} {currentDate.getDate()}, {currentDate.getFullYear()} - {monthNames[new Date(year, month + 1, 0).getMonth()]} {new Date(year, month + 1, 0).getDate()}, {new Date(year, month + 1, 0).getFullYear()}
-            </p>
+
+          {/* Bottom Row: Navigation and Actions */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={previousMonth}
+                className={`p-2 rounded-lg ${darkMode ? 'hover:bg-[#2a3142]' : 'hover:bg-gray-100'} transition-colors`}
+                aria-label="Previous month"
+              >
+                <ChevronLeft className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+              </button>
+
+              <button
+                onClick={goToToday}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+                  darkMode
+                    ? 'bg-[#2a3142] text-white hover:bg-[#3a4152]'
+                    : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                } transition-colors`}
+              >
+                Today
+              </button>
+
+              <button
+                onClick={nextMonth}
+                className={`p-2 rounded-lg ${darkMode ? 'hover:bg-[#2a3142]' : 'hover:bg-gray-100'} transition-colors`}
+                aria-label="Next month"
+              >
+                <ChevronRight className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+              </button>
+            </div>
+
+            {canCreate && (
+              <button
+                onClick={() => {
+                  setSelectedDate(new Date());
+                  setShowNewEventModal(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Right: Actions */}
-        <div className="flex items-center gap-3">
-          <button
-            className={`p-2 rounded-lg ${darkMode ? 'hover:bg-[#2a3142]' : 'hover:bg-gray-100'} transition-colors`}
-            aria-label="Search"
-          >
-            <Search className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-          </button>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={previousMonth}
-              className={`p-2 rounded-lg ${darkMode ? 'hover:bg-[#2a3142]' : 'hover:bg-gray-100'} transition-colors`}
-              aria-label="Previous month"
-            >
-              <ChevronLeft className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-            </button>
-
-            <button
-              onClick={goToToday}
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                darkMode
-                  ? 'bg-[#2a3142] text-white hover:bg-[#3a4152]'
-                  : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-              } transition-colors`}
-            >
-              Today
-            </button>
-
-            <button
-              onClick={nextMonth}
-              className={`p-2 rounded-lg ${darkMode ? 'hover:bg-[#2a3142]' : 'hover:bg-gray-100'} transition-colors`}
-              aria-label="Next month"
-            >
-              <ChevronRight className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-            </button>
+        {/* Desktop Layout */}
+        <div className="hidden lg:flex items-center justify-between">
+          {/* Left: Date Display */}
+          <div className="flex items-center gap-4">
+            <div className={`${darkMode ? 'bg-[#2a3142]' : 'bg-gray-100'} rounded-xl px-4 py-3`}>
+              <div className={`text-[11px] ${darkMode ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wide font-semibold`}>
+                {monthNames[month].slice(0, 3)}
+              </div>
+              <div className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} leading-none mt-1`}>
+                {new Date().getDate()}
+              </div>
+            </div>
+            <div>
+              <h1 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                {monthNames[month]}, {year}
+              </h1>
+              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
+                {monthNames[currentDate.getMonth()]} {currentDate.getDate()}, {currentDate.getFullYear()} - {monthNames[new Date(year, month + 1, 0).getMonth()]} {new Date(year, month + 1, 0).getDate()}, {new Date(year, month + 1, 0).getFullYear()}
+              </p>
+            </div>
           </div>
 
-          <button
-            onClick={() => {
-              setSelectedDate(new Date());
-              setShowNewEventModal(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Event</span>
-          </button>
+          {/* Right: Actions */}
+          <div className="flex items-center gap-3">
+            <button
+              className={`p-2 rounded-lg ${darkMode ? 'hover:bg-[#2a3142]' : 'hover:bg-gray-100'} transition-colors`}
+              aria-label="Search"
+            >
+              <Search className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={previousMonth}
+                className={`p-2 rounded-lg ${darkMode ? 'hover:bg-[#2a3142]' : 'hover:bg-gray-100'} transition-colors`}
+                aria-label="Previous month"
+              >
+                <ChevronLeft className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+              </button>
+
+              <button
+                onClick={goToToday}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                  darkMode
+                    ? 'bg-[#2a3142] text-white hover:bg-[#3a4152]'
+                    : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                } transition-colors`}
+              >
+                Today
+              </button>
+
+              <button
+                onClick={nextMonth}
+                className={`p-2 rounded-lg ${darkMode ? 'hover:bg-[#2a3142]' : 'hover:bg-gray-100'} transition-colors`}
+                aria-label="Next month"
+              >
+                <ChevronRight className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+              </button>
+            </div>
+
+            {canCreate && (
+              <button
+                onClick={() => {
+                  setSelectedDate(new Date());
+                  setShowNewEventModal(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Event</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Calendar Grid */}
-      <div className={`flex-1 ${darkMode ? 'bg-[#1a1f2e]' : 'bg-gray-50'} p-3 overflow-hidden`}>
-        <div className={`${darkMode ? 'bg-[#0f1419]' : 'bg-white'} rounded-xl border ${darkMode ? 'border-[#1e2530]' : 'border-gray-200'} h-full flex flex-col overflow-hidden`}>
-          <div className="min-w-[700px] overflow-auto custom-scrollbar flex-1">
+      <div className={`flex-1 ${darkMode ? 'bg-[#1a1f2e]' : 'bg-gray-50'} p-2 lg:p-3 overflow-hidden`}>
+        <div className={`${darkMode ? 'bg-[#0f1419]' : 'bg-white'} rounded-lg lg:rounded-xl border ${darkMode ? 'border-[#1e2530]' : 'border-gray-200'} h-full flex flex-col overflow-hidden`}>
+          <div className="overflow-auto custom-scrollbar flex-1">
             {/* Day Headers */}
             <div className={`grid grid-cols-7 sticky top-0 z-10 ${darkMode ? 'bg-[#0f1419]' : 'bg-white'}`}>
               {dayNames.map((day) => (
                 <div
                   key={day}
-                  className={`p-3 text-center text-sm font-semibold ${
+                  className={`p-1.5 lg:p-3 text-center text-xs lg:text-sm font-semibold ${
                     darkMode ? 'text-gray-500' : 'text-gray-600'
                   } border-b ${darkMode ? 'border-[#1e2530]' : 'border-gray-200'}`}
                 >
-                  {day}
+                  <span className="hidden lg:inline">{day}</span>
+                  <span className="lg:hidden">{day.slice(0, 1)}</span>
                 </div>
               ))}
             </div>
@@ -269,11 +349,11 @@ const Calendar: React.FC<CalendarProps> = ({ darkMode }) => {
               {prevMonthDays.map((day, index) => (
                 <div
                   key={`prev-${index}`}
-                  className={`h-[85px] lg:h-[90px] p-2 border-b border-r ${
+                  className={`h-[60px] lg:h-[85px] p-1 lg:p-2 border-b border-r ${
                     darkMode ? 'border-[#1e2530]' : 'border-gray-200'
                   } ${darkMode ? 'bg-[#1a1f2e]/50' : 'bg-gray-50'}`}
                 >
-                  <div className={`text-sm ${darkMode ? 'text-gray-700' : 'text-gray-400'}`}>
+                  <div className={`text-xs lg:text-sm ${darkMode ? 'text-gray-700' : 'text-gray-400'}`}>
                     {day}
                   </div>
                 </div>
@@ -286,7 +366,7 @@ const Calendar: React.FC<CalendarProps> = ({ darkMode }) => {
                   <div
                     key={day}
                     onClick={() => handleDayClick(day)}
-                    className={`h-[85px] lg:h-[90px] p-2 border-b border-r ${
+                    className={`h-[60px] lg:h-[85px] p-1 lg:p-2 border-b border-r ${
                       darkMode ? 'border-[#1e2530]' : 'border-gray-200'
                     } ${
                       dayHasEvent
@@ -298,9 +378,9 @@ const Calendar: React.FC<CalendarProps> = ({ darkMode }) => {
                         : 'bg-white hover:bg-gray-50'
                     } cursor-pointer transition-colors relative`}
                   >
-                    <div className={`text-sm font-medium ${
+                    <div className={`text-xs lg:text-sm font-medium ${
                       isToday(day)
-                        ? 'bg-white text-gray-900 w-7 h-7 rounded-full flex items-center justify-center font-semibold'
+                        ? 'bg-white text-gray-900 w-5 h-5 lg:w-7 lg:h-7 rounded-full flex items-center justify-center font-semibold'
                         : darkMode
                         ? 'text-gray-300'
                         : 'text-gray-900'
@@ -308,8 +388,8 @@ const Calendar: React.FC<CalendarProps> = ({ darkMode }) => {
                       {day}
                     </div>
                     {dayHasEvent && (
-                      <div className="absolute bottom-2 right-2">
-                        <div className={`w-2 h-2 rounded-full ${
+                      <div className="absolute bottom-1 right-1 lg:bottom-2 lg:right-2">
+                        <div className={`w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full ${
                           darkMode ? 'bg-blue-400' : 'bg-blue-500'
                         }`} />
                       </div>
@@ -322,11 +402,11 @@ const Calendar: React.FC<CalendarProps> = ({ darkMode }) => {
               {Array.from({ length: nextMonthDays }, (_, i) => i + 1).map((day) => (
                 <div
                   key={`next-${day}`}
-                  className={`h-[85px] lg:h-[90px] p-2 border-b border-r ${
+                  className={`h-[60px] lg:h-[85px] p-1 lg:p-2 border-b border-r ${
                     darkMode ? 'border-[#1e2530]' : 'border-gray-200'
                   } ${darkMode ? 'bg-[#1a1f2e]/50' : 'bg-gray-50'}`}
                 >
-                  <div className={`text-sm ${darkMode ? 'text-gray-700' : 'text-gray-400'}`}>
+                  <div className={`text-xs lg:text-sm ${darkMode ? 'text-gray-700' : 'text-gray-400'}`}>
                     {day}
                   </div>
                 </div>
@@ -354,6 +434,7 @@ const Calendar: React.FC<CalendarProps> = ({ darkMode }) => {
         darkMode={darkMode}
         selectedDate={selectedDate}
         events={events}
+        canDelete={canDelete || false}
         onClose={() => {
           setShowEventSidebar(false);
           setSelectedDate(null);

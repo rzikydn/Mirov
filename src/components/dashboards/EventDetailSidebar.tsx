@@ -16,6 +16,7 @@ interface EventDetailSidebarProps {
   darkMode: boolean;
   selectedDate: Date | null;
   events: CalendarEvent[];
+  canDelete: boolean;
   onClose: () => void;
   onDeleteEvent: (eventId: string) => void;
 }
@@ -25,6 +26,7 @@ const EventDetailSidebar: React.FC<EventDetailSidebarProps> = ({
   darkMode,
   selectedDate,
   events,
+  canDelete,
   onClose,
   onDeleteEvent,
 }) => {
@@ -141,17 +143,19 @@ const EventDetailSidebar: React.FC<EventDetailSidebarProps> = ({
                         }`}>
                           {event.title}
                         </h4>
-                        <button
-                          onClick={() => onDeleteEvent(event.id)}
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            darkMode
-                              ? 'hover:bg-red-500/20 text-red-400 hover:text-red-300'
-                              : 'hover:bg-red-50 text-red-500 hover:text-red-600'
-                          }`}
-                          aria-label="Delete event"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {canDelete && (
+                          <button
+                            onClick={() => onDeleteEvent(event.id)}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              darkMode
+                                ? 'hover:bg-red-500/20 text-red-400 hover:text-red-300'
+                                : 'hover:bg-red-50 text-red-500 hover:text-red-600'
+                            }`}
+                            aria-label="Delete event"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
 
                       {event.description && (
