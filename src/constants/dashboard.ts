@@ -3,8 +3,7 @@
 import { MenuItem } from '../types/database';
 
 export const menuItems: MenuItem[] = [
-  { id: '1', name: 'Team Notes' },
-  { id: '2', name: 'Calendar' }
+  { id: '1', name: 'Team Notes' }
 ];
 
 export const propertyTypes = [

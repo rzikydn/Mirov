@@ -142,7 +142,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
     return entry.description.includes('removed note from favorites');
   };
 
-  const getIcon = (target: 'note' | 'database' | 'schedule' | 'calendar', entry?: HistoryEntry) => {
+  const getIcon = (target: 'note' | 'database' | 'schedule', entry?: HistoryEntry) => {
     // Show yellow star icon for favorite actions
     if (entry && isFavoriteAction(entry)) {
       return <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />;
@@ -159,8 +159,6 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
       case 'database':
         return <DatabaseIcon className="w-4 h-4" />;
       case 'schedule':
-        return <Calendar className="w-4 h-4" />;
-      case 'calendar':
         return <Calendar className="w-4 h-4" />;
     }
   };
@@ -351,9 +349,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
                             ? 'Note'
                             : entry.target === 'database'
                             ? 'Database'
-                            : entry.target === 'schedule'
-                            ? 'Schedule'
-                            : 'Calendar Event'}
+                            : 'Schedule'}
                         </span>
                         {entry.targetName && (
                           <>
