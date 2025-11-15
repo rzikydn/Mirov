@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Edit3, Trash2, Star, Plus, Search } from 'lucide-react';
+import { Edit3, Trash2, Star, Plus, Search, ChevronRight } from 'lucide-react';
 import { Note } from '../../types/database';
 import { useAuth } from '../../context/AuthContext';
 import { useHistory } from '../../context/HistoryContext';
@@ -29,21 +29,21 @@ const noteColors = [
   '#C4F5A4', // Green
 ];
 
-// ⭐ FUNGSI BARU: Format tanggal ke bahasa Indonesia
+// ⭐ FUNGSI BARU: Format tanggal ke bahasa Indonesia (format pendek)
 const formatDateIndonesian = (dateString: string): string => {
   const date = new Date(dateString);
-  
+
   const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
   const months = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+    'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
   ];
-  
+
   const dayName = days[date.getDay()];
   const day = date.getDate();
   const month = months[date.getMonth()];
   const year = date.getFullYear();
-  
+
   return `${dayName}, ${day} ${month} ${year}`;
 };
 
@@ -195,6 +195,8 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
   const [editingNote, setEditingNote] = useState<ColoredNote | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<{ id: number; text: string } | null>(null);
+  const [showDetailSidebar, setShowDetailSidebar] = useState(false);
+  const [selectedNote, setSelectedNote] = useState<ColoredNote | null>(null);
 
   const addNote = () => {
     if (!newNoteText.trim()) return;
@@ -415,10 +417,24 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
 
               {/* Bottom Section */}
               <div className="flex items-center justify-between mt-6">
-                {/* ⭐ DIUBAH: Format tanggal menggunakan fungsi baru */}
-                <span className="text-gray-700 text-sm font-medium">
-                  {note.createdAt ? new Date(note.createdAt).toLocaleDateString('id-ID') : (note.date ? formatDateIndonesian(note.date) : '')}
-                </span>
+                <div className="flex flex-col gap-2">
+                  {/* ⭐ DIUBAH: Format tanggal menggunakan fungsi baru */}
+                  <span className="text-gray-700 text-sm font-medium">
+                    {note.createdAt ? formatDateIndonesian(note.createdAt) : (note.date ? formatDateIndonesian(note.date) : '')}
+                  </span>
+
+                  {/* Detail Button */}
+                  <button
+                    onClick={() => {
+                      setSelectedNote(note);
+                      setShowDetailSidebar(true);
+                    }}
+                    className="text-gray-700 hover:text-gray-900 transition-colors"
+                    title="View details"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
 
                 {/* Edit Button - Only for ADMIN/SUPERUSER */}
                 {canEdit && (
@@ -549,6 +565,155 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
       />
+
+      {/* Detail Sidebar */}
+      {showDetailSidebar && selectedNote && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/30 z-40"
+            onClick={() => {
+              setShowDetailSidebar(false);
+              setSelectedNote(null);
+            }}
+          />
+
+          {/* Sidebar */}
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className={`fixed right-0 top-0 h-full w-full sm:w-96 z-50 shadow-2xl ${
+              darkMode ? 'bg-gray-800' : 'bg-white'
+            } overflow-y-auto`}
+          >
+            {/* Sidebar Header */}
+            <div className={`sticky top-0 z-10 px-6 py-4 border-b ${
+              darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Note Details
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowDetailSidebar(false);
+                    setSelectedNote(null);
+                  }}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                    darkMode
+                      ? 'hover:bg-gray-700 text-gray-400 hover:text-white'
+                      : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Sidebar Content */}
+            <div className="px-6 py-6 space-y-6">
+              {/* Note Preview */}
+              <div>
+                <h3 className={`text-sm font-semibold mb-3 ${
+                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  Content
+                </h3>
+                <div
+                  className="rounded-xl p-4 shadow-sm"
+                  style={{ backgroundColor: selectedNote.color }}
+                >
+                  <p className="text-gray-900 text-base leading-relaxed whitespace-pre-wrap">
+                    {selectedNote.content || selectedNote.text || ''}
+                  </p>
+                </div>
+              </div>
+
+              {/* Creation Date */}
+              <div>
+                <h3 className={`text-sm font-semibold mb-2 ${
+                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  Created
+                </h3>
+                <p className={`text-base ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {selectedNote.createdAt
+                    ? formatDateIndonesian(selectedNote.createdAt)
+                    : (selectedNote.date ? formatDateIndonesian(selectedNote.date) : 'N/A')}
+                </p>
+              </div>
+
+              {/* Last Updated */}
+              {selectedNote.updatedAt && (
+                <div>
+                  <h3 className={`text-sm font-semibold mb-2 ${
+                    darkMode ? 'text-gray-400' : 'text-gray-600'
+                  }`}>
+                    Last Updated
+                  </h3>
+                  <p className={`text-base ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {formatDateIndonesian(selectedNote.updatedAt)}
+                  </p>
+                </div>
+              )}
+
+              {/* Creator Info */}
+              <div>
+                <h3 className={`text-sm font-semibold mb-2 ${
+                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  Created By
+                </h3>
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
+                    darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {(selectedNote as any).createdBy?.name?.charAt(0).toUpperCase() ||
+                     (selectedNote as any).userName?.charAt(0).toUpperCase() ||
+                     user?.name?.charAt(0).toUpperCase() ||
+                     'U'}
+                  </div>
+                  <div>
+                    <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {(selectedNote as any).createdBy?.name ||
+                       (selectedNote as any).userName ||
+                       user?.name ||
+                       'Unknown User'}
+                    </p>
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {(selectedNote as any).createdBy?.role ||
+                       (selectedNote as any).userRole ||
+                       user?.role ||
+                       'User'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Favorite Status */}
+              {selectedNote.favorite && (
+                <div>
+                  <h3 className={`text-sm font-semibold mb-2 ${
+                    darkMode ? 'text-gray-400' : 'text-gray-600'
+                  }`}>
+                    Status
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                    <span className={`text-base ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      Favorited
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </>
+      )}
     </motion.div>
   );
 };

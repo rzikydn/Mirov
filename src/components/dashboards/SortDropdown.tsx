@@ -29,6 +29,8 @@ const SortDropdown: React.FC<SortDropdownProps> = ({
   onClose
 }) => {
   const [showAddSortDropdown, setShowAddSortDropdown] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const addSortButtonRef = React.useRef<HTMLButtonElement>(null);
 
   return (
     <div
@@ -102,7 +104,35 @@ const SortDropdown: React.FC<SortDropdownProps> = ({
       <div className={`p-2 ${sortConfig.length > 0 ? 'border-t' : ''} ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
         <div className="relative">
           <button
-            onClick={() => setShowAddSortDropdown(!showAddSortDropdown)}
+            ref={addSortButtonRef}
+            onClick={() => {
+              if (!showAddSortDropdown && addSortButtonRef.current) {
+                const rect = addSortButtonRef.current.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+
+                let leftPosition;
+                let topPosition;
+
+                if (viewportWidth < 640) { // mobile (sm breakpoint)
+                  // Center vertically on viewport
+                  topPosition = (viewportHeight - 192) / 2; // 192px = max-h-48 (12rem)
+                  // Center horizontally: left position is 1rem, width will be calc(100vw-2rem)
+                  leftPosition = 16; // 1rem from left (16px)
+                } else {
+                  // Desktop: align to button
+                  const maxDropdownWidth = 320; // w-80
+                  leftPosition = Math.max(16, rect.right - maxDropdownWidth);
+                  topPosition = rect.bottom + window.scrollY + 4;
+                }
+
+                setDropdownPosition({
+                  top: topPosition,
+                  left: leftPosition
+                });
+              }
+              setShowAddSortDropdown(!showAddSortDropdown);
+            }}
             className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm ${
               darkMode
                 ? 'hover:bg-gray-700 text-gray-300'
@@ -116,10 +146,16 @@ const SortDropdown: React.FC<SortDropdownProps> = ({
           {/* Column Selection Dropdown for Add Sort */}
           {showAddSortDropdown && (
             <div
-              className={`absolute top-full left-0 mt-1 w-full rounded-lg shadow-lg border max-h-48 overflow-y-auto custom-scrollbar ${
-                darkMode ? 'bg-[#2a2a2a] border-gray-700' : 'bg-white border-gray-200'
-              }`}
-              style={{ zIndex: 100 }}
+              className={`fixed rounded-lg shadow-lg border max-h-48 overflow-y-auto custom-scrollbar
+                ${darkMode ? 'bg-[#2a2a2a] border-gray-700' : 'bg-white border-gray-200'}
+              `}
+              style={{
+                zIndex: 100,
+                top: `${dropdownPosition.top}px`,
+                left: `${dropdownPosition.left}px`,
+                right: window.innerWidth < 640 ? '16px' : 'auto',
+                width: window.innerWidth >= 640 ? '320px' : 'auto'
+              }}
             >
               {columns
                 .filter(col => !sortConfig.find(s => s.column === col.key))
