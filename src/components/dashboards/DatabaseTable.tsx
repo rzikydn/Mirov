@@ -982,34 +982,62 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
               {/* Action Buttons - Below description */}
               <div className="flex flex-wrap items-center gap-1 mt-3 -ml-2">
-                {canEdit && (
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
-                        darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      <Smile className="w-4 h-4 flex-shrink-0" />
-                      <span className="hidden xs:inline">{database.icon ? 'Change icon' : 'Add icon'}</span>
-                      <span className="xs:hidden">Icon</span>
-                    </button>
-                    {showEmojiPicker && (
-                      <EmojiPicker
-                        darkMode={darkMode}
-                        onSelect={handleEmojiSelect}
-                        onClose={() => setShowEmojiPicker(false)}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {canEdit && !database.description && (
+                {/* Icon Button - Always visible */}
+                <div className="relative">
                   <button
-                    onClick={handleAddDescription}
+                    onClick={() => {
+                      if (!canEdit) {
+                        toast.error('Only ADMIN and SUPERUSER can change icon');
+                        return;
+                      }
+                      setShowEmojiPicker(!showEmojiPicker);
+                    }}
+                    disabled={!canEdit}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
-                      darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
+                      !canEdit
+                        ? darkMode
+                          ? 'text-gray-500 cursor-not-allowed opacity-50'
+                          : 'text-gray-400 cursor-not-allowed opacity-50'
+                        : darkMode
+                          ? 'text-gray-400 hover:bg-gray-800'
+                          : 'text-gray-600 hover:bg-gray-100'
                     }`}
+                    title={!canEdit ? 'Only ADMIN and SUPERUSER can change icon' : database.icon ? 'Change icon' : 'Add icon'}
+                  >
+                    <Smile className="w-4 h-4 flex-shrink-0" />
+                    <span className="hidden xs:inline">{database.icon ? 'Change icon' : 'Add icon'}</span>
+                    <span className="xs:hidden">Icon</span>
+                  </button>
+                  {showEmojiPicker && canEdit && (
+                    <EmojiPicker
+                      darkMode={darkMode}
+                      onSelect={handleEmojiSelect}
+                      onClose={() => setShowEmojiPicker(false)}
+                    />
+                  )}
+                </div>
+
+                {/* Description Button - Always visible if no description */}
+                {!database.description && (
+                  <button
+                    onClick={() => {
+                      if (!canEdit) {
+                        toast.error('Only ADMIN and SUPERUSER can add description');
+                        return;
+                      }
+                      handleAddDescription();
+                    }}
+                    disabled={!canEdit}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                      !canEdit
+                        ? darkMode
+                          ? 'text-gray-500 cursor-not-allowed opacity-50'
+                          : 'text-gray-400 cursor-not-allowed opacity-50'
+                        : darkMode
+                          ? 'text-gray-400 hover:bg-gray-800'
+                          : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                    title={!canEdit ? 'Only ADMIN and SUPERUSER can add description' : 'Add description'}
                   >
                     <FileText className="w-4 h-4 flex-shrink-0" />
                     <span className="hidden xs:inline">Add description</span>
@@ -1017,25 +1045,38 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   </button>
                 )}
 
-                {/* Import Button */}
-                {canEdit && (
-                  <button
-                    onClick={() => setShowImportModal(true)}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
-                      darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Upload className="w-4 h-4 flex-shrink-0" />
-                    <span>Import</span>
-                  </button>
-                )}
+                {/* Import Button - Always visible */}
+                <button
+                  onClick={() => {
+                    if (!canEdit) {
+                      toast.error('Only ADMIN and SUPERUSER can import data');
+                      return;
+                    }
+                    setShowImportModal(true);
+                  }}
+                  disabled={!canEdit}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                    !canEdit
+                      ? darkMode
+                        ? 'text-gray-500 cursor-not-allowed opacity-50'
+                        : 'text-gray-400 cursor-not-allowed opacity-50'
+                      : darkMode
+                        ? 'text-gray-400 hover:bg-gray-800'
+                        : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                  title={!canEdit ? 'Only ADMIN and SUPERUSER can import data' : 'Import CSV file'}
+                >
+                  <Upload className="w-4 h-4 flex-shrink-0" />
+                  <span>Import</span>
+                </button>
 
-                {/* Export Button */}
+                {/* Export Button - Always visible and functional */}
                 <button
                   onClick={() => setShowExportModal(true)}
                   className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                     darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
                   }`}
+                  title="Export data to CSV or JSON"
                 >
                   <Download className="w-4 h-4 flex-shrink-0" />
                   <span>Export</span>
@@ -1103,8 +1144,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                 !canEdit
                   ? darkMode
-                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed opacity-60'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
+                    ? 'bg-white text-gray-900 cursor-not-allowed opacity-40'
+                    : 'bg-gray-900 text-white cursor-not-allowed opacity-40'
                   : darkMode
                     ? 'bg-white hover:bg-gray-100 text-gray-900'
                     : 'bg-gray-900 hover:bg-gray-800 text-white'
