@@ -981,7 +981,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               )}
 
               {/* Action Buttons - Below description */}
-              <div className="flex flex-wrap items-center gap-1 mt-3 -ml-2">
+              <div className="grid grid-cols-2 xs:flex xs:flex-wrap items-center gap-1 mt-3 -ml-2">
                 {/* Icon Button - Always visible */}
                 <div className="relative">
                   <button
@@ -993,7 +993,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       setShowEmojiPicker(!showEmojiPicker);
                     }}
                     disabled={!canEdit}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                    className={`w-full flex items-center justify-center xs:justify-start gap-1 xs:gap-1.5 px-1.5 xs:px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                       !canEdit
                         ? darkMode
                           ? 'text-gray-500 cursor-not-allowed opacity-50'
@@ -1005,8 +1005,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     title={!canEdit ? 'Only ADMIN and SUPERUSER can change icon' : database.icon ? 'Change icon' : 'Add icon'}
                   >
                     <Smile className="w-4 h-4 flex-shrink-0" />
-                    <span className="hidden xs:inline">{database.icon ? 'Change icon' : 'Add icon'}</span>
-                    <span className="xs:hidden">Icon</span>
+                    <span className="text-[10px] xs:text-xs sm:text-sm">{database.icon ? 'Icon' : 'Icon'}</span>
                   </button>
                   {showEmojiPicker && canEdit && (
                     <EmojiPicker
@@ -1028,7 +1027,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       handleAddDescription();
                     }}
                     disabled={!canEdit}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                    className={`w-full flex items-center justify-center xs:justify-start gap-1 xs:gap-1.5 px-1.5 xs:px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                       !canEdit
                         ? darkMode
                           ? 'text-gray-500 cursor-not-allowed opacity-50'
@@ -1040,8 +1039,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     title={!canEdit ? 'Only ADMIN and SUPERUSER can add description' : 'Add description'}
                   >
                     <FileText className="w-4 h-4 flex-shrink-0" />
-                    <span className="hidden xs:inline">Add description</span>
-                    <span className="xs:hidden">Description</span>
+                    <span className="text-[10px] xs:text-xs sm:text-sm">Desc</span>
                   </button>
                 )}
 
@@ -1055,7 +1053,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     setShowImportModal(true);
                   }}
                   disabled={!canEdit}
-                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                  className={`w-full flex items-center justify-center xs:justify-start gap-1 xs:gap-1.5 px-1.5 xs:px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                     !canEdit
                       ? darkMode
                         ? 'text-gray-500 cursor-not-allowed opacity-50'
@@ -1067,19 +1065,19 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   title={!canEdit ? 'Only ADMIN and SUPERUSER can import data' : 'Import CSV file'}
                 >
                   <Upload className="w-4 h-4 flex-shrink-0" />
-                  <span>Import</span>
+                  <span className="text-[10px] xs:text-xs sm:text-sm">Import</span>
                 </button>
 
                 {/* Export Button - Always visible and functional */}
                 <button
                   onClick={() => setShowExportModal(true)}
-                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                  className={`w-full flex items-center justify-center xs:justify-start gap-1 xs:gap-1.5 px-1.5 xs:px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                     darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
                   }`}
                   title="Export data to CSV or JSON"
                 >
                   <Download className="w-4 h-4 flex-shrink-0" />
-                  <span>Export</span>
+                  <span className="text-[10px] xs:text-xs sm:text-sm">Export</span>
                 </button>
               </div>
             </>
