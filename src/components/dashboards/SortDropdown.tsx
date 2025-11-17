@@ -1,7 +1,7 @@
 // src/components/dashboards/SortDropdown.tsx
 // Multi-level sort dropdown component (Notion-style)
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, ArrowUpDown } from 'lucide-react';
 import { DatabaseColumn } from '../../types/database';
 import { SortConfig } from '../../utils/sortingUtils';
@@ -31,9 +31,25 @@ const SortDropdown: React.FC<SortDropdownProps> = ({
   const [showAddSortDropdown, setShowAddSortDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const addSortButtonRef = React.useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [onClose]);
 
   return (
     <div
+      ref={dropdownRef}
       className={`absolute top-full mt-2 rounded-lg shadow-lg border z-50
         w-80 max-w-[calc(100vw-2rem)]
         left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0

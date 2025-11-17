@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, MoreHorizontal, Smile, FileText, Edit3, ChevronDown, X, Download, Upload, ArrowUpDown } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { Database, DatabaseRow } from '../../types/database';
 import { useAuth } from '../../context/AuthContext';
 import { useHistory } from '../../context/HistoryContext';
@@ -516,7 +517,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
   const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!canEdit) {
-      alert('You do not have permission to import CSV. Only ADMIN and SUPERUSER can edit.');
+      toast.error('You do not have permission to import CSV. Only ADMIN and SUPERUSER can edit.');
       return;
     }
 
@@ -769,10 +770,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         });
       }
 
-      alert(`Successfully imported ${newRows.length} rows from CSV file`);
+      toast.success(`Successfully imported ${newRows.length} rows from CSV file!`);
     } catch (error) {
       console.error('Error importing CSV:', error);
-      alert('Error importing CSV file. Please check the file format.');
+      toast.error('Error importing CSV file. Please check the file format.');
     }
   };
 
@@ -1090,19 +1091,29 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               )}
             </div>
 
-            {canEdit && (
-              <button
-                onClick={() => setShowAddProperty(true)}
-                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
-                  darkMode
+            <button
+              onClick={() => {
+                if (!canEdit) {
+                  toast.error('Only ADMIN and SUPERUSER can add properties');
+                  return;
+                }
+                setShowAddProperty(true);
+              }}
+              disabled={!canEdit}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                !canEdit
+                  ? darkMode
+                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed opacity-60'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'
+                  : darkMode
                     ? 'bg-white hover:bg-gray-100 text-gray-900'
                     : 'bg-gray-900 hover:bg-gray-800 text-white'
-                }`}
-              >
-                <Plus className="w-4 h-4 flex-shrink-0" />
-                <span>Add Property</span>
-              </button>
-            )}
+              }`}
+              title={!canEdit ? 'Only ADMIN and SUPERUSER can add properties' : 'Add a new property'}
+            >
+              <Plus className="w-4 h-4 flex-shrink-0" />
+              <span>Add Property</span>
+            </button>
           </div>
         </div>
       </div>
