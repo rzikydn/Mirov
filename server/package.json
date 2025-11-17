@@ -13,6 +13,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:push": "prisma db push",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:resolve": "prisma migrate resolve --applied 20251027000000_init && prisma migrate deploy",
     "db:reset": "prisma migrate reset",
     "db:setup": "npm run prisma:migrate && npm run prisma:seed",
     "update-users": "ts-node scripts/update-production-users.ts"
