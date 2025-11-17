@@ -13,6 +13,7 @@ interface EmojiPickerProps {
 
 const EmojiPicker: React.FC<EmojiPickerProps> = ({ darkMode, onSelect, onClose }) => {
   const [activeCategory, setActiveCategory] = useState('smileys');
+  const [position, setPosition] = useState({ top: 0, left: 0 });
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -26,14 +27,47 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ darkMode, onSelect, onClose }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [onClose]);
 
+  // Calculate position on mount
+  useEffect(() => {
+    if (pickerRef.current) {
+      const button = pickerRef.current.parentElement?.querySelector('button');
+      if (button) {
+        const rect = button.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const pickerWidth = 380;
+        const pickerHeight = 400; // approximate height
+
+        let left = rect.left;
+        let top = rect.bottom + 8;
+
+        // Adjust if picker would go off screen horizontally
+        if (left + pickerWidth > viewportWidth) {
+          left = viewportWidth - pickerWidth - 16;
+        }
+        if (left < 16) {
+          left = 16;
+        }
+
+        // Adjust if picker would go off screen vertically
+        if (top + pickerHeight > viewportHeight) {
+          top = rect.top - pickerHeight - 8;
+        }
+
+        setPosition({ top, left });
+      }
+    }
+  }, []);
+
   return (
     <div
       ref={pickerRef}
-      className={`absolute top-full left-0 mt-2 ${
+      className={`fixed ${
         darkMode ? 'bg-[#2a2a2a]' : 'bg-white'
       } rounded-xl shadow-2xl border ${
         darkMode ? 'border-gray-700' : 'border-gray-200'
-      } z-50 w-[380px]`}
+      } z-[100] w-[380px] max-w-[calc(100vw-2rem)]`}
+      style={{ top: `${position.top}px`, left: `${position.left}px` }}
     >
       {/* Header */}
       <div className={`flex items-center justify-between p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>

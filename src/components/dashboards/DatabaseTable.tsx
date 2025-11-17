@@ -980,8 +980,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 </div>
               )}
 
-              {/* Action Buttons - Below description - Single row with horizontal scroll on mobile */}
-              <div className="flex items-center gap-1 mt-3 -ml-2 overflow-x-auto pb-1 scrollbar-thin">
+              {/* Action Buttons - Below description - Single row */}
+              <div className="flex items-center gap-1 mt-3 -ml-2 flex-wrap sm:flex-nowrap">
                 {/* Icon Button - Always visible */}
                 <div className="relative flex-shrink-0">
                   <button
