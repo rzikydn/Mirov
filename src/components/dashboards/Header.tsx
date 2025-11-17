@@ -177,30 +177,44 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, user }) => {
           </>
         )}
 
-        {/* Clouds */}
+        {/* Clouds - OPTIMIZED with backface-visibility */}
         {(timeOfDay === 'morning' || timeOfDay === 'afternoon') && (
           <>
             <motion.div
-              animate={{ x: [0, 50, 0] }}
-              transition={{ duration: 20, repeat: Infinity }}
+              animate={{ x: [0, 40, 0] }}
+              transition={{ duration: 25, repeat: Infinity, ease: "linear", repeatType: "loop" }}
               className="absolute"
-              style={{ left: '8%', top: '12%', opacity: 0.55 }}
+              style={{
+                left: '8%',
+                top: '12%',
+                opacity: 0.5,
+                willChange: 'transform',
+                transform: 'translateZ(0)',
+                backfaceVisibility: 'hidden'
+              }}
             >
-              <svg width="55" height="20" viewBox="0 0 80 30" fill="none">
-                <ellipse cx="20" cy="20" rx="20" ry="10" fill="white" opacity="0.8" />
-                <ellipse cx="40" cy="15" rx="25" ry="12" fill="white" opacity="0.8" />
-                <ellipse cx="60" cy="20" rx="18" ry="10" fill="white" opacity="0.8" />
+              <svg width="50" height="18" viewBox="0 0 80 30" fill="none">
+                <ellipse cx="20" cy="20" rx="20" ry="10" fill="white" opacity="0.7" />
+                <ellipse cx="40" cy="15" rx="25" ry="12" fill="white" opacity="0.7" />
+                <ellipse cx="60" cy="20" rx="18" ry="10" fill="white" opacity="0.7" />
               </svg>
             </motion.div>
             <motion.div
-              animate={{ x: [0, -30, 0] }}
-              transition={{ duration: 25, repeat: Infinity }}
+              animate={{ x: [0, -25, 0] }}
+              transition={{ duration: 30, repeat: Infinity, ease: "linear", repeatType: "loop" }}
               className="absolute"
-              style={{ right: '12%', top: '18%', opacity: 0.45 }}
+              style={{
+                right: '12%',
+                top: '18%',
+                opacity: 0.4,
+                willChange: 'transform',
+                transform: 'translateZ(0)',
+                backfaceVisibility: 'hidden'
+              }}
             >
-              <svg width="42" height="16" viewBox="0 0 60 25" fill="none">
-                <ellipse cx="15" cy="15" rx="15" ry="8" fill="white" opacity="0.8" />
-                <ellipse cx="35" cy="12" rx="20" ry="10" fill="white" opacity="0.8" />
+              <svg width="38" height="14" viewBox="0 0 60 25" fill="none">
+                <ellipse cx="15" cy="15" rx="15" ry="8" fill="white" opacity="0.7" />
+                <ellipse cx="35" cy="12" rx="20" ry="10" fill="white" opacity="0.7" />
               </svg>
             </motion.div>
           </>
@@ -270,34 +284,39 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, user }) => {
           ))}
         </motion.div>
 
-        {/* Birds (morning/afternoon only) */}
+        {/* Birds (morning/afternoon only) - REDUCED to 2 birds for performance */}
         {(timeOfDay === 'morning' || timeOfDay === 'afternoon') && (
           <>
-            {[...Array(3)].map((_, i) => (
+            {[...Array(2)].map((_, i) => (
               <motion.div
                 key={`bird-${i}`}
                 animate={{
-                  x: [-50, window.innerWidth + 50],
-                  y: [0, -10, 0],
+                  x: [-50, 1600], // Fixed value instead of window.innerWidth
+                  y: [0, -8, 0],
                 }}
                 transition={{
-                  duration: 15 + i * 3,
+                  duration: 20 + i * 5,
                   repeat: Infinity,
-                  delay: i * 5,
+                  delay: i * 8,
+                  ease: "linear",
+                  repeatType: "loop",
                 }}
                 className="absolute"
                 style={{
                   left: '-50px',
-                  top: `${20 + i * 15}%`,
+                  top: `${25 + i * 20}%`,
+                  willChange: 'transform',
+                  transform: 'translateZ(0)',
+                  backfaceVisibility: 'hidden',
                 }}
               >
-                <svg width="20" height="10" viewBox="0 0 20 10" fill="none">
+                <svg width="18" height="9" viewBox="0 0 20 10" fill="none">
                   <path
                     d="M0,5 Q5,0 10,5 Q15,0 20,5"
                     stroke={darkMode ? '#1F2937' : '#374151'}
                     strokeWidth="1.5"
                     fill="none"
-                    opacity="0.6"
+                    opacity="0.5"
                   />
                 </svg>
               </motion.div>

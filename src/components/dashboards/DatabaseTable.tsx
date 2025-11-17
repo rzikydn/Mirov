@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, MoreHorizontal, Smile, FileText, Edit3, ChevronDown, X, Download, ArrowUpDown } from 'lucide-react';
+import { Plus, MoreHorizontal, Smile, FileText, Edit3, ChevronDown, X, Download, Upload, ArrowUpDown } from 'lucide-react';
 import { Database, DatabaseRow } from '../../types/database';
 import { useAuth } from '../../context/AuthContext';
 import { useHistory } from '../../context/HistoryContext';
@@ -14,6 +14,7 @@ import SortDropdown from './SortDropdown';
 import AddPropertyModal from './modals/AddPropertyModal';
 import DeleteModal from './modals/DeleteModal';
 import ExportModal from './modals/ExportModal';
+import ImportModal from './modals/ImportModal';
 import DateInput from './DateInput';
 
 // Import constants
@@ -54,10 +55,12 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const newRowRef = useRef<HTMLTableRowElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const newColumnRef = useRef<HTMLTableHeaderCellElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState(database.description || '');
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [sortConfig, setSortConfig] = useState<SortConfig[]>(() => {
     // Set default sort to first column
     // If first column is date type, sort descending; otherwise ascending
@@ -102,59 +105,93 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }
   }, []);
 
-  // Handle column resize with smooth animation and damping
+  // Handle column resize with guide line (Google Sheets style) - ZERO REACT RE-RENDER
   useEffect(() => {
-    let animationFrameId: number | null = null;
-    const smoothingFactor = 0.3; // Lower = smoother (range: 0.1 - 0.5)
+    let guideLineElement: HTMLDivElement | null = null;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (resizingColumn) {
-        // Calculate target width directly from mouse position
-        const diff = e.clientX - resizingColumn.startX;
-        const targetWidth = Math.max(40, resizingColumn.startWidth + diff);
-
-        // Get current width from state
-        setColumnWidths(prev => {
-          const currentWidth = prev[resizingColumn.key] || resizingColumn.startWidth;
-
-          // Apply lerp smoothing: gradually move towards target
-          const difference = targetWidth - currentWidth;
-          const newWidth = currentWidth + difference * smoothingFactor;
-
-          return {
-            ...prev,
-            [resizingColumn.key]: Math.round(newWidth)
-          };
-        });
+      if (resizingColumn && guideLineElement) {
+        // Use transform instead of left for GPU acceleration - NO LAYOUT RECALC!
+        guideLineElement.style.transform = `translateX(${e.clientX}px) translateZ(0)`;
       }
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: MouseEvent) => {
       if (resizingColumn) {
-        if (animationFrameId) {
-          cancelAnimationFrame(animationFrameId);
-        }
+        const diff = e.clientX - resizingColumn.startX;
+        const finalWidth = Math.max(40, resizingColumn.startWidth + diff);
+
+        // Update CSS variable directly on ALL col elements - NO REACT RE-RENDER!
+        const colElements = document.querySelectorAll(`col[data-col-key="${resizingColumn.key}"]`);
+        colElements.forEach((col) => {
+          (col as HTMLElement).style.width = `${finalWidth}px`;
+          (col as HTMLElement).style.minWidth = `${finalWidth}px`;
+          (col as HTMLElement).style.maxWidth = `${finalWidth}px`;
+        });
+
+        // Update state for persistence (this won't cause immediate re-render lag)
+        setTimeout(() => {
+          setColumnWidths(prev => ({
+            ...prev,
+            [resizingColumn.key]: Math.round(finalWidth)
+          }));
+        }, 0);
+
+        // Clean up
         setResizingColumn(null);
+        if (guideLineElement && guideLineElement.parentNode) {
+          guideLineElement.parentNode.removeChild(guideLineElement);
+          guideLineElement = null;
+        }
       }
     };
 
     if (resizingColumn) {
-      document.addEventListener('mousemove', handleMouseMove);
+      // Create guide line element directly in DOM (no React state!)
+      guideLineElement = document.createElement('div');
+      guideLineElement.style.cssText = `
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: #3b82f6;
+        pointer-events: none;
+        z-index: 9999;
+        left: 0;
+        will-change: transform;
+        transform: translateX(${resizingColumn.startX}px) translateZ(0);
+        contain: strict;
+      `;
+      document.body.appendChild(guideLineElement);
+
+      document.addEventListener('mousemove', handleMouseMove, { passive: true });
       document.addEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
       document.body.classList.add('resizing-column');
+
+      // Disable pointer events on table body during resize to prevent hover lag
+      const tableBody = document.querySelector('tbody');
+      if (tableBody) {
+        (tableBody as HTMLElement).style.pointerEvents = 'none';
+      }
     }
 
     return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
+      if (guideLineElement && guideLineElement.parentNode) {
+        guideLineElement.parentNode.removeChild(guideLineElement);
       }
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       document.body.classList.remove('resizing-column');
+
+      // Re-enable pointer events on table body
+      const tableBody = document.querySelector('tbody');
+      if (tableBody) {
+        (tableBody as HTMLElement).style.pointerEvents = '';
+      }
     };
   }, [resizingColumn]);
 
@@ -453,6 +490,261 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }, 100);
   };
 
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canEdit) {
+      alert('You do not have permission to import CSV. Only ADMIN and SUPERUSER can edit.');
+      return;
+    }
+
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    try {
+      const text = await file.text();
+
+      // Remove BOM if present
+      const cleanText = text.replace(/^\ufeff/, '');
+
+      // Detect delimiter (semicolon or comma)
+      const firstLine = cleanText.split(/\r?\n/)[0];
+      const delimiter = firstLine.includes(';') ? ';' : ',';
+
+      // Parse entire CSV properly handling quoted fields with newlines
+      const parseCSV = (csvText: string): string[][] => {
+        const rows: string[][] = [];
+        let currentRow: string[] = [];
+        let currentField = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < csvText.length; i++) {
+          const char = csvText[i];
+          const nextChar = csvText[i + 1];
+
+          if (char === '"') {
+            if (inQuotes && nextChar === '"') {
+              // Double quote - add single quote to field
+              currentField += '"';
+              i++; // Skip next quote
+            } else {
+              // Toggle quote state
+              inQuotes = !inQuotes;
+            }
+          } else if (char === delimiter && !inQuotes) {
+            // End of field
+            currentRow.push(currentField.trim());
+            currentField = '';
+          } else if ((char === '\n' || (char === '\r' && nextChar === '\n')) && !inQuotes) {
+            // End of row (handle both \n and \r\n)
+            if (char === '\r') i++; // Skip \n if we're at \r
+            currentRow.push(currentField.trim());
+            if (currentRow.some(field => field.length > 0)) {
+              rows.push(currentRow);
+            }
+            currentRow = [];
+            currentField = '';
+          } else if (char !== '\r' || inQuotes) {
+            // Add character to current field (skip standalone \r outside quotes)
+            currentField += char;
+          }
+        }
+
+        // Add last field and row if any
+        if (currentField || currentRow.length > 0) {
+          currentRow.push(currentField.trim());
+          if (currentRow.some(field => field.length > 0)) {
+            rows.push(currentRow);
+          }
+        }
+
+        return rows;
+      };
+
+      // Auto-detect column type based on sample values
+      const detectColumnType = (values: string[]): 'text' | 'number' | 'date' => {
+        // Filter out empty values for type detection
+        const nonEmptyValues = values.filter(v => v && v.trim());
+        if (nonEmptyValues.length === 0) return 'text';
+
+        // Sample first few non-empty values (max 10)
+        const sampleValues = nonEmptyValues.slice(0, 10);
+
+        // Check if all samples are numbers
+        const allNumbers = sampleValues.every(v => {
+          const num = v.replace(/,/g, ''); // Remove thousand separators
+          return !isNaN(Number(num)) && num.trim() !== '';
+        });
+
+        if (allNumbers) return 'number';
+
+        // Check if all samples are dates (DD/MM/YYYY or YYYY-MM-DD format)
+        const datePattern1 = /^\d{1,2}\/\d{1,2}\/\d{4}$/; // DD/MM/YYYY
+        const datePattern2 = /^\d{4}-\d{1,2}-\d{1,2}$/; // YYYY-MM-DD
+        const allDates = sampleValues.every(v =>
+          datePattern1.test(v.trim()) || datePattern2.test(v.trim())
+        );
+
+        if (allDates) return 'date';
+
+        return 'text';
+      };
+
+      // Parse CSV
+      const allRows = parseCSV(cleanText);
+
+      if (allRows.length < 2) {
+        alert('CSV file must have at least a header row and one data row');
+        return;
+      }
+
+      // First row is headers - NORMALIZE by removing newlines and extra spaces
+      const headers = allRows[0].map(header =>
+        header.replace(/\s*\n\s*/g, ' ').replace(/\s+/g, ' ').trim()
+      );
+
+      console.log('=== NORMALIZED HEADERS ===');
+      console.log(headers);
+
+      // Find KODE JADWAL column index
+      const kodeJadwalIndex = headers.findIndex(h => h.includes('KODE') && h.includes('JADWAL'));
+      console.log('KODE JADWAL column index:', kodeJadwalIndex);
+
+      // Rest are data rows
+      const dataRows = allRows.slice(1);
+
+      // Check first 5 rows for KODE JADWAL data
+      console.log('=== FIRST 5 ROWS - KODE JADWAL DATA ===');
+      dataRows.slice(0, 5).forEach((row, idx) => {
+        console.log(`Row ${idx + 1}:`, row[kodeJadwalIndex]);
+      });
+
+      // Check for empty columns and warn user
+      const emptyColumns: string[] = [];
+      headers.forEach((header, colIndex) => {
+        const columnValues = dataRows.map(row => row[colIndex] || '');
+        const allEmpty = columnValues.every(v => !v || v.trim() === '');
+        if (allEmpty) {
+          emptyColumns.push(header);
+        }
+      });
+
+      if (emptyColumns.length > 0) {
+        console.warn('⚠️ WARNING: The following columns have NO data in CSV file:');
+        console.warn(emptyColumns);
+
+        // Show alert if KODE JADWAL is empty
+        if (emptyColumns.some(col => col.includes('KODE') && col.includes('JADWAL'))) {
+          alert(`⚠️ WARNING: Column "KODE JADWAL" is completely EMPTY in your CSV file!\n\nPlease check your CSV file and make sure it contains data for this column.`);
+        }
+      }
+
+      if (dataRows.length === 0) {
+        alert('CSV file contains no data rows');
+        return;
+      }
+
+      // Ensure all data rows have same number of columns as headers
+      const maxColumns = headers.length;
+      const normalizedDataRows = dataRows.map(row => {
+        const normalized = [...row];
+        // Pad with empty strings if row has fewer columns
+        while (normalized.length < maxColumns) {
+          normalized.push('');
+        }
+        // Trim if row has more columns
+        return normalized.slice(0, maxColumns);
+      });
+
+      // Detect type for each column based on data
+      const columnTypes: ('text' | 'number' | 'date')[] = headers.map((_, colIndex) => {
+        const columnValues = normalizedDataRows.map(row => row[colIndex] || '');
+        return detectColumnType(columnValues);
+      });
+
+      // Create columns with detected types
+      const newColumns = headers.map((header, index) => ({
+        key: `col-${Date.now()}-${index}`,
+        label: header,
+        type: columnTypes[index]
+      }));
+
+      // Helper function to convert DD/MM/YYYY to YYYY-MM-DD
+      const convertDateFormat = (dateStr: string): string => {
+        if (!dateStr) return '';
+
+        // Check if already in YYYY-MM-DD format
+        const isoPattern = /^\d{4}-\d{1,2}-\d{1,2}$/;
+        if (isoPattern.test(dateStr.trim())) {
+          return dateStr.trim();
+        }
+
+        // Convert DD/MM/YYYY to YYYY-MM-DD
+        const ddmmyyyyPattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+        const match = dateStr.trim().match(ddmmyyyyPattern);
+        if (match) {
+          const day = match[1].padStart(2, '0');
+          const month = match[2].padStart(2, '0');
+          const year = match[3];
+          return `${year}-${month}-${day}`;
+        }
+
+        return dateStr; // Return as-is if no pattern matches
+      };
+
+      // Create rows with proper typing and date format conversion
+      const newRows: DatabaseRow[] = normalizedDataRows.map((values, rowIndex) => {
+        const properties: Record<string, { value: string; type: string }> = {};
+
+        newColumns.forEach((col, colIndex) => {
+          let cellValue = values[colIndex] || '';
+
+          // Convert date format if column type is date
+          if (col.type === 'date' && cellValue) {
+            cellValue = convertDateFormat(cellValue);
+          }
+
+          properties[col.key] = {
+            value: cellValue,
+            type: col.type
+          };
+        });
+
+        return {
+          id: `row-${Date.now()}-${rowIndex}`,
+          properties
+        };
+      });
+
+      // Update database with imported data
+      await updateThisDb((db) => ({
+        ...db,
+        columns: newColumns,
+        rows: newRows
+      }));
+
+      // Add history entry
+      if (user) {
+        await addHistory({
+          userName: user.name,
+          userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
+          action: 'edit',
+          target: 'database',
+          targetName: database.name,
+          description: `${user.name} imported CSV file with ${newRows.length} rows into database "${database.name}"`
+        });
+      }
+
+      alert(`Successfully imported ${newRows.length} rows from CSV file`);
+    } catch (error) {
+      console.error('Error importing CSV:', error);
+      alert('Error importing CSV file. Please check the file format.');
+    }
+  };
+
   // Sort handlers using utility functions
   const handleAddSort = (columnKey: string) => {
     setSortConfig(addSort(sortConfig, columnKey));
@@ -693,6 +985,19 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   </button>
                 )}
 
+                {/* Import Button */}
+                {canEdit && (
+                  <button
+                    onClick={() => setShowImportModal(true)}
+                    className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                      darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Upload className="w-4 h-4 flex-shrink-0" />
+                    <span>Import</span>
+                  </button>
+                )}
+
                 {/* Export Button */}
                 <button
                   onClick={() => setShowExportModal(true)}
@@ -777,12 +1082,41 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           darkMode ? 'border-gray-800' : 'border-gray-200'
         }`}>
           {/* Scrollable container - both horizontal and vertical scroll */}
-          <div className="overflow-auto hide-scrollbar max-h-[calc(100vh-300px)]" ref={tableContainerRef}>
+          <div
+            className="overflow-auto hide-scrollbar max-h-[calc(100vh-300px)]"
+            ref={tableContainerRef}
+            style={{
+              willChange: 'transform',
+              transform: 'translateZ(0)',
+              WebkitOverflowScrolling: 'touch'
+            }}
+          >
             <table className="border-collapse" style={{
               width: tableWidth > 0 ? `${tableWidth}px` : '100%'
             }}>
+              {/* Column width definitions - PERFORMANCE: Define widths once here instead of on every cell */}
+              <colgroup>
+                {database.columns.map((col) => (
+                  <col
+                    key={col.key}
+                    data-col-key={col.key}
+                    style={{
+                      width: `${columnWidths[col.key] || 150}px`,
+                      minWidth: `${columnWidths[col.key] || 150}px`,
+                      maxWidth: `${columnWidths[col.key] || 150}px`
+                    }}
+                  />
+                ))}
+              </colgroup>
               {/* Table Header - Sticky */}
-              <thead className={`sticky top-0 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}`} style={{ zIndex: 100 }}>
+              <thead
+                className={`sticky top-0 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}`}
+                style={{
+                  zIndex: 100,
+                  willChange: 'transform',
+                  transform: 'translateZ(0)'
+                }}
+              >
                 <tr className={`border-b ${darkMode ? 'border-gray-800' : 'border-gray-200'}`}>
                   {database.columns.map((col, index) => (
                     <th
@@ -793,8 +1127,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       } ${index === 0 ? `sticky left-0 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}` : ''}`}
                       style={{
                         padding: index === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
-                        width: `${columnWidths[col.key] || 150}px`,
-                        maxWidth: `${columnWidths[col.key] || 150}px`,
                         whiteSpace: 'nowrap',
                         overflow: typeDropdownOpen === col.key ? 'visible' : 'hidden',
                         textOverflow: 'ellipsis',
@@ -894,6 +1226,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     className={`group ${
                       darkMode ? 'hover:bg-[#202020]' : 'hover:bg-gray-50'
                     }`}
+                    style={{
+                      contain: 'layout style paint',
+                      contentVisibility: 'auto'
+                    }}
                   >
                     {database.columns.map((col, colIndex) => {
                       const prop = row.properties[col.key];
@@ -904,8 +1240,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''}`}
                         style={{
                           padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
-                          width: `${columnWidths[col.key] || 150}px`,
-                          maxWidth: `${columnWidths[col.key] || 150}px`,
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -922,8 +1256,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                           } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''}`}
                           style={{
                             padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
-                            width: `${columnWidths[col.key] || 150}px`,
-                            maxWidth: `${columnWidths[col.key] || 150}px`,
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -1048,6 +1380,22 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         darkMode={darkMode}
         database={database}
         onClose={() => setShowExportModal(false)}
+      />
+
+      <ImportModal
+        show={showImportModal}
+        darkMode={darkMode}
+        onImport={handleImportCSV}
+        onClose={() => setShowImportModal(false)}
+      />
+
+      {/* Hidden file input for CSV import */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept=".csv"
+        onChange={handleImportCSV}
+        className="hidden"
       />
     </motion.div>
   );

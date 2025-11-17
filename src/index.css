@@ -107,19 +107,24 @@ body.resizing-column {
   user-select: none !important;
 }
 
-body.resizing-column * {
-  cursor: col-resize !important;
-  pointer-events: none;
+/* Disable pointer events on table and header during resize - NOT everything! */
+body.resizing-column table,
+body.resizing-column table *,
+body.resizing-column header {
+  pointer-events: none !important;
 }
 
-body.resizing-column .resize-handle {
-  pointer-events: auto;
-}
-
-/* Smooth width transition untuk column yang di-resize - only when actively resizing */
+/* CRITICAL: NO transitions during resize - causes presentation delay! */
 body.resizing-column table th,
-body.resizing-column table td {
-  transition: width 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+body.resizing-column table td,
+body.resizing-column table col,
+body.resizing-column * {
+  transition: none !important;
+}
+
+/* FREEZE all animations during resize for ZERO LAG */
+body.resizing-column header * {
+  animation-play-state: paused !important;
 }
 
 /* Remove transition when not resizing for instant scroll */
