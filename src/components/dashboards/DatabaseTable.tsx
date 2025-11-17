@@ -214,13 +214,21 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     // Sync with backend if database has a numeric ID (already saved)
     // Note: We don't pass addHistory here anymore because we handle specific history entries in each handler
     if (typeof updatedDb.id === 'number') {
-      await updateDatabase(
-        updatedDb,
-        token,
-        undefined, // Don't use generic history
-        user?.name,
-        user?.role as 'SUPERUSER' | 'ADMIN' | 'UMUM'
-      );
+      try {
+        await updateDatabase(
+          updatedDb,
+          token,
+          undefined, // Don't use generic history
+          user?.name,
+          user?.role as 'SUPERUSER' | 'ADMIN' | 'UMUM'
+        );
+        console.log('✅ Database updated successfully on backend');
+      } catch (error) {
+        console.error('❌ Failed to save to backend:', error);
+        alert('Failed to save changes to server. Please try again.');
+      }
+    } else {
+      console.warn('⚠️ Database ID is not numeric, skipping backend sync:', updatedDb.id);
     }
   };
 
@@ -720,11 +728,18 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       });
 
       // Update database with imported data
+      console.log('📊 Importing CSV data...');
+      console.log('Database ID:', database.id, 'Type:', typeof database.id);
+      console.log('New columns:', newColumns.length);
+      console.log('New rows:', newRows.length);
+
       await updateThisDb((db) => ({
         ...db,
         columns: newColumns,
         rows: newRows
       }));
+
+      console.log('✅ CSV import completed - updateThisDb called');
 
       // Add history entry
       if (user) {
