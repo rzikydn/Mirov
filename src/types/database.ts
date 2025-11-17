@@ -24,6 +24,7 @@ export interface Database {
   description?: string; // ✨ Added for database description
   rows: DatabaseRow[];
   columns: Column[];
+  columnWidths?: Record<string, number>; // ✨ Added for persisting column widths
 }
 
 export interface MenuItem {

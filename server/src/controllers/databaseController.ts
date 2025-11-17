@@ -80,7 +80,7 @@ export const createDatabase = async (req: Request, res: Response): Promise<void>
 export const updateDatabase = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, description, icon, columns, rows } = req.body;
+    const { name, description, icon, columns, rows, columnWidths } = req.body;
 
     const database = await prisma.database.findUnique({
       where: { id: parseInt(id) }
@@ -98,7 +98,8 @@ export const updateDatabase = async (req: Request, res: Response): Promise<void>
         description: description !== undefined ? description : database.description,
         icon: icon !== undefined ? icon : database.icon,
         columns: columns !== undefined ? columns : database.columns,
-        rows: rows !== undefined ? rows : database.rows
+        rows: rows !== undefined ? rows : database.rows,
+        columnWidths: columnWidths !== undefined ? columnWidths : database.columnWidths
       },
       include: {
         creator: {

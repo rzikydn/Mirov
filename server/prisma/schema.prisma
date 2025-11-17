@@ -54,16 +54,17 @@ model Note {
 }
 
 model Database {
-  id          Int      @id @default(autoincrement())
-  name        String
-  description String?
-  icon        String?
-  columns     Json
-  rows        Json
-  createdBy   Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  creator     User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String?
+  icon         String?
+  columns      Json
+  rows         Json
+  columnWidths Json?
+  createdBy    Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  creator      User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@map("databases")
 }

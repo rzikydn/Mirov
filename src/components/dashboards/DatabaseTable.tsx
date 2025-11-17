@@ -75,6 +75,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [editingCell, setEditingCell] = useState<{ rowId: string; key: string; oldValue: any } | null>(null);
   const [editingColumnLabel, setEditingColumnLabel] = useState<{ key: string; oldLabel: string } | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    // Load from database.columnWidths if available, otherwise use defaults
+    if (database.columnWidths && Object.keys(database.columnWidths).length > 0) {
+      return database.columnWidths;
+    }
+
     // Initialize default widths for each column
     const widths: Record<string, number> = {};
     database.columns.forEach((col) => {
@@ -131,9 +136,16 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
         // Update state for persistence (this won't cause immediate re-render lag)
         setTimeout(() => {
-          setColumnWidths(prev => ({
-            ...prev,
+          const updatedWidths = {
+            ...columnWidths,
             [resizingColumn.key]: Math.round(finalWidth)
+          };
+          setColumnWidths(updatedWidths);
+
+          // Save column widths to backend so all users see the same widths
+          updateThisDb((db) => ({
+            ...db,
+            columnWidths: updatedWidths
           }));
         }, 0);
 
