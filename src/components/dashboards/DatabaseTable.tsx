@@ -119,7 +119,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     const handleMouseUp = (e: MouseEvent) => {
       if (resizingColumn) {
         const diff = e.clientX - resizingColumn.startX;
-        const finalWidth = Math.max(40, resizingColumn.startWidth + diff);
+        const finalWidth = Math.max(24, resizingColumn.startWidth + diff); // Min 24px for icons/numbers
 
         // Update CSS variable directly on ALL col elements - NO REACT RE-RENDER!
         const colElements = document.querySelectorAll(`col[data-col-key="${resizingColumn.key}"]`);
@@ -1122,11 +1122,13 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     <th
                       key={col.key}
                       ref={index === database.columns.length - 1 ? newColumnRef : null}
-                      className={`text-left py-2 font-normal relative ${
+                      className={`group text-left py-2 font-normal relative ${
                         index !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
                       } ${index === 0 ? `sticky left-0 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}` : ''}`}
                       style={{
                         padding: index === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
+                        width: `${columnWidths[col.key] || 150}px`,
+                        maxWidth: `${columnWidths[col.key] || 150}px`,
                         whiteSpace: 'nowrap',
                         overflow: typeDropdownOpen === col.key ? 'visible' : 'hidden',
                         textOverflow: 'ellipsis',
