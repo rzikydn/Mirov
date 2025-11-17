@@ -14,6 +14,7 @@ interface EmojiPickerProps {
 const EmojiPicker: React.FC<EmojiPickerProps> = ({ darkMode, onSelect, onClose }) => {
   const [activeCategory, setActiveCategory] = useState('smileys');
   const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [isVisible, setIsVisible] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,10 +28,11 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ darkMode, onSelect, onClose }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [onClose]);
 
-  // Calculate position on mount
+  // Calculate position on mount - WITH FADE IN
   useEffect(() => {
     if (pickerRef.current) {
-      const button = pickerRef.current.parentElement?.querySelector('button');
+      const container = document.getElementById('emoji-button-container');
+      const button = container?.querySelector('button');
       if (button) {
         const rect = button.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
@@ -55,6 +57,10 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ darkMode, onSelect, onClose }
         }
 
         setPosition({ top, left });
+        // Delay visibility to prevent glitch
+        requestAnimationFrame(() => {
+          setIsVisible(true);
+        });
       }
     }
   }, []);
@@ -66,7 +72,9 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ darkMode, onSelect, onClose }
         darkMode ? 'bg-[#2a2a2a]' : 'bg-white'
       } rounded-xl shadow-2xl border ${
         darkMode ? 'border-gray-700' : 'border-gray-200'
-      } z-[100] w-[380px] max-w-[calc(100vw-2rem)]`}
+      } z-[200] w-[380px] max-w-[calc(100vw-2rem)] transition-opacity duration-150 ${
+        isVisible ? 'opacity-100' : 'opacity-0'
+      }`}
       style={{ top: `${position.top}px`, left: `${position.left}px` }}
     >
       {/* Header */}

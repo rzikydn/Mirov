@@ -983,7 +983,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               {/* Action Buttons - Below description - Single row */}
               <div className="flex items-center gap-1 mt-3 -ml-2 flex-wrap sm:flex-nowrap">
                 {/* Icon Button - Always visible */}
-                <div className="relative flex-shrink-0">
+                <div className="relative flex-shrink-0" id="emoji-button-container">
                   <button
                     onClick={(e) => {
                       e.preventDefault();
@@ -992,10 +992,13 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         toast.error('Only ADMIN and SUPERUSER can change icon');
                         return;
                       }
-                      setShowEmojiPicker(!showEmojiPicker);
+                      // Use requestAnimationFrame to prevent visual glitch
+                      requestAnimationFrame(() => {
+                        setShowEmojiPicker(!showEmojiPicker);
+                      });
                     }}
                     type="button"
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap transition-colors ${
                       !canEdit
                         ? darkMode
                           ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
