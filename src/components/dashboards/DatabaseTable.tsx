@@ -16,6 +16,7 @@ import AddPropertyModal from './modals/AddPropertyModal';
 import DeleteModal from './modals/DeleteModal';
 import ExportModal from './modals/ExportModal';
 import ImportModal from './modals/ImportModal';
+import WarningModal from './modals/WarningModal';
 import DateInput from './DateInput';
 
 // Import constants
@@ -62,13 +63,13 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [editedDescription, setEditedDescription] = useState(database.description || '');
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [warningMessage, setWarningMessage] = useState({ title: '', message: '' });
   const [sortConfig, setSortConfig] = useState<SortConfig[]>(() => {
-    // Set default sort to first column
-    // If first column is date type, sort descending; otherwise ascending
+    // Set default sort to first column - DESCENDING
     if (database.columns.length > 0) {
       const firstColumn = database.columns[0];
-      const direction = firstColumn.type === 'date' ? 'desc' : 'asc';
-      return [{ column: firstColumn.key, direction }];
+      return [{ column: firstColumn.key, direction: 'desc' }];
     }
     return [];
   });
@@ -661,9 +662,13 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         console.warn('⚠️ WARNING: The following columns have NO data in CSV file:');
         console.warn(emptyColumns);
 
-        // Show alert if KODE JADWAL is empty
+        // Show warning modal if KODE JADWAL is empty
         if (emptyColumns.some(col => col.includes('KODE') && col.includes('JADWAL'))) {
-          alert(`⚠️ WARNING: Column "KODE JADWAL" is completely EMPTY in your CSV file!\n\nPlease check your CSV file and make sure it contains data for this column.`);
+          setWarningMessage({
+            title: 'Column "KODE JADWAL" is Empty',
+            message: 'Column "KODE JADWAL" is completely EMPTY in your CSV file!\n\nPlease check your CSV file and make sure it contains data for this column.'
+          });
+          setShowWarningModal(true);
         }
       }
 
@@ -1483,6 +1488,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         darkMode={darkMode}
         onImport={handleImportCSV}
         onClose={() => setShowImportModal(false)}
+      />
+
+      <WarningModal
+        show={showWarningModal}
+        darkMode={darkMode}
+        title={warningMessage.title}
+        message={warningMessage.message}
+        onConfirm={() => setShowWarningModal(false)}
       />
 
       {/* Hidden file input for CSV import */}
