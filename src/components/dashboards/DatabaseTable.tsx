@@ -77,9 +77,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
     // Load from database.columnWidths if available, otherwise use defaults
     if (database.columnWidths && Object.keys(database.columnWidths).length > 0) {
+      console.log('📏 Loading saved column widths from database:', database.columnWidths);
       return database.columnWidths;
     }
 
+    console.log('📏 No saved column widths, using defaults');
     // Initialize default widths for each column
     const widths: Record<string, number> = {};
     database.columns.forEach((col) => {
@@ -141,6 +143,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             [resizingColumn.key]: Math.round(finalWidth)
           };
           setColumnWidths(updatedWidths);
+
+          console.log('📏 Saving column widths to backend:', updatedWidths);
 
           // Save column widths to backend so all users see the same widths
           updateThisDb((db) => ({

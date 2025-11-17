@@ -32,6 +32,7 @@ export const updateDatabase = async (
   // Sync with backend if database has a numeric ID (already saved)
   if (typeof database.id === 'number') {
     try {
+      console.log('🔄 Sending to backend - columnWidths:', database.columnWidths);
       const response = await fetch(`${API_URL}/${database.id}`, {
         method: 'PUT',
         headers: getAuthHeaders(token),
@@ -40,7 +41,8 @@ export const updateDatabase = async (
           description: database.description,
           icon: database.icon,
           columns: database.columns,
-          rows: database.rows
+          rows: database.rows,
+          columnWidths: database.columnWidths
         })
       });
 
