@@ -1,7 +1,7 @@
 // src/components/dashboards/TeamNotes.tsx
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Edit3, Trash2, Star, Plus, Search, ChevronRight } from 'lucide-react';
 import { Note } from '../../types/database';
 import { useAuth } from '../../context/AuthContext';
@@ -567,27 +567,32 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       />
 
       {/* Detail Sidebar */}
-      {showDetailSidebar && selectedNote && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-black/30 z-40"
-            onClick={() => {
-              setShowDetailSidebar(false);
-              setSelectedNote(null);
-            }}
-          />
+      <AnimatePresence>
+        {showDetailSidebar && selectedNote && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/30 z-40"
+              onClick={() => {
+                setShowDetailSidebar(false);
+                setSelectedNote(null);
+              }}
+            />
 
-          {/* Sidebar */}
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className={`fixed right-0 top-0 h-full w-full sm:w-96 z-50 shadow-2xl ${
-              darkMode ? 'bg-gray-800' : 'bg-white'
-            } overflow-y-auto`}
-          >
+            {/* Sidebar */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className={`fixed right-0 top-0 h-full w-full sm:w-96 z-50 shadow-2xl ${
+                darkMode ? 'bg-gray-800' : 'bg-white'
+              } overflow-y-auto`}
+            >
             {/* Sidebar Header */}
             <div className={`sticky top-0 z-10 px-6 py-4 border-b ${
               darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
@@ -714,6 +719,7 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
           </motion.div>
         </>
       )}
+      </AnimatePresence>
     </motion.div>
   );
 };

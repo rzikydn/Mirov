@@ -729,19 +729,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowSortDropdown(!showSortDropdown)}
-                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 rounded text-xs sm:text-sm font-medium border ${
-                  sortConfig.length > 0
-                    ? darkMode
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-blue-600 text-white border-blue-600'
-                    : darkMode
-                      ? 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                }`}
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
               >
-                <ArrowUpDown className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Sort{sortConfig.length > 0 ? ` (${sortConfig.length})` : ''}</span>
-                <span className="sm:hidden">{sortConfig.length > 0 ? `(${sortConfig.length})` : ''}</span>
+                <ArrowUpDown className="w-4 h-4" />
+                <span className="hidden sm:inline">Sort{sortConfig.length > 0 ? ` ${sortConfig.length}` : ' 1'}</span>
+                {/* Mobile: Show count badge */}
+                {sortConfig.length > 0 && (
+                  <span className="sm:hidden text-xs">{sortConfig.length}</span>
+                )}
               </button>
 
               {/* Sort Dropdown Component */}
@@ -762,11 +757,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             {canEdit && (
               <button
                 onClick={() => setShowAddProperty(true)}
-                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs sm:text-sm font-medium"
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                  darkMode
+                    ? 'bg-white hover:bg-gray-100 text-gray-900'
+                    : 'bg-gray-900 hover:bg-gray-800 text-white'
+                }`}
               >
-                <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Add Property</span>
-                <span className="sm:hidden">Add</span>
+                <Plus className="w-4 h-4 flex-shrink-0" />
+                <span>Add Property</span>
               </button>
             )}
           </div>
