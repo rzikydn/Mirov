@@ -949,12 +949,12 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               )}
 
               {/* Action Buttons - Below description */}
-              <div className="flex flex-wrap items-center gap-2 mt-3">
+              <div className="flex flex-wrap items-center gap-1 mt-3 -ml-2">
                 {canEdit && (
                   <div className="relative">
                     <button
                       onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                         darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
                       }`}
                     >
@@ -975,7 +975,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 {canEdit && !database.description && (
                   <button
                     onClick={handleAddDescription}
-                    className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                       darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
                     }`}
                   >
@@ -989,7 +989,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 {canEdit && (
                   <button
                     onClick={() => setShowImportModal(true)}
-                    className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                       darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
                     }`}
                   >
@@ -1001,7 +1001,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 {/* Export Button */}
                 <button
                   onClick={() => setShowExportModal(true)}
-                  className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                     darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
