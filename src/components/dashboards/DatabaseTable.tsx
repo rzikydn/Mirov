@@ -985,19 +985,21 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 {/* Icon Button - Always visible */}
                 <div className="relative flex-shrink-0">
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       if (!canEdit) {
                         toast.error('Only ADMIN and SUPERUSER can change icon');
                         return;
                       }
                       setShowEmojiPicker(!showEmojiPicker);
                     }}
-                    disabled={!canEdit}
+                    type="button"
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                       !canEdit
                         ? darkMode
-                          ? 'text-gray-500 cursor-not-allowed opacity-50'
-                          : 'text-gray-400 cursor-not-allowed opacity-50'
+                          ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
+                          : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
                         : darkMode
                           ? 'text-gray-400 hover:bg-gray-800'
                           : 'text-gray-600 hover:bg-gray-100'
@@ -1020,19 +1022,21 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 {/* Description Button - Always visible if no description */}
                 {!database.description && (
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       if (!canEdit) {
                         toast.error('Only ADMIN and SUPERUSER can add description');
                         return;
                       }
                       handleAddDescription();
                     }}
-                    disabled={!canEdit}
+                    type="button"
                     className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                       !canEdit
                         ? darkMode
-                          ? 'text-gray-500 cursor-not-allowed opacity-50'
-                          : 'text-gray-400 cursor-not-allowed opacity-50'
+                          ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
+                          : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
                         : darkMode
                           ? 'text-gray-400 hover:bg-gray-800'
                           : 'text-gray-600 hover:bg-gray-100'
@@ -1047,19 +1051,21 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
                 {/* Import Button - Always visible */}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     if (!canEdit) {
                       toast.error('Only ADMIN and SUPERUSER can import data');
                       return;
                     }
                     setShowImportModal(true);
                   }}
-                  disabled={!canEdit}
+                  type="button"
                   className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
                     !canEdit
                       ? darkMode
-                        ? 'text-gray-500 cursor-not-allowed opacity-50'
-                        : 'text-gray-400 cursor-not-allowed opacity-50'
+                        ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
+                        : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
                       : darkMode
                         ? 'text-gray-400 hover:bg-gray-800'
                         : 'text-gray-600 hover:bg-gray-100'
@@ -1133,19 +1139,21 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             </div>
 
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 if (!canEdit) {
                   toast.error('Only ADMIN and SUPERUSER can add properties');
                   return;
                 }
                 setShowAddProperty(true);
               }}
-              disabled={!canEdit}
+              type="button"
               className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                 !canEdit
                   ? darkMode
-                    ? 'bg-white text-gray-900 cursor-not-allowed opacity-40'
-                    : 'bg-gray-900 text-white cursor-not-allowed opacity-40'
+                    ? 'bg-white text-gray-900 cursor-not-allowed opacity-40 pointer-events-auto'
+                    : 'bg-gray-900 text-white cursor-not-allowed opacity-40 pointer-events-auto'
                   : darkMode
                     ? 'bg-white hover:bg-gray-100 text-gray-900'
                     : 'bg-gray-900 hover:bg-gray-800 text-white'
@@ -1161,7 +1169,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
       {/* Table - Notion Style with Scroll */}
       <div className="px-8 sm:px-12 lg:px-24 pb-12">
-        <div className={`border rounded-lg ${
+        <div className={`border rounded-lg overflow-hidden ${
           darkMode ? 'border-gray-800' : 'border-gray-200'
         }`}>
           {/* Scrollable container - both horizontal and vertical scroll */}
