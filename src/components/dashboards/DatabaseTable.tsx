@@ -761,6 +761,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         rows: newRows
       }));
 
+      // Apply default descending sort on first column after import
+      if (newColumns.length > 0) {
+        setSortConfig([{ column: newColumns[0].key, direction: 'desc' }]);
+      }
+
       console.log('✅ CSV import completed - updateThisDb called');
 
       // Add history entry
@@ -1180,16 +1185,16 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         <div className={`border rounded-lg overflow-hidden ${
           darkMode ? 'border-gray-800' : 'border-gray-200'
         }`}>
-          {/* Scrollable container - both horizontal and vertical scroll */}
-          <div
-            className="overflow-auto hide-scrollbar max-h-[calc(100vh-300px)]"
-            ref={tableContainerRef}
-            style={{
-              willChange: 'transform',
-              transform: 'translateZ(0)',
-              WebkitOverflowScrolling: 'touch'
-            }}
-          >
+            {/* Scrollable container - both horizontal and vertical scroll */}
+            <div
+              className="overflow-auto hide-scrollbar max-h-[calc(100vh-300px)]"
+              ref={tableContainerRef}
+              style={{
+                willChange: 'transform',
+                transform: 'translateZ(0)',
+                WebkitOverflowScrolling: 'touch'
+              }}
+            >
             <table className="border-collapse" style={{
               width: tableWidth > 0 ? `${tableWidth}px` : '100%'
             }}>
@@ -1317,13 +1322,19 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               </thead>
 
               {/* Table Body */}
-              <tbody className={`${darkMode ? 'divide-gray-800' : 'divide-gray-200'} divide-y`}>
+              <tbody
+                className={`${darkMode ? 'divide-gray-800' : 'divide-gray-200'} divide-y`}
+                style={{
+                  willChange: resizingColumn ? 'auto' : 'contents',
+                  pointerEvents: resizingColumn ? 'none' : 'auto'
+                }}
+              >
                 {sortedRows.map((row, rowIndex) => (
                   <tr
                     key={row.id}
                     ref={rowIndex === sortedRows.length - 1 ? newRowRef : null}
-                    onMouseEnter={() => setHoveredRow(row.id)}
-                    onMouseLeave={() => setHoveredRow(null)}
+                    onMouseEnter={() => !resizingColumn && setHoveredRow(row.id)}
+                    onMouseLeave={() => !resizingColumn && setHoveredRow(null)}
                     className={`group ${
                       darkMode ? 'hover:bg-[#202020]' : 'hover:bg-gray-50'
                     }`}
@@ -1364,17 +1375,18 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                           }}
                         >
-                          {/* Delete Row Button - Only show on first column when row is hovered */}
+                          {/* Delete Row Button - Only show on hover for first column and only for users with edit permission */}
                           {colIndex === 0 && canEdit && hoveredRow === row.id && (
                             <button
                               onClick={() => handleDeleteRow(row.id)}
-                              className={`absolute left-1 top-1/2 -translate-y-1/2 p-1 rounded ${
-                                darkMode ? 'bg-gray-800 hover:bg-red-600' : 'bg-gray-100 hover:bg-red-500'
-                              } transition-colors`}
-                              title="Delete row"
+                              className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded transition-colors ${
+                                darkMode
+                                  ? 'bg-[#191919] hover:bg-gray-700 text-gray-400'
+                                  : 'bg-white hover:bg-gray-100 text-gray-600'
+                              }`}
                               style={{ zIndex: 60 }}
                             >
-                              <MoreHorizontal className={`w-3 h-3 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                              <MoreHorizontal className="w-3.5 h-3.5" />
                             </button>
                           )}
                           {prop.type === 'text' && (

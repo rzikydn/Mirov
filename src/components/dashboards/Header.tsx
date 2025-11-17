@@ -151,46 +151,34 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, user }) => {
           }}
         />
 
-        {/* Stars (only at night) */}
+        {/* Stars (only at night) - STATIC NO ANIMATION */}
         {timeOfDay === 'night' && (
           <>
             {[...Array(15)].map((_, i) => (
-              <motion.div
+              <div
                 key={`star-${i}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: [0, 1, 0] }}
-                transition={{
-                  duration: 2,
-                  delay: i * 0.1,
-                  repeat: Infinity,
-                  repeatDelay: 1,
-                }}
                 className="absolute rounded-full bg-white"
                 style={{
                   width: '2px',
                   height: '2px',
                   left: `${Math.random() * 100}%`,
                   top: `${Math.random() * 55}%`,
+                  opacity: 0.8,
                 }}
               />
             ))}
           </>
         )}
 
-        {/* Clouds - OPTIMIZED with backface-visibility */}
+        {/* Clouds - STATIC NO ANIMATION */}
         {(timeOfDay === 'morning' || timeOfDay === 'afternoon') && (
           <>
-            <motion.div
-              animate={{ x: [0, 40, 0] }}
-              transition={{ duration: 25, repeat: Infinity, ease: "linear", repeatType: "loop" }}
+            <div
               className="absolute"
               style={{
                 left: '8%',
                 top: '12%',
                 opacity: 0.5,
-                willChange: 'transform',
-                transform: 'translateZ(0)',
-                backfaceVisibility: 'hidden'
               }}
             >
               <svg width="50" height="18" viewBox="0 0 80 30" fill="none">
@@ -198,25 +186,20 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, user }) => {
                 <ellipse cx="40" cy="15" rx="25" ry="12" fill="white" opacity="0.7" />
                 <ellipse cx="60" cy="20" rx="18" ry="10" fill="white" opacity="0.7" />
               </svg>
-            </motion.div>
-            <motion.div
-              animate={{ x: [0, -25, 0] }}
-              transition={{ duration: 30, repeat: Infinity, ease: "linear", repeatType: "loop" }}
+            </div>
+            <div
               className="absolute"
               style={{
                 right: '12%',
                 top: '18%',
                 opacity: 0.4,
-                willChange: 'transform',
-                transform: 'translateZ(0)',
-                backfaceVisibility: 'hidden'
               }}
             >
               <svg width="38" height="14" viewBox="0 0 60 25" fill="none">
                 <ellipse cx="15" cy="15" rx="15" ry="8" fill="white" opacity="0.7" />
                 <ellipse cx="35" cy="12" rx="20" ry="10" fill="white" opacity="0.7" />
               </svg>
-            </motion.div>
+            </div>
           </>
         )}
 
@@ -284,45 +267,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, user }) => {
           ))}
         </motion.div>
 
-        {/* Birds (morning/afternoon only) - REDUCED to 2 birds for performance */}
-        {(timeOfDay === 'morning' || timeOfDay === 'afternoon') && (
-          <>
-            {[...Array(2)].map((_, i) => (
-              <motion.div
-                key={`bird-${i}`}
-                animate={{
-                  x: [-50, 1600], // Fixed value instead of window.innerWidth
-                  y: [0, -8, 0],
-                }}
-                transition={{
-                  duration: 20 + i * 5,
-                  repeat: Infinity,
-                  delay: i * 8,
-                  ease: "linear",
-                  repeatType: "loop",
-                }}
-                className="absolute"
-                style={{
-                  left: '-50px',
-                  top: `${25 + i * 20}%`,
-                  willChange: 'transform',
-                  transform: 'translateZ(0)',
-                  backfaceVisibility: 'hidden',
-                }}
-              >
-                <svg width="18" height="9" viewBox="0 0 20 10" fill="none">
-                  <path
-                    d="M0,5 Q5,0 10,5 Q15,0 20,5"
-                    stroke={darkMode ? '#1F2937' : '#374151'}
-                    strokeWidth="1.5"
-                    fill="none"
-                    opacity="0.5"
-                  />
-                </svg>
-              </motion.div>
-            ))}
-          </>
-        )}
+        {/* Birds REMOVED - No animation for better performance */}
       </div>
 
       {/* Content Overlay */}

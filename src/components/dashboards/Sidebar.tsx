@@ -94,7 +94,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             }}
             exit={{ x: -320 }}
             transition={{
-              duration: 0.2,
+              duration: 0.15,
               ease: "easeOut"
             }}
             className={`fixed lg:static z-40 top-0 left-0 lg:inset-auto ${
@@ -106,7 +106,8 @@ const Sidebar: React.FC<SidebarProps> = ({
               bottom: window.innerWidth < 1024 ? 0 : 'auto',
               willChange: 'transform, width',
               transform: 'translateZ(0)',
-              backfaceVisibility: 'hidden'
+              backfaceVisibility: 'hidden',
+              contain: 'layout style paint'
             }}
           >
             <div className="p-3 flex flex-col flex-1 overflow-y-auto custom-scrollbar">
