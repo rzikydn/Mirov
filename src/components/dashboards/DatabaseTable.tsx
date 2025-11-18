@@ -1502,7 +1502,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
                           } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''}`}
                           style={{
-                            padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
+                            padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : colIndex === database.columns.length - 1 ? '0.5rem 2.5rem 0.5rem 0.25rem' : '0.5rem 0.25rem',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -1510,8 +1510,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                           }}
                         >
-                          {/* Delete Row Button - Only show on hover for first column and only for users with edit permission */}
-                          {colIndex === 0 && canEdit && hoveredRow === row.id && (
+                          {/* Delete Row Button - Only show on hover for last column and only for users with edit permission */}
+                          {colIndex === database.columns.length - 1 && canEdit && hoveredRow === row.id && (
                             <button
                               onClick={() => handleDeleteRow(row.id)}
                               className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded transition-colors ${
