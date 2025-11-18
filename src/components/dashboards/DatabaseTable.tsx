@@ -95,12 +95,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [resizingColumn, setResizingColumn] = useState<{ key: string; startX: number; startWidth: number } | null>(null);
   const [tableWidth, setTableWidth] = useState<number>(0);
 
-  // Calculate table width
+  // Calculate table width - Update whenever columnWidths changes
   useEffect(() => {
     if (database.columns.length > 0) {
       const totalWidth = database.columns.reduce((sum, col) => sum + (columnWidths[col.key] || 150), 0);
       const containerWidth = tableContainerRef.current?.offsetWidth || 0;
-      setTableWidth(Math.max(totalWidth, containerWidth));
+      const newTableWidth = Math.max(totalWidth, containerWidth);
+      setTableWidth(newTableWidth);
+      console.log('📐 Table width updated:', newTableWidth, 'from column widths:', columnWidths);
     }
   }, [columnWidths, database.columns]);
 
@@ -135,26 +137,23 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         const colElements = document.querySelectorAll(`col[data-col-key="${resizingColumn.key}"]`);
         colElements.forEach((col) => {
           (col as HTMLElement).style.width = `${finalWidth}px`;
-          (col as HTMLElement).style.minWidth = `${finalWidth}px`;
-          (col as HTMLElement).style.maxWidth = `${finalWidth}px`;
+          (col as HTMLElement).style.minWidth = '24px'; // Keep flexible minimum
         });
 
-        // Update state for persistence (this won't cause immediate re-render lag)
-        setTimeout(() => {
-          const updatedWidths = {
-            ...columnWidths,
-            [resizingColumn.key]: Math.round(finalWidth)
-          };
-          setColumnWidths(updatedWidths);
+        // Update state immediately for responsive UI
+        const updatedWidths = {
+          ...columnWidths,
+          [resizingColumn.key]: Math.round(finalWidth)
+        };
+        setColumnWidths(updatedWidths);
 
-          console.log('📏 Saving column widths to backend:', updatedWidths);
+        console.log('📏 Saving column widths to backend:', updatedWidths);
 
-          // Save column widths to backend so all users see the same widths
-          updateThisDb((db) => ({
-            ...db,
-            columnWidths: updatedWidths
-          }));
-        }, 0);
+        // Save column widths to backend so all users see the same widths
+        updateThisDb((db) => ({
+          ...db,
+          columnWidths: updatedWidths
+        }));
 
         // Clean up
         setResizingColumn(null);
@@ -1344,7 +1343,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               }}
             >
             <table className="border-collapse" style={{
-              width: tableWidth > 0 ? `${tableWidth}px` : '100%'
+              width: tableWidth > 0 ? `${tableWidth}px` : '100%',
+              tableLayout: 'fixed' // Fixed layout for consistent column widths
             }}>
               {/* Column width definitions - PERFORMANCE: Define widths once here instead of on every cell */}
               <colgroup>
@@ -1354,8 +1354,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     data-col-key={col.key}
                     style={{
                       width: `${columnWidths[col.key] || 150}px`,
-                      minWidth: `${columnWidths[col.key] || 150}px`,
-                      maxWidth: `${columnWidths[col.key] || 150}px`
+                      minWidth: '24px' // Allow columns to shrink to 24px minimum
                     }}
                   />
                 ))}
