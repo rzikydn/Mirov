@@ -341,7 +341,7 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       animate={{ opacity: 1 }}
       className={`h-full overflow-auto ${darkMode ? 'bg-[#191919]' : 'bg-gray-50'}`}
     >
-      <div className="px-8 sm:px-12 lg:px-24 py-12">
+      <div className="px-4 sm:px-6 lg:px-12 py-12">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">

@@ -889,7 +889,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       className={`h-full overflow-auto hide-scrollbar ${darkMode ? 'bg-[#191919]' : 'bg-white'}`}
     >
       {/* Header - Notion Style */}
-      <div className="px-8 sm:px-12 lg:px-24 pt-6 pb-4">
+      <div className="px-4 sm:px-6 lg:px-12 pt-6 pb-4">
         {/* Title Section */}
         <div className="mb-6">
           {/* Title with Icon (Inline) */}
@@ -1316,7 +1316,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       </div>
 
       {/* Table - Notion Style with Scroll */}
-      <div className="px-8 sm:px-12 lg:px-24 pb-12">
+      <div className="px-4 sm:px-6 lg:px-12 pb-12">
         <div className={`border rounded-lg overflow-hidden ${
           darkMode ? 'border-gray-800' : 'border-gray-200'
         }`}>
