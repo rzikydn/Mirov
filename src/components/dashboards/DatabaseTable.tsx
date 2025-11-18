@@ -497,6 +497,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         database.columns.map((col) => [col.key, { value: '', type: col.type }])
       ),
     };
+
+    // Clear sorting so new row appears at the top
+    setSortConfig([]);
+
     // Add new row at the beginning (index 0) instead of at the end
     await updateThisDb((db) => ({ ...db, rows: [newRow, ...db.rows] }));
 
