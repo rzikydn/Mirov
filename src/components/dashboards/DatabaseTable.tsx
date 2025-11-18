@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, MoreHorizontal, Smile, FileText, Edit3, ChevronDown, X, Download, Upload, ArrowUpDown } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Database, DatabaseRow } from '../../types/database';
 import { useAuth } from '../../context/AuthContext';
 import { useHistory } from '../../context/HistoryContext';
@@ -885,6 +886,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   // Get sorted rows using utility function
   const sortedRows = getSortedRows(database.rows, database.columns, sortConfig);
 
+  // Virtual scrolling setup - Only render visible rows for performance
+  const rowVirtualizer = useVirtualizer({
+    count: sortedRows.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 42, // Estimated row height in pixels
+    overscan: 10, // Render 10 extra items above and below viewport for smooth scrolling
+  });
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -1326,8 +1335,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         }`}>
             {/* Scrollable container - both horizontal and vertical scroll */}
             <div
-              className="overflow-auto hide-scrollbar max-h-[calc(100vh-300px)]"
               ref={tableContainerRef}
+              className="overflow-auto hide-scrollbar max-h-[calc(100vh-300px)]"
               style={{
                 willChange: 'transform',
                 transform: 'translateZ(0)',
@@ -1370,8 +1379,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       } ${index === 0 ? `sticky left-0 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}` : ''}`}
                       style={{
                         padding: index === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
-                        width: `${columnWidths[col.key] || 150}px`,
-                        maxWidth: `${columnWidths[col.key] || 150}px`,
                         whiteSpace: 'nowrap',
                         overflow: typeDropdownOpen === col.key ? 'visible' : 'hidden',
                         textOverflow: 'ellipsis',
@@ -1460,137 +1467,160 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 </tr>
               </thead>
 
-              {/* Table Body */}
+              {/* Table Body - VIRTUALIZED for performance with 1000+ rows */}
               <tbody
-                className={`${darkMode ? 'divide-gray-800' : 'divide-gray-200'} divide-y`}
                 style={{
                   willChange: resizingColumn ? 'auto' : 'contents',
                   pointerEvents: resizingColumn ? 'none' : 'auto'
                 }}
               >
-                {sortedRows.map((row, rowIndex) => (
-                  <tr
-                    key={row.id}
-                    ref={rowIndex === 0 ? newRowRef : null}
-                    onMouseEnter={() => !resizingColumn && setHoveredRow(row.id)}
-                    onMouseLeave={() => !resizingColumn && setHoveredRow(null)}
-                    className={`group ${
-                      darkMode ? 'hover:bg-[#202020]' : 'hover:bg-gray-50'
-                    }`}
-                    style={{
-                      contain: 'layout style paint',
-                      contentVisibility: 'auto'
-                    }}
-                  >
-                    {database.columns.map((col, colIndex) => {
-                      const prop = row.properties[col.key];
-                      if (!prop) return <td
-                        key={col.key}
-                        className={`py-2 ${
-                          colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
-                        } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''}`}
-                        style={{
-                          padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          zIndex: colIndex === 0 ? 50 : 1,
-                          ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
-                        }}
-                      ></td>;
+                {/* Spacer for virtual scrolling - top padding */}
+                {rowVirtualizer.getVirtualItems().length > 0 && (
+                  <tr style={{ height: `${rowVirtualizer.getVirtualItems()[0].start}px` }}>
+                    <td colSpan={database.columns.length} style={{ padding: 0, border: 'none' }} />
+                  </tr>
+                )}
 
-                      return (
-                        <td
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const row = sortedRows[virtualRow.index];
+                  const rowIndex = virtualRow.index;
+
+                  return (
+                    <tr
+                      key={row.id}
+                      ref={rowIndex === 0 ? newRowRef : null}
+                      onMouseEnter={() => !resizingColumn && setHoveredRow(row.id)}
+                      onMouseLeave={() => !resizingColumn && setHoveredRow(null)}
+                      className={`group border-b ${
+                        darkMode ? 'hover:bg-[#202020] border-gray-800' : 'hover:bg-gray-50 border-gray-200'
+                      }`}
+                      style={{
+                        height: `${virtualRow.size}px`,
+                        contain: 'layout style paint',
+                      }}
+                    >
+                      {database.columns.map((col, colIndex) => {
+                        const prop = row.properties[col.key];
+                        if (!prop) return <td
                           key={col.key}
-                          className={`py-2 relative ${
+                          className={`py-2 ${
                             colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
                           } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''}`}
                           style={{
-                            padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : colIndex === database.columns.length - 1 ? '0.5rem 2.5rem 0.5rem 0.25rem' : '0.5rem 0.25rem',
+                            padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             zIndex: colIndex === 0 ? 50 : 1,
                             ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                           }}
-                        >
-                          {/* Delete Row Button - Only show on hover for last column and only for users with edit permission */}
-                          {colIndex === database.columns.length - 1 && canEdit && hoveredRow === row.id && (
-                            <button
-                              onClick={() => handleDeleteRow(row.id)}
-                              className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded transition-colors ${
-                                darkMode
-                                  ? 'bg-[#191919] hover:bg-gray-700 text-gray-400'
-                                  : 'bg-white hover:bg-gray-100 text-gray-600'
-                              }`}
-                              style={{ zIndex: 60 }}
-                            >
-                              <MoreHorizontal className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {prop.type === 'text' && (
-                            <input
-                              type="text"
-                              value={prop.value}
-                              onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
-                              onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.value)}
-                              onBlur={(e) => handleCellBlur(row.id, col.key, e.target.value)}
-                              disabled={!canEdit}
-                              placeholder=""
-                              className={`w-full text-sm ${
-                                darkMode
-                                  ? 'bg-transparent text-gray-300'
-                                  : 'bg-transparent text-gray-900'
-                              } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
-                            />
-                          )}
-                          {prop.type === 'number' && (
-                            <input
-                              type="number"
-                              value={prop.value}
-                              onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
-                              onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.valueAsNumber)}
-                              onBlur={(e) => handleCellBlur(row.id, col.key, e.target.valueAsNumber)}
-                              disabled={!canEdit}
-                              placeholder=""
-                              className={`w-full text-sm ${
-                                darkMode
-                                  ? 'bg-transparent text-gray-300'
-                                  : 'bg-transparent text-gray-900'
-                              } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
-                            />
-                          )}
-                          {prop.type === 'date' && (
-                            <DateInput
-                              value={prop.value}
-                              onChange={(value) => canEdit && handleValueChange(row.id, col.key, value)}
-                              onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
-                              onBlur={(value) => handleCellBlur(row.id, col.key, value)}
-                              disabled={!canEdit}
-                              darkMode={darkMode}
-                            />
-                          )}
-                          {prop.type === 'checkbox' && (
-                            <input
-                              type="checkbox"
-                              checked={!!prop.value}
-                              onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
-                              onChange={(e) => {
-                                if (canEdit) {
-                                  handleValueChange(row.id, col.key, e.target.checked);
-                                  // For checkbox, trigger blur immediately after change
-                                  handleCellBlur(row.id, col.key, e.target.checked);
-                                }
-                              }}
-                              disabled={!canEdit}
-                              className={`custom-checkbox ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
-                            />
-                          )}
-                        </td>
-                      );
-                    })}
+                        ></td>;
+
+                        return (
+                          <td
+                            key={col.key}
+                            className={`py-2 relative ${
+                              colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
+                            } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''}`}
+                            style={{
+                              padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : colIndex === database.columns.length - 1 ? '0.5rem 2.5rem 0.5rem 0.25rem' : '0.5rem 0.25rem',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              zIndex: colIndex === 0 ? 50 : 1,
+                              ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
+                            }}
+                          >
+                            {/* Delete Row Button - Only show on hover for last column and only for users with edit permission */}
+                            {colIndex === database.columns.length - 1 && canEdit && hoveredRow === row.id && (
+                              <button
+                                onClick={() => handleDeleteRow(row.id)}
+                                className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded transition-colors ${
+                                  darkMode
+                                    ? 'bg-[#191919] hover:bg-gray-700 text-gray-400'
+                                    : 'bg-white hover:bg-gray-100 text-gray-600'
+                                }`}
+                                style={{ zIndex: 60 }}
+                              >
+                                <MoreHorizontal className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {prop.type === 'text' && (
+                              <input
+                                type="text"
+                                value={prop.value}
+                                onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
+                                onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.value)}
+                                onBlur={(e) => handleCellBlur(row.id, col.key, e.target.value)}
+                                disabled={!canEdit}
+                                placeholder=""
+                                className={`w-full text-sm ${
+                                  darkMode
+                                    ? 'bg-transparent text-gray-300'
+                                    : 'bg-transparent text-gray-900'
+                                } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                              />
+                            )}
+                            {prop.type === 'number' && (
+                              <input
+                                type="number"
+                                value={prop.value}
+                                onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
+                                onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.valueAsNumber)}
+                                onBlur={(e) => handleCellBlur(row.id, col.key, e.target.valueAsNumber)}
+                                disabled={!canEdit}
+                                placeholder=""
+                                className={`w-full text-sm ${
+                                  darkMode
+                                    ? 'bg-transparent text-gray-300'
+                                    : 'bg-transparent text-gray-900'
+                                } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                              />
+                            )}
+                            {prop.type === 'date' && (
+                              <DateInput
+                                value={prop.value}
+                                onChange={(value) => canEdit && handleValueChange(row.id, col.key, value)}
+                                onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
+                                onBlur={(value) => handleCellBlur(row.id, col.key, value)}
+                                disabled={!canEdit}
+                                darkMode={darkMode}
+                              />
+                            )}
+                            {prop.type === 'checkbox' && (
+                              <input
+                                type="checkbox"
+                                checked={!!prop.value}
+                                onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
+                                onChange={(e) => {
+                                  if (canEdit) {
+                                    handleValueChange(row.id, col.key, e.target.checked);
+                                    // For checkbox, trigger blur immediately after change
+                                    handleCellBlur(row.id, col.key, e.target.checked);
+                                  }
+                                }}
+                                disabled={!canEdit}
+                                className={`custom-checkbox ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                              />
+                            )}
+                          </td>
+                        );
+                      })}
                     </tr>
-                ))}
+                  );
+                })}
+
+                {/* Spacer for virtual scrolling - bottom padding */}
+                {rowVirtualizer.getVirtualItems().length > 0 && (
+                  <tr style={{
+                    height: `${
+                      rowVirtualizer.getTotalSize() -
+                      (rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1]?.end || 0)
+                    }px`
+                  }}>
+                    <td colSpan={database.columns.length} style={{ padding: 0, border: 'none' }} />
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
