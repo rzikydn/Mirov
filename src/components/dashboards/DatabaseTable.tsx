@@ -497,7 +497,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         database.columns.map((col) => [col.key, { value: '', type: col.type }])
       ),
     };
-    await updateThisDb((db) => ({ ...db, rows: [...db.rows, newRow] }));
+    // Add new row at the beginning (index 0) instead of at the end
+    await updateThisDb((db) => ({ ...db, rows: [newRow, ...db.rows] }));
 
     // Add specific history entry
     if (user) {
@@ -512,7 +513,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }
 
     setTimeout(() => {
-      newRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      newRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
   };
 
@@ -906,38 +907,153 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             />
           ) : (
             <>
-              {/* Title Row */}
-              <div className="flex items-center gap-3 group">
-                <h1
-                  onClick={() => canEdit && setIsEditingName(true)}
-                  className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${canEdit ? 'cursor-text' : 'cursor-default'} ${
-                    darkMode ? 'text-white' : 'text-gray-900'
-                  }`}
-                >
-                  {database.name}
-                </h1>
-                {canEdit && (
-                  <button
-                    onClick={() => setIsEditingName(true)}
-                    className={`opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded ${
-                      darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+              {/* Title Row with Action Buttons on Desktop */}
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                {/* Title and Edit Buttons */}
+                <div className="flex items-center gap-3 group">
+                  <h1
+                    onClick={() => canEdit && setIsEditingName(true)}
+                    className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${canEdit ? 'cursor-text' : 'cursor-default'} ${
+                      darkMode ? 'text-white' : 'text-gray-900'
                     }`}
-                    title="Edit title"
                   >
-                    <Edit3 className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-                  </button>
-                )}
-                {canEdit && database.icon && (
+                    {database.name}
+                  </h1>
+                  {canEdit && (
+                    <button
+                      onClick={() => setIsEditingName(true)}
+                      className={`opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded ${
+                        darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+                      }`}
+                      title="Edit title"
+                    >
+                      <Edit3 className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                    </button>
+                  )}
+                  {canEdit && database.icon && (
+                    <button
+                      onClick={handleRemoveIcon}
+                      className={`opacity-0 group-hover:opacity-100 p-1.5 rounded transition-opacity ${
+                        darkMode ? 'hover:bg-gray-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
+                      }`}
+                      title="Remove icon"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Action Buttons - Desktop: On the right side, Mobile: Below title */}
+                <div className="hidden lg:flex items-center gap-1 -ml-2 flex-shrink-0">
+                  {/* Icon Button - Always visible */}
+                  <div className="relative flex-shrink-0" id="emoji-button-container">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!canEdit) {
+                          toast.error('Only ADMIN and SUPERUSER can change icon');
+                          return;
+                        }
+                        // Use requestAnimationFrame to prevent visual glitch
+                        requestAnimationFrame(() => {
+                          setShowEmojiPicker(!showEmojiPicker);
+                        });
+                      }}
+                      type="button"
+                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap transition-colors ${
+                        !canEdit
+                          ? darkMode
+                            ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
+                            : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
+                          : darkMode
+                            ? 'text-gray-400 hover:bg-gray-800'
+                            : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                      title={!canEdit ? 'Only ADMIN and SUPERUSER can change icon' : database.icon ? 'Change icon' : 'Add icon'}
+                    >
+                      <Smile className="w-4 h-4 flex-shrink-0" />
+                      <span className="hidden xs:inline">{database.icon ? 'Change icon' : 'Add icon'}</span>
+                      <span className="xs:hidden">Icon</span>
+                    </button>
+                    {showEmojiPicker && canEdit && (
+                      <EmojiPicker
+                        darkMode={darkMode}
+                        onSelect={handleEmojiSelect}
+                        onClose={() => setShowEmojiPicker(false)}
+                      />
+                    )}
+                  </div>
+
+                  {/* Description Button - Always visible if no description */}
+                  {!database.description && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!canEdit) {
+                          toast.error('Only ADMIN and SUPERUSER can add description');
+                          return;
+                        }
+                        handleAddDescription();
+                      }}
+                      type="button"
+                      className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                        !canEdit
+                          ? darkMode
+                            ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
+                            : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
+                          : darkMode
+                            ? 'text-gray-400 hover:bg-gray-800'
+                            : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                      title={!canEdit ? 'Only ADMIN and SUPERUSER can add description' : 'Add description'}
+                    >
+                      <FileText className="w-4 h-4 flex-shrink-0" />
+                      <span className="hidden xs:inline">Add description</span>
+                      <span className="xs:hidden">Description</span>
+                    </button>
+                  )}
+
+                  {/* Import Button - Always visible */}
                   <button
-                    onClick={handleRemoveIcon}
-                    className={`opacity-0 group-hover:opacity-100 p-1.5 rounded transition-opacity ${
-                      darkMode ? 'hover:bg-gray-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!canEdit) {
+                        toast.error('Only ADMIN and SUPERUSER can import data');
+                        return;
+                      }
+                      setShowImportModal(true);
+                    }}
+                    type="button"
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                      !canEdit
+                        ? darkMode
+                          ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
+                          : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
+                        : darkMode
+                          ? 'text-gray-400 hover:bg-gray-800'
+                          : 'text-gray-600 hover:bg-gray-100'
                     }`}
-                    title="Remove icon"
+                    title={!canEdit ? 'Only ADMIN and SUPERUSER can import data' : 'Import CSV file'}
                   >
-                    <X className="w-4 h-4" />
+                    <Upload className="w-4 h-4 flex-shrink-0" />
+                    <span>Import</span>
                   </button>
-                )}
+
+                  {/* Export Button - Always visible and functional */}
+                  <button
+                    onClick={() => setShowExportModal(true)}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
+                      darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                    title="Export data to CSV or JSON"
+                  >
+                    <Download className="w-4 h-4 flex-shrink-0" />
+                    <span>Export</span>
+                  </button>
+                </div>
               </div>
 
               {/* Description Section - Right after title */}
@@ -990,8 +1106,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 </div>
               )}
 
-              {/* Action Buttons - Below description - Single row */}
-              <div className="flex items-center gap-1 mt-3 -ml-2 flex-wrap sm:flex-nowrap">
+              {/* Action Buttons - Mobile: Below description - Single row */}
+              <div className="flex lg:hidden items-center gap-1 mt-3 -ml-2 flex-nowrap overflow-x-auto">
                 {/* Icon Button - Always visible */}
                 <div className="relative flex-shrink-0" id="emoji-button-container">
                   <button
@@ -1126,7 +1242,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowSortDropdown(!showSortDropdown)}
-                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                className="flex items-center gap-2 px-2 sm:px-3 py-2 rounded-full text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
               >
                 <ArrowUpDown className="w-4 h-4" />
                 <span className="hidden sm:inline">Sort{sortConfig.length > 0 ? ` ${sortConfig.length}` : ' 1'}</span>
@@ -1151,6 +1267,24 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               )}
             </div>
 
+            {/* New Rows Button - Positioned between Sort and Add Property */}
+            {canEdit && (
+              <button
+                onClick={handleAddRow}
+                className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                  darkMode
+                    ? 'bg-white hover:bg-gray-100 text-gray-900'
+                    : 'bg-gray-900 hover:bg-gray-800 text-white'
+                }`}
+                title="Add a new row"
+              >
+                <Plus className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">New rows</span>
+                <span className="sm:hidden">Rows</span>
+              </button>
+            )}
+
+            {/* Add Property Button */}
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -1162,7 +1296,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 setShowAddProperty(true);
               }}
               type="button"
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                 !canEdit
                   ? darkMode
                     ? 'bg-white text-gray-900 cursor-not-allowed opacity-40 pointer-events-auto'
@@ -1174,7 +1308,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               title={!canEdit ? 'Only ADMIN and SUPERUSER can add properties' : 'Add a new property'}
             >
               <Plus className="w-4 h-4 flex-shrink-0" />
-              <span>Add Property</span>
+              <span className="hidden sm:inline">Add Property</span>
+              <span className="sm:hidden">Property</span>
             </button>
           </div>
         </div>
@@ -1332,7 +1467,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 {sortedRows.map((row, rowIndex) => (
                   <tr
                     key={row.id}
-                    ref={rowIndex === sortedRows.length - 1 ? newRowRef : null}
+                    ref={rowIndex === 0 ? newRowRef : null}
                     onMouseEnter={() => !resizingColumn && setHoveredRow(row.id)}
                     onMouseLeave={() => !resizingColumn && setHoveredRow(null)}
                     className={`group ${
@@ -1456,19 +1591,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             </table>
           </div>
         </div>
-
-        {/* New Row Button - Outside table */}
-        {canEdit && (
-          <button
-            onClick={handleAddRow}
-            className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm mt-4 px-3 sm:px-4 py-2 rounded ${
-              darkMode ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-800' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
-            } transition-colors`}
-          >
-            <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-            New rows
-          </button>
-        )}
       </div>
 
       {/* Modals */}
