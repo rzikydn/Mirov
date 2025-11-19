@@ -19,13 +19,25 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ darkMode, onSelect, onClose }
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+      // Check if click is outside picker AND outside the emoji button container
+      const emojiButtonContainer = document.getElementById('emoji-button-container');
+      const clickedInsideButton = emojiButtonContainer?.contains(event.target as Node);
+      const clickedInsidePicker = pickerRef.current?.contains(event.target as Node);
+
+      if (!clickedInsidePicker && !clickedInsideButton) {
         onClose();
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    // Add delay to prevent immediate closing when picker first opens
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [onClose]);
 
   // Calculate position on mount - WITH FADE IN

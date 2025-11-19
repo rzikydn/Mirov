@@ -122,7 +122,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-100">
+    <div className="min-h-screen flex bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800">
       {/* Left Side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center py-8 px-6 lg:px-12 bg-white overflow-y-auto">
         <motion.div

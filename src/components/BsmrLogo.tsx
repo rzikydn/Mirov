@@ -10,6 +10,19 @@ interface BsmrLogoProps {
 }
 
 const BsmrLogo: React.FC<BsmrLogoProps> = ({ collapsed = false, darkMode = false, className = '' }) => {
+  // In dark mode: Make BSM white, keep R red
+  // This is achieved by inverting colors (BSM blue->orange, R red->cyan) then using hue-rotate
+  const logoStyle = darkMode
+    ? {
+        filter: 'brightness(0) invert(1) hue-rotate(180deg) saturate(2) brightness(1.3)',
+        // brightness(0) = make all black
+        // invert(1) = make all white
+        // hue-rotate(180deg) = shift hues (red stays reddish)
+        // saturate(2) = make red more vibrant
+        // brightness(1.3) = brighten overall
+      }
+    : {};
+
   if (collapsed) {
     // Show compact logo when collapsed
     return (
@@ -18,6 +31,7 @@ const BsmrLogo: React.FC<BsmrLogoProps> = ({ collapsed = false, darkMode = false
           src={BsmrLogoSvg}
           alt="BSMR Logo"
           className="w-12 h-12 object-contain flex-shrink-0"
+          style={logoStyle}
         />
       </div>
     );
@@ -30,6 +44,7 @@ const BsmrLogo: React.FC<BsmrLogoProps> = ({ collapsed = false, darkMode = false
         src={BsmrLogoSvg}
         alt="BSMR Logo"
         className="w-32 h-auto object-contain flex-shrink-0"
+        style={logoStyle}
       />
     </div>
   );
