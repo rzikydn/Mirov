@@ -94,6 +94,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   });
   const [resizingColumn, setResizingColumn] = useState<{ key: string; startX: number; startWidth: number } | null>(null);
   const [tableWidth, setTableWidth] = useState<number>(0);
+  const [wrapText, setWrapText] = useState(false); // Excel-like wrap text toggle
+  const horizontalScrollRef = useRef<HTMLDivElement>(null); // Ref for external horizontal scrollbar
 
   // Calculate table width - Update whenever columnWidths changes
   useEffect(() => {
@@ -105,6 +107,36 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       console.log('📐 Table width updated:', newTableWidth, 'from column widths:', columnWidths);
     }
   }, [columnWidths, database.columns]);
+
+  // Sync scroll between table container and horizontal scrollbar
+  useEffect(() => {
+    const tableContainer = tableContainerRef.current;
+    const horizontalScroll = horizontalScrollRef.current;
+
+    if (!tableContainer || !horizontalScroll) return;
+
+    // Sync from table to scrollbar
+    const handleTableScroll = () => {
+      if (horizontalScroll) {
+        horizontalScroll.scrollLeft = tableContainer.scrollLeft;
+      }
+    };
+
+    // Sync from scrollbar to table
+    const handleScrollbarScroll = () => {
+      if (tableContainer) {
+        tableContainer.scrollLeft = horizontalScroll.scrollLeft;
+      }
+    };
+
+    tableContainer.addEventListener('scroll', handleTableScroll);
+    horizontalScroll.addEventListener('scroll', handleScrollbarScroll);
+
+    return () => {
+      tableContainer.removeEventListener('scroll', handleTableScroll);
+      horizontalScroll.removeEventListener('scroll', handleScrollbarScroll);
+    };
+  }, []);
 
   // Inject styles for date input calendar icon
   useEffect(() => {
@@ -889,7 +921,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const rowVirtualizer = useVirtualizer({
     count: sortedRows.length,
     getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 42, // Estimated row height in pixels
+    estimateSize: () => wrapText ? 80 : 42, // Dynamic row height: 80px for wrapped text, 42px for normal
     overscan: 10, // Render 10 extra items above and below viewport for smooth scrolling
   });
 
@@ -1250,6 +1282,24 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Wrap Text Toggle - Excel-like */}
+            <button
+              onClick={() => setWrapText(!wrapText)}
+              className={`flex items-center gap-2 px-2 sm:px-3 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${
+                wrapText
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : darkMode
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+              title={wrapText ? "Disable text wrapping" : "Enable text wrapping (Excel-like)"}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
+              </svg>
+              <span className="hidden sm:inline">Wrap</span>
+            </button>
+
             {/* Sort Dropdown */}
             <div className="relative">
               <button
@@ -1507,9 +1557,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                           } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''}`}
                           style={{
                             padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
-                            whiteSpace: 'nowrap',
+                            whiteSpace: wrapText ? 'normal' : 'nowrap',
                             overflow: 'hidden',
-                            textOverflow: 'ellipsis',
+                            textOverflow: wrapText ? 'clip' : 'ellipsis',
+                            wordWrap: wrapText ? 'break-word' : 'normal',
+                            verticalAlign: 'top',
                             zIndex: colIndex === 0 ? 50 : 1,
                             ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                           }}
@@ -1523,9 +1575,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''}`}
                             style={{
                               padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : colIndex === database.columns.length - 1 ? '0.5rem 2.5rem 0.5rem 0.25rem' : '0.5rem 0.25rem',
-                              whiteSpace: 'nowrap',
+                              whiteSpace: wrapText ? 'normal' : 'nowrap',
                               overflow: 'hidden',
-                              textOverflow: 'ellipsis',
+                              textOverflow: wrapText ? 'clip' : 'ellipsis',
+                              wordWrap: wrapText ? 'break-word' : 'normal',
+                              verticalAlign: 'top',
                               zIndex: colIndex === 0 ? 50 : 1,
                               ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                             }}
@@ -1545,20 +1599,45 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                               </button>
                             )}
                             {prop.type === 'text' && (
-                              <input
-                                type="text"
-                                value={prop.value}
-                                onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
-                                onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.value)}
-                                onBlur={(e) => handleCellBlur(row.id, col.key, e.target.value)}
-                                disabled={!canEdit}
-                                placeholder=""
-                                className={`w-full text-sm ${
-                                  darkMode
-                                    ? 'bg-transparent text-gray-300'
-                                    : 'bg-transparent text-gray-900'
-                                } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
-                              />
+                              wrapText ? (
+                                <textarea
+                                  value={prop.value}
+                                  onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
+                                  onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.value)}
+                                  onBlur={(e) => handleCellBlur(row.id, col.key, e.target.value)}
+                                  disabled={!canEdit}
+                                  placeholder=""
+                                  rows={1}
+                                  className={`w-full text-sm resize-none ${
+                                    darkMode
+                                      ? 'bg-transparent text-gray-300'
+                                      : 'bg-transparent text-gray-900'
+                                  } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                                  style={{
+                                    whiteSpace: 'pre-wrap',
+                                    wordBreak: 'break-word',
+                                    overflowWrap: 'break-word',
+                                    minHeight: '1.5rem',
+                                    maxHeight: '10rem',
+                                    overflow: 'auto'
+                                  }}
+                                />
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={prop.value}
+                                  onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
+                                  onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.value)}
+                                  onBlur={(e) => handleCellBlur(row.id, col.key, e.target.value)}
+                                  disabled={!canEdit}
+                                  placeholder=""
+                                  className={`w-full text-sm ${
+                                    darkMode
+                                      ? 'bg-transparent text-gray-300'
+                                      : 'bg-transparent text-gray-900'
+                                  } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                                />
+                              )
                             )}
                             {prop.type === 'number' && (
                               <input
@@ -1622,6 +1701,18 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* External Horizontal Scrollbar - Excel-like */}
+          <div
+            ref={horizontalScrollRef}
+            className={`overflow-x-auto custom-scrollbar mt-2 ${darkMode ? 'bg-[#191919]' : 'bg-white'}`}
+            style={{
+              height: '12px',
+              overflowY: 'hidden'
+            }}
+          >
+            <div style={{ width: `${tableWidth}px`, height: '1px' }} />
           </div>
         </div>
       </div>
