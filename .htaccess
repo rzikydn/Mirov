@@ -1,0 +1,116 @@
+# ============================================
+# .htaccess for Frontend (React Vite App)
+# Place this file in the root directory where you deploy the frontend build
+# ============================================
+
+# Enable Rewrite Engine
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Force HTTPS (Optional - uncomment if you have SSL)
+  # RewriteCond %{HTTPS} off
+  # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # Handle React Router - redirect all requests to index.html
+  # Except for existing files and directories
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_FILENAME} !-l
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# ============================================
+# Compression (Gzip)
+# ============================================
+<IfModule mod_deflate.c>
+  # Compress HTML, CSS, JavaScript, Text, XML and fonts
+  AddOutputFilterByType DEFLATE application/javascript
+  AddOutputFilterByType DEFLATE application/json
+  AddOutputFilterByType DEFLATE application/x-javascript
+  AddOutputFilterByType DEFLATE application/xml
+  AddOutputFilterByType DEFLATE text/css
+  AddOutputFilterByType DEFLATE text/html
+  AddOutputFilterByType DEFLATE text/javascript
+  AddOutputFilterByType DEFLATE text/plain
+  AddOutputFilterByType DEFLATE text/xml
+  AddOutputFilterByType DEFLATE image/svg+xml
+  AddOutputFilterByType DEFLATE application/vnd.ms-fontobject
+  AddOutputFilterByType DEFLATE application/x-font-ttf
+  AddOutputFilterByType DEFLATE font/opentype
+  AddOutputFilterByType DEFLATE font/ttf
+  AddOutputFilterByType DEFLATE font/otf
+</IfModule>
+
+# ============================================
+# Browser Caching
+# ============================================
+<IfModule mod_expires.c>
+  ExpiresActive On
+
+  # Images
+  ExpiresByType image/jpg "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/gif "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType image/x-icon "access plus 1 year"
+
+  # CSS and JavaScript
+  ExpiresByType text/css "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
+  ExpiresByType text/javascript "access plus 1 month"
+
+  # Fonts
+  ExpiresByType font/ttf "access plus 1 year"
+  ExpiresByType font/otf "access plus 1 year"
+  ExpiresByType font/woff "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+  ExpiresByType application/font-woff "access plus 1 year"
+
+  # HTML
+  ExpiresByType text/html "access plus 0 seconds"
+
+  # Data
+  ExpiresByType application/json "access plus 0 seconds"
+  ExpiresByType application/xml "access plus 0 seconds"
+  ExpiresByType text/xml "access plus 0 seconds"
+</IfModule>
+
+# ============================================
+# Security Headers
+# ============================================
+<IfModule mod_headers.c>
+  # Prevent MIME sniffing
+  Header set X-Content-Type-Options "nosniff"
+
+  # XSS Protection
+  Header set X-XSS-Protection "1; mode=block"
+
+  # Prevent clickjacking
+  Header set X-Frame-Options "SAMEORIGIN"
+
+  # Referrer Policy
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+
+  # Remove X-Powered-By header
+  Header unset X-Powered-By
+</IfModule>
+
+# ============================================
+# Disable Directory Browsing
+# ============================================
+Options -Indexes
+
+# ============================================
+# Custom Error Pages (Optional)
+# ============================================
+# ErrorDocument 404 /index.html
+# ErrorDocument 500 /index.html
+
+# ============================================
+# File Upload Limit (if needed)
+# ============================================
+# php_value upload_max_filesize 50M
+# php_value post_max_size 50M
