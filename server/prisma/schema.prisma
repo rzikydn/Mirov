@@ -3,15 +3,15 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 model User {
   id        Int        @id @default(autoincrement())
-  email     String     @unique
-  password  String
-  name      String
+  email     String     @unique @db.VarChar(255)
+  password  String     @db.VarChar(255)
+  name      String     @db.VarChar(255)
   role      Role       @default(UMUM)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -25,12 +25,12 @@ model User {
 
 model Schedule {
   id          Int      @id @default(autoincrement())
-  title       String
-  description String?
+  title       String   @db.VarChar(255)
+  description String?  @db.Text
   startDate   DateTime
   endDate     DateTime
-  location    String?
-  status      String   @default("planned")
+  location    String?  @db.VarChar(255)
+  status      String   @default("planned") @db.VarChar(50)
   createdBy   Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -41,9 +41,9 @@ model Schedule {
 
 model Note {
   id        Int      @id @default(autoincrement())
-  title     String
-  content   String
-  color     String?
+  title     String   @db.VarChar(255)
+  content   String   @db.Text
+  color     String?  @db.VarChar(50)
   userId    Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -55,9 +55,9 @@ model Note {
 
 model Database {
   id           Int      @id @default(autoincrement())
-  name         String
-  description  String?
-  icon         String?
+  name         String   @db.VarChar(255)
+  description  String?  @db.Text
+  icon         String?  @db.VarChar(100)
   columns      Json
   rows         Json
   columnWidths Json?
@@ -72,12 +72,12 @@ model Database {
 model History {
   id          Int           @id @default(autoincrement())
   userId      Int
-  userName    String
+  userName    String        @db.VarChar(255)
   userRole    Role
   action      HistoryAction
   target      HistoryTarget
-  targetName  String?
-  description String
+  targetName  String?       @db.VarChar(255)
+  description String        @db.Text
   createdAt   DateTime      @default(now())
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
