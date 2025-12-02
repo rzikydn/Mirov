@@ -10,8 +10,9 @@ Database table sudah benar (column `userRole` ada), tapi Drizzle masih query den
 
 ## Root Cause
 1. Table `history` sudah dibuat dengan column `userRole` ✅
-2. Drizzle schema (`server/src/db/schema.ts`) sudah benar dengan `userRole` ✅
-3. **MASALAH**: Drizzle ORM masih menggunakan cached query definition yang lama
+2. **MASALAH**: Drizzle schema menggunakan shared enum `roleEnum` yang didefinisikan dengan nama `'role'`
+3. Ketika enum digunakan tanpa explicit column name, Drizzle menggunakan enum name sebagai column name
+4. Hasil: Drizzle query menggunakan `history.role` bukan `history.userRole`
 
 ## Complete Fix Steps
 
@@ -45,42 +46,31 @@ rmdir /s /q drizzle
 npm install
 ```
 
-### Step 3: Verify Drizzle Schema
-Check `server/src/db/schema.ts` line 75:
+### Step 3: Fix Drizzle Schema
+Edit `server/src/db/schema.ts` lines 75-77 to use inline enum definitions:
+
+**SEBELUM (SALAH):**
 ```typescript
-export const history = mysqlTable('history', {
-  id: int('id').primaryKey().autoincrement(),
-  userId: int('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  userName: varchar('userName', { length: 255 }).notNull(),
-  userRole: roleEnum.notNull(),  // ✅ MUST be 'userRole', NOT 'role'
-  action: historyActionEnum.notNull(),
-  target: historyTargetEnum.notNull(),
-  targetName: varchar('targetName', { length: 255 }),
-  description: text('description').notNull(),
-  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
-});
+userRole: roleEnum.notNull(),  // ❌ Menggunakan shared enum 'role'
+action: historyActionEnum.notNull(),  // ❌ Menggunakan shared enum 'action'
+target: historyTargetEnum.notNull(),  // ❌ Menggunakan shared enum 'target'
 ```
 
-### Step 4: Restart Everything
-```bash
-# Kill all running processes
-# Ctrl+C on all terminals
-
-# Start backend fresh
-cd server
-npm run dev
-
-# In another terminal, start frontend
-cd .. (root directory)
-npm run dev
+**SESUDAH (BENAR):**
+```typescript
+userRole: mysqlEnum('userRole', ['SUPERUSER', 'ADMIN', 'UMUM']).notNull(),  // ✅ Explicit column name
+action: mysqlEnum('action', ['CREATE', 'EDIT', 'DELETE']).notNull(),  // ✅ Explicit column name
+target: mysqlEnum('target', ['NOTE', 'DATABASE', 'SCHEDULE']).notNull(),  // ✅ Explicit column name
 ```
 
-### Step 5: Hard Refresh Frontend
+Perubahan ini sudah dilakukan dan server akan auto-restart.
+
+### Step 4: Hard Refresh Frontend (Backend sudah auto-restart)
 - Press `Ctrl + Shift + R` (hard reload)
 - OR `Ctrl + F5`
 - OR DevTools (F12) → Right-click refresh → "Empty Cache and Hard Reload"
 
-### Step 6: Test
+### Step 5: Test
 1. Login with `userhans` / `hans123`
 2. Create a new note
 3. Delete a note
@@ -129,29 +119,47 @@ Should show recent activities with `userRole` column filled.
 
 ## Files Modified
 
-1. ✅ `server/src/db/schema.ts` - Already correct
+1. ✅ `server/src/db/schema.ts` - **FIXED**: Changed lines 75-77 to use inline mysqlEnum with explicit column names
 2. ✅ `server/src/controllers/historyController.ts` - Already correct
-3. ✅ Database table `history` - Fixed with SQL
+3. ✅ Database table `history` - Fixed with SQL (has `userRole` column)
 4. ✅ `server/check-and-fix-history.sql` - SQL fix script created
 
 ## Technical Details
 
-### Why This Happens
-Drizzle ORM generates TypeScript types and query builders from schema at runtime. When:
-1. Schema file changes (role → userRole)
-2. But TypeScript/Node cache still has old version
-3. Drizzle uses cached definition
-4. Results in wrong SQL query
+### Why This Happens - ACTUAL ROOT CAUSE
+Drizzle ORM menggunakan enum name sebagai column name ketika enum didefinisikan sebagai shared constant:
 
-### Solution
-Force complete refresh by:
-- Deleting all build artifacts
-- Restarting dev server (ts-node-dev)
-- Hard refresh browser
-- This forces Drizzle to re-read schema from disk
+**Shared Enum Definition (line 15):**
+```typescript
+export const roleEnum = mysqlEnum('role', ['SUPERUSER', 'ADMIN', 'UMUM']);
+```
+
+**History Table (line 75 - SALAH):**
+```typescript
+userRole: roleEnum.notNull(),
+```
+
+Drizzle membaca nama enum `'role'` dari definisi shared enum, bukan dari property name `userRole`.
+
+**SQL yang dihasilkan:**
+```sql
+SELECT `history`.`role` FROM `history`  -- ❌ SALAH, mencari column 'role'
+```
+
+### Solution - FIXED
+Gunakan inline enum definition dengan explicit column name:
+
+```typescript
+userRole: mysqlEnum('userRole', ['SUPERUSER', 'ADMIN', 'UMUM']).notNull(),
+```
+
+**SQL yang dihasilkan sekarang:**
+```sql
+SELECT `history`.`userRole` FROM `history`  -- ✅ BENAR, mencari column 'userRole'
+```
 
 ---
 
-**Last Updated**: December 2, 2025
-**Issue**: History feature not working
-**Status**: FIXED (pending cache clear)
+**Last Updated**: December 2, 2025 11:15 AM
+**Issue**: History feature not working - Drizzle query menggunakan `history.role` bukan `history.userRole`
+**Status**: ✅ FIXED - Schema updated, backend restarted, ready for testing
