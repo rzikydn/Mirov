@@ -195,7 +195,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         <div
                           key={db.id}
                           className={`w-full text-left px-2 py-1.5 rounded-lg transition-all duration-150 flex items-center gap-1.5 group text-sm ${
-                            selectedDatabase === db.id
+                            selectedDatabase === db.id.toString()
                               ? darkMode
                                 ? 'bg-blue-900 text-blue-300'
                                 : 'bg-blue-50 text-[#2563eb]'
@@ -206,7 +206,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         >
                           <button
                             onClick={() => {
-                              onSelectDatabase(db.id);
+                              onSelectDatabase(db.id.toString());
                               setIsOpen(false);
                             }}
                             className="flex items-center gap-2 flex-1 min-w-0"
@@ -219,7 +219,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDeleteClick(e, db.id);
+                                handleDeleteClick(e, db.id.toString());
                               }}
                               className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-opacity flex-shrink-0"
                               title="Delete database (SUPERUSER only)"
@@ -250,11 +250,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                       <button
                         key={db.id}
                         onClick={() => {
-                          onSelectDatabase(db.id);
+                          onSelectDatabase(db.id.toString());
                           setIsOpen(false);
                         }}
                         className={`w-full flex justify-center p-2 rounded-lg transition-colors relative ${
-                          selectedDatabase === db.id
+                          selectedDatabase === db.id.toString()
                             ? darkMode
                               ? 'bg-blue-900 text-blue-300'
                               : 'bg-blue-50 text-[#2563eb]'

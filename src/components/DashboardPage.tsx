@@ -136,7 +136,7 @@ export default function DashboardPage() {
     if (!token) return;
 
     // Find database name before deleting
-    const dbToDelete = databases.find((db) => db.id === id || db.id === parseInt(id));
+    const dbToDelete = databases.find((db) => db.id.toString() === id);
 
     try {
       const response = await fetch(`${API_URL}/${id}`, {
@@ -159,7 +159,7 @@ export default function DashboardPage() {
             description: `${user.name} deleted a database`
           });
         }
-        setDatabases((prev) => prev.filter((db) => db.id !== id && db.id !== parseInt(id)));
+        setDatabases((prev) => prev.filter((db) => db.id.toString() !== id));
         if (selectedDatabase === id) {
           setSelectedDatabase(null);
         }
@@ -176,7 +176,7 @@ export default function DashboardPage() {
     navigate('/auth');
   };
 
-  const currentDb = databases.find((d) => d.id === selectedDatabase) || null;
+  const currentDb = databases.find((d) => d.id.toString() === selectedDatabase) || null;
 
   return (
     <div className={`flex h-screen relative overflow-hidden ${darkMode ? 'bg-gray-900' : ''}`}>

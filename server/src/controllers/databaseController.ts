@@ -29,7 +29,15 @@ export const getAllDatabases = async (_req: Request, res: Response): Promise<voi
       .leftJoin(users, eq(databases.createdBy, users.id))
       .orderBy(desc(databases.createdAt));
 
-    res.json({ success: true, data: allDatabases });
+    // Parse JSON fields (MySQL returns them as strings)
+    const parsedDatabases = allDatabases.map(db => ({
+      ...db,
+      columns: typeof db.columns === 'string' ? JSON.parse(db.columns) : db.columns,
+      rows: typeof db.rows === 'string' ? JSON.parse(db.rows) : db.rows,
+      columnWidths: db.columnWidths ? (typeof db.columnWidths === 'string' ? JSON.parse(db.columnWidths) : db.columnWidths) : null
+    }));
+
+    res.json({ success: true, data: parsedDatabases });
   } catch (error) {
     console.error('Error fetching databases:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch databases' });
@@ -69,7 +77,15 @@ export const getDatabaseById = async (req: Request, res: Response): Promise<void
       return;
     }
 
-    res.json({ success: true, data: database });
+    // Parse JSON fields (MySQL returns them as strings)
+    const parsedDatabase = {
+      ...database,
+      columns: typeof database.columns === 'string' ? JSON.parse(database.columns) : database.columns,
+      rows: typeof database.rows === 'string' ? JSON.parse(database.rows) : database.rows,
+      columnWidths: database.columnWidths ? (typeof database.columnWidths === 'string' ? JSON.parse(database.columnWidths) : database.columnWidths) : null
+    };
+
+    res.json({ success: true, data: parsedDatabase });
   } catch (error) {
     console.error('Error fetching database:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch database' });
@@ -116,7 +132,15 @@ export const createDatabase = async (req: Request, res: Response): Promise<void>
       .where(eq(databases.id, result.id))
       .limit(1);
 
-    res.status(201).json({ success: true, data: database });
+    // Parse JSON fields (MySQL returns them as strings)
+    const parsedDatabase = {
+      ...database,
+      columns: typeof database.columns === 'string' ? JSON.parse(database.columns) : database.columns,
+      rows: typeof database.rows === 'string' ? JSON.parse(database.rows) : database.rows,
+      columnWidths: database.columnWidths ? (typeof database.columnWidths === 'string' ? JSON.parse(database.columnWidths) : database.columnWidths) : null
+    };
+
+    res.status(201).json({ success: true, data: parsedDatabase });
   } catch (error) {
     console.error('Error creating database:', error);
     res.status(500).json({ success: false, message: 'Failed to create database' });
@@ -179,7 +203,15 @@ export const updateDatabase = async (req: Request, res: Response): Promise<void>
       .where(eq(databases.id, parseInt(id)))
       .limit(1);
 
-    res.json({ success: true, data: updatedDatabase });
+    // Parse JSON fields (MySQL returns them as strings)
+    const parsedDatabase = {
+      ...updatedDatabase,
+      columns: typeof updatedDatabase.columns === 'string' ? JSON.parse(updatedDatabase.columns) : updatedDatabase.columns,
+      rows: typeof updatedDatabase.rows === 'string' ? JSON.parse(updatedDatabase.rows) : updatedDatabase.rows,
+      columnWidths: updatedDatabase.columnWidths ? (typeof updatedDatabase.columnWidths === 'string' ? JSON.parse(updatedDatabase.columnWidths) : updatedDatabase.columnWidths) : null
+    };
+
+    res.json({ success: true, data: parsedDatabase });
   } catch (error) {
     console.error('Error updating database:', error);
     res.status(500).json({ success: false, message: 'Failed to update database' });
