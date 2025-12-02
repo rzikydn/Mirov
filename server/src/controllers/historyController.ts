@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { PrismaClient, HistoryAction, HistoryTarget, Role } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { eq, desc, notInArray } from 'drizzle-orm';
+import { db } from '../db';
+import { history, users, type HistoryAction, type HistoryTarget, type Role } from '../db/schema';
 
 // Get all history (with pagination)
 export const getAllHistory = async (req: Request, res: Response): Promise<void> => {
@@ -9,27 +9,33 @@ export const getAllHistory = async (req: Request, res: Response): Promise<void> 
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    const history = await prisma.history.findMany({
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: limit,
-      skip: offset,
-      include: {
+    const allHistory = await db
+      .select({
+        id: history.id,
+        userId: history.userId,
+        userName: history.userName,
+        userRole: history.userRole,
+        action: history.action,
+        target: history.target,
+        targetName: history.targetName,
+        description: history.description,
+        createdAt: history.createdAt,
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role
         }
-      }
-    });
+      })
+      .from(history)
+      .leftJoin(users, eq(history.userId, users.id))
+      .orderBy(desc(history.createdAt))
+      .limit(limit)
+      .offset(offset);
 
     res.status(200).json({
       success: true,
-      data: history
+      data: allHistory
     });
   } catch (error) {
     console.error('Error fetching history:', error);
@@ -71,17 +77,22 @@ export const createHistory = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const historyEntry = await prisma.history.create({
-      data: {
-        userId,
-        userName,
-        userRole: userRole as Role,
-        action: action as HistoryAction,
-        target: target as HistoryTarget,
-        targetName,
-        description
-      }
-    });
+    const [result] = await db.insert(history).values({
+      userId,
+      userName,
+      userRole: userRole as Role,
+      action: action as HistoryAction,
+      target: target as HistoryTarget,
+      targetName,
+      description
+    }).$returningId();
+
+    // Get the created history entry
+    const [historyEntry] = await db
+      .select()
+      .from(history)
+      .where(eq(history.id, result.id))
+      .limit(1);
 
     res.status(201).json({
       success: true,
@@ -99,11 +110,11 @@ export const createHistory = async (req: Request, res: Response): Promise<void> 
 // Get last change (most recent history entry)
 export const getLastChange = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const lastChange = await prisma.history.findFirst({
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+    const [lastChange] = await db
+      .select()
+      .from(history)
+      .orderBy(desc(history.createdAt))
+      .limit(1);
 
     res.status(200).json({
       success: true,
@@ -142,9 +153,11 @@ export const deleteHistory = async (req: Request, res: Response): Promise<void> 
     }
 
     // Check if history entry exists
-    const historyEntry = await prisma.history.findUnique({
-      where: { id: parseInt(id) }
-    });
+    const [historyEntry] = await db
+      .select()
+      .from(history)
+      .where(eq(history.id, parseInt(id)))
+      .limit(1);
 
     if (!historyEntry) {
       res.status(404).json({
@@ -155,9 +168,9 @@ export const deleteHistory = async (req: Request, res: Response): Promise<void> 
     }
 
     // Delete the history entry
-    await prisma.history.delete({
-      where: { id: parseInt(id) }
-    });
+    await db
+      .delete(history)
+      .where(eq(history.id, parseInt(id)));
 
     res.status(200).json({
       success: true,
@@ -178,30 +191,33 @@ export const clearOldHistory = async (req: Request, res: Response): Promise<void
     const keepLast = parseInt(req.query.keepLast as string) || 50;
 
     // Get IDs of entries to keep
-    const entriesToKeep = await prisma.history.findMany({
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: keepLast,
-      select: {
-        id: true
-      }
-    });
+    const entriesToKeep = await db
+      .select({ id: history.id })
+      .from(history)
+      .orderBy(desc(history.createdAt))
+      .limit(keepLast);
 
     const idsToKeep = entriesToKeep.map(entry => entry.id);
 
     // Delete entries not in the keep list
-    const deleted = await prisma.history.deleteMany({
-      where: {
-        id: {
-          notIn: idsToKeep
-        }
-      }
-    });
+    if (idsToKeep.length > 0) {
+      await db
+        .delete(history)
+        .where(notInArray(history.id, idsToKeep));
+    } else {
+      // If no entries to keep, delete all
+      await db.delete(history);
+    }
+
+    // Count remaining entries to calculate deleted count
+    const remainingEntries = await db
+      .select({ id: history.id })
+      .from(history);
+    const deletedCount = Math.max(0, entriesToKeep.length - remainingEntries.length);
 
     res.status(200).json({
       success: true,
-      message: `Deleted ${deleted.count} old history entries`,
+      message: `Deleted ${deletedCount} old history entries`,
       kept: keepLast
     });
   } catch (error) {

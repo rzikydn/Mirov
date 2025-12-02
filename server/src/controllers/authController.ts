@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
+import { db } from '../db';
+import { users } from '../db/schema';
 import { generateToken } from '../utils/token';
-
-const prisma = new PrismaClient();
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -19,9 +19,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Find user
-    const user = await prisma.user.findUnique({
-      where: { email }
-    });
+    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
     if (!user) {
       res.status(401).json({
@@ -86,9 +84,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    });
+    const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
     if (existingUser) {
       res.status(409).json({
@@ -102,20 +98,21 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user (default role: UMUM)
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-        role: 'UMUM'
-      }
-    });
+    const [user] = await db.insert(users).values({
+      email,
+      password: hashedPassword,
+      name,
+      role: 'UMUM'
+    }).$returningId();
+
+    // Get the created user
+    const [createdUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
 
     // Generate token
     const token = generateToken({
-      userId: user.id,
-      email: user.email,
-      role: user.role
+      userId: createdUser.id,
+      email: createdUser.email,
+      role: createdUser.role
     });
 
     res.status(201).json({
@@ -123,10 +120,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       message: 'User registered successfully',
       data: {
         user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role
+          id: createdUser.id,
+          name: createdUser.name,
+          email: createdUser.email,
+          role: createdUser.role
         },
         token
       }
@@ -144,17 +141,14 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
   try {
     const userId = (req as any).user.userId;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true
-      }
-    });
+    const [user] = await db.select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt
+    }).from(users).where(eq(users.id, userId)).limit(1);
 
     if (!user) {
       res.status(404).json({

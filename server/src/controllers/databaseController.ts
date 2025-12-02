@@ -1,21 +1,35 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { eq, desc } from 'drizzle-orm';
+import { db } from '../db';
+import { databases, users } from '../db/schema';
 
 // Get all databases
 export const getAllDatabases = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const databases = await prisma.database.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
+    const allDatabases = await db
+      .select({
+        id: databases.id,
+        name: databases.name,
+        description: databases.description,
+        icon: databases.icon,
+        columns: databases.columns,
+        rows: databases.rows,
+        columnWidths: databases.columnWidths,
+        createdBy: databases.createdBy,
+        createdAt: databases.createdAt,
+        updatedAt: databases.updatedAt,
         creator: {
-          select: { id: true, name: true, email: true, role: true }
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role
         }
-      }
-    });
+      })
+      .from(databases)
+      .leftJoin(users, eq(databases.createdBy, users.id))
+      .orderBy(desc(databases.createdAt));
 
-    res.json({ success: true, data: databases });
+    res.json({ success: true, data: allDatabases });
   } catch (error) {
     console.error('Error fetching databases:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch databases' });
@@ -26,14 +40,29 @@ export const getAllDatabases = async (_req: Request, res: Response): Promise<voi
 export const getDatabaseById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const database = await prisma.database.findUnique({
-      where: { id: parseInt(id) },
-      include: {
+    const [database] = await db
+      .select({
+        id: databases.id,
+        name: databases.name,
+        description: databases.description,
+        icon: databases.icon,
+        columns: databases.columns,
+        rows: databases.rows,
+        columnWidths: databases.columnWidths,
+        createdBy: databases.createdBy,
+        createdAt: databases.createdAt,
+        updatedAt: databases.updatedAt,
         creator: {
-          select: { id: true, name: true, email: true, role: true }
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role
         }
-      }
-    });
+      })
+      .from(databases)
+      .leftJoin(users, eq(databases.createdBy, users.id))
+      .where(eq(databases.id, parseInt(id)))
+      .limit(1);
 
     if (!database) {
       res.status(404).json({ success: false, message: 'Database not found' });
@@ -53,21 +82,39 @@ export const createDatabase = async (req: Request, res: Response): Promise<void>
     const { name, description, icon, columns, rows } = req.body;
     const userId = req.user!.userId;
 
-    const database = await prisma.database.create({
-      data: {
-        name: name || 'Untitled Database',
-        description: description || null,
-        icon: icon || null,
-        columns: columns || [],
-        rows: rows || [],
-        createdBy: userId
-      },
-      include: {
+    const [result] = await db.insert(databases).values({
+      name: name || 'Untitled Database',
+      description: description || null,
+      icon: icon || null,
+      columns: columns || [],
+      rows: rows || [],
+      createdBy: userId
+    }).$returningId();
+
+    // Get the created database with user data
+    const [database] = await db
+      .select({
+        id: databases.id,
+        name: databases.name,
+        description: databases.description,
+        icon: databases.icon,
+        columns: databases.columns,
+        rows: databases.rows,
+        columnWidths: databases.columnWidths,
+        createdBy: databases.createdBy,
+        createdAt: databases.createdAt,
+        updatedAt: databases.updatedAt,
         creator: {
-          select: { id: true, name: true, email: true, role: true }
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role
         }
-      }
-    });
+      })
+      .from(databases)
+      .leftJoin(users, eq(databases.createdBy, users.id))
+      .where(eq(databases.id, result.id))
+      .limit(1);
 
     res.status(201).json({ success: true, data: database });
   } catch (error) {
@@ -82,31 +129,55 @@ export const updateDatabase = async (req: Request, res: Response): Promise<void>
     const { id } = req.params;
     const { name, description, icon, columns, rows, columnWidths } = req.body;
 
-    const database = await prisma.database.findUnique({
-      where: { id: parseInt(id) }
-    });
+    const [existingDatabase] = await db
+      .select()
+      .from(databases)
+      .where(eq(databases.id, parseInt(id)))
+      .limit(1);
 
-    if (!database) {
+    if (!existingDatabase) {
       res.status(404).json({ success: false, message: 'Database not found' });
       return;
     }
 
-    const updatedDatabase = await prisma.database.update({
-      where: { id: parseInt(id) },
-      data: {
-        name: name !== undefined ? name : database.name,
-        description: description !== undefined ? description : database.description,
-        icon: icon !== undefined ? icon : database.icon,
-        columns: columns !== undefined ? columns : database.columns,
-        rows: rows !== undefined ? rows : database.rows,
-        columnWidths: columnWidths !== undefined ? columnWidths : database.columnWidths
-      },
-      include: {
+    // Build update data
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (icon !== undefined) updateData.icon = icon;
+    if (columns !== undefined) updateData.columns = columns;
+    if (rows !== undefined) updateData.rows = rows;
+    if (columnWidths !== undefined) updateData.columnWidths = columnWidths;
+
+    await db
+      .update(databases)
+      .set(updateData)
+      .where(eq(databases.id, parseInt(id)));
+
+    // Get the updated database with user data
+    const [updatedDatabase] = await db
+      .select({
+        id: databases.id,
+        name: databases.name,
+        description: databases.description,
+        icon: databases.icon,
+        columns: databases.columns,
+        rows: databases.rows,
+        columnWidths: databases.columnWidths,
+        createdBy: databases.createdBy,
+        createdAt: databases.createdAt,
+        updatedAt: databases.updatedAt,
         creator: {
-          select: { id: true, name: true, email: true, role: true }
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role
         }
-      }
-    });
+      })
+      .from(databases)
+      .leftJoin(users, eq(databases.createdBy, users.id))
+      .where(eq(databases.id, parseInt(id)))
+      .limit(1);
 
     res.json({ success: true, data: updatedDatabase });
   } catch (error) {
@@ -120,18 +191,20 @@ export const deleteDatabase = async (req: Request, res: Response): Promise<void>
   try {
     const { id } = req.params;
 
-    const database = await prisma.database.findUnique({
-      where: { id: parseInt(id) }
-    });
+    const [existingDatabase] = await db
+      .select()
+      .from(databases)
+      .where(eq(databases.id, parseInt(id)))
+      .limit(1);
 
-    if (!database) {
+    if (!existingDatabase) {
       res.status(404).json({ success: false, message: 'Database not found' });
       return;
     }
 
-    await prisma.database.delete({
-      where: { id: parseInt(id) }
-    });
+    await db
+      .delete(databases)
+      .where(eq(databases.id, parseInt(id)));
 
     res.json({ success: true, message: 'Database deleted successfully' });
   } catch (error) {

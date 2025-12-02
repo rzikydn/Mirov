@@ -1,29 +1,36 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { eq, asc } from 'drizzle-orm';
+import { db } from '../db';
+import { schedules, users } from '../db/schema';
 
 export const getAllSchedules = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const schedules = await prisma.schedule.findMany({
-      include: {
+    const allSchedules = await db
+      .select({
+        id: schedules.id,
+        title: schedules.title,
+        description: schedules.description,
+        startDate: schedules.startDate,
+        endDate: schedules.endDate,
+        location: schedules.location,
+        status: schedules.status,
+        createdBy: schedules.createdBy,
+        createdAt: schedules.createdAt,
+        updatedAt: schedules.updatedAt,
         creator: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role
         }
-      },
-      orderBy: {
-        startDate: 'asc'
-      }
-    });
+      })
+      .from(schedules)
+      .leftJoin(users, eq(schedules.createdBy, users.id))
+      .orderBy(asc(schedules.startDate));
 
     res.status(200).json({
       success: true,
-      data: { schedules }
+      data: { schedules: allSchedules }
     });
   } catch (error) {
     console.error('Get schedules error:', error);
@@ -38,19 +45,29 @@ export const getScheduleById = async (req: Request, res: Response): Promise<void
   try {
     const { id } = req.params;
 
-    const schedule = await prisma.schedule.findUnique({
-      where: { id: parseInt(id) },
-      include: {
+    const [schedule] = await db
+      .select({
+        id: schedules.id,
+        title: schedules.title,
+        description: schedules.description,
+        startDate: schedules.startDate,
+        endDate: schedules.endDate,
+        location: schedules.location,
+        status: schedules.status,
+        createdBy: schedules.createdBy,
+        createdAt: schedules.createdAt,
+        updatedAt: schedules.updatedAt,
         creator: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role
         }
-      }
-    });
+      })
+      .from(schedules)
+      .leftJoin(users, eq(schedules.createdBy, users.id))
+      .where(eq(schedules.id, parseInt(id)))
+      .limit(1);
 
     if (!schedule) {
       res.status(404).json({
@@ -87,27 +104,40 @@ export const createSchedule = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const schedule = await prisma.schedule.create({
-      data: {
-        title,
-        description,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        location,
-        status: status || 'planned',
-        createdBy: userId
-      },
-      include: {
+    const [result] = await db.insert(schedules).values({
+      title,
+      description,
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      location,
+      status: status || 'planned',
+      createdBy: userId
+    }).$returningId();
+
+    // Get the created schedule with user data
+    const [schedule] = await db
+      .select({
+        id: schedules.id,
+        title: schedules.title,
+        description: schedules.description,
+        startDate: schedules.startDate,
+        endDate: schedules.endDate,
+        location: schedules.location,
+        status: schedules.status,
+        createdBy: schedules.createdBy,
+        createdAt: schedules.createdAt,
+        updatedAt: schedules.updatedAt,
         creator: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role
         }
-      }
-    });
+      })
+      .from(schedules)
+      .leftJoin(users, eq(schedules.createdBy, users.id))
+      .where(eq(schedules.id, result.id))
+      .limit(1);
 
     res.status(201).json({
       success: true,
@@ -129,9 +159,11 @@ export const updateSchedule = async (req: Request, res: Response): Promise<void>
     const { title, description, startDate, endDate, location, status } = req.body;
 
     // Check if schedule exists
-    const existingSchedule = await prisma.schedule.findUnique({
-      where: { id: parseInt(id) }
-    });
+    const [existingSchedule] = await db
+      .select()
+      .from(schedules)
+      .where(eq(schedules.id, parseInt(id)))
+      .limit(1);
 
     if (!existingSchedule) {
       res.status(404).json({
@@ -141,27 +173,44 @@ export const updateSchedule = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const schedule = await prisma.schedule.update({
-      where: { id: parseInt(id) },
-      data: {
-        ...(title && { title }),
-        ...(description !== undefined && { description }),
-        ...(startDate && { startDate: new Date(startDate) }),
-        ...(endDate && { endDate: new Date(endDate) }),
-        ...(location !== undefined && { location }),
-        ...(status && { status })
-      },
-      include: {
+    // Build update data
+    const updateData: any = {};
+    if (title) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (startDate) updateData.startDate = new Date(startDate);
+    if (endDate) updateData.endDate = new Date(endDate);
+    if (location !== undefined) updateData.location = location;
+    if (status) updateData.status = status;
+
+    await db
+      .update(schedules)
+      .set(updateData)
+      .where(eq(schedules.id, parseInt(id)));
+
+    // Get the updated schedule with user data
+    const [schedule] = await db
+      .select({
+        id: schedules.id,
+        title: schedules.title,
+        description: schedules.description,
+        startDate: schedules.startDate,
+        endDate: schedules.endDate,
+        location: schedules.location,
+        status: schedules.status,
+        createdBy: schedules.createdBy,
+        createdAt: schedules.createdAt,
+        updatedAt: schedules.updatedAt,
         creator: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role
         }
-      }
-    });
+      })
+      .from(schedules)
+      .leftJoin(users, eq(schedules.createdBy, users.id))
+      .where(eq(schedules.id, parseInt(id)))
+      .limit(1);
 
     res.status(200).json({
       success: true,
@@ -182,9 +231,11 @@ export const deleteSchedule = async (req: Request, res: Response): Promise<void>
     const { id } = req.params;
 
     // Check if schedule exists
-    const existingSchedule = await prisma.schedule.findUnique({
-      where: { id: parseInt(id) }
-    });
+    const [existingSchedule] = await db
+      .select()
+      .from(schedules)
+      .where(eq(schedules.id, parseInt(id)))
+      .limit(1);
 
     if (!existingSchedule) {
       res.status(404).json({
@@ -194,9 +245,9 @@ export const deleteSchedule = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    await prisma.schedule.delete({
-      where: { id: parseInt(id) }
-    });
+    await db
+      .delete(schedules)
+      .where(eq(schedules.id, parseInt(id)));
 
     res.status(200).json({
       success: true,

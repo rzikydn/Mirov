@@ -1,29 +1,34 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { eq, desc } from 'drizzle-orm';
+import { db } from '../db';
+import { notes, users } from '../db/schema';
 
 export const getAllNotes = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const notes = await prisma.note.findMany({
-      include: {
+    const allNotes = await db
+      .select({
+        id: notes.id,
+        title: notes.title,
+        content: notes.content,
+        color: notes.color,
+        userId: notes.userId,
+        createdAt: notes.createdAt,
+        updatedAt: notes.updatedAt,
+        favorite: notes.favorite,
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role
         }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+      })
+      .from(notes)
+      .leftJoin(users, eq(notes.userId, users.id))
+      .orderBy(desc(notes.createdAt));
 
     res.status(200).json({
       success: true,
-      data: notes
+      data: allNotes
     });
   } catch (error) {
     console.error('Get notes error:', error);
@@ -38,19 +43,27 @@ export const getNoteById = async (req: Request, res: Response): Promise<void> =>
   try {
     const { id } = req.params;
 
-    const note = await prisma.note.findUnique({
-      where: { id: parseInt(id) },
-      include: {
+    const [note] = await db
+      .select({
+        id: notes.id,
+        title: notes.title,
+        content: notes.content,
+        color: notes.color,
+        userId: notes.userId,
+        createdAt: notes.createdAt,
+        updatedAt: notes.updatedAt,
+        favorite: notes.favorite,
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role
         }
-      }
-    });
+      })
+      .from(notes)
+      .leftJoin(users, eq(notes.userId, users.id))
+      .where(eq(notes.id, parseInt(id)))
+      .limit(1);
 
     if (!note) {
       res.status(404).json({
@@ -87,24 +100,35 @@ export const createNote = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const note = await prisma.note.create({
-      data: {
-        title: title || 'Untitled',
-        content,
-        color: color || '#FEF08A',
-        userId
-      },
-      include: {
+    const [result] = await db.insert(notes).values({
+      title: title || 'Untitled',
+      content,
+      color: color || '#FEF08A',
+      userId
+    }).$returningId();
+
+    // Get the created note with user data
+    const [note] = await db
+      .select({
+        id: notes.id,
+        title: notes.title,
+        content: notes.content,
+        color: notes.color,
+        userId: notes.userId,
+        createdAt: notes.createdAt,
+        updatedAt: notes.updatedAt,
+        favorite: notes.favorite,
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role
         }
-      }
-    });
+      })
+      .from(notes)
+      .leftJoin(users, eq(notes.userId, users.id))
+      .where(eq(notes.id, result.id))
+      .limit(1);
 
     res.status(201).json({
       success: true,
@@ -126,9 +150,11 @@ export const updateNote = async (req: Request, res: Response): Promise<void> => 
     const { title, content, color, favorite } = req.body;
 
     // Check if note exists
-    const existingNote = await prisma.note.findUnique({
-      where: { id: parseInt(id) }
-    });
+    const [existingNote] = await db
+      .select()
+      .from(notes)
+      .where(eq(notes.id, parseInt(id)))
+      .limit(1);
 
     if (!existingNote) {
       res.status(404).json({
@@ -138,25 +164,40 @@ export const updateNote = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const note = await prisma.note.update({
-      where: { id: parseInt(id) },
-      data: {
-        ...(title !== undefined && { title }),
-        ...(content !== undefined && { content }),
-        ...(color !== undefined && { color }),
-        ...(favorite !== undefined && { favorite })
-      },
-      include: {
+    // Build update data
+    const updateData: any = {};
+    if (title !== undefined) updateData.title = title;
+    if (content !== undefined) updateData.content = content;
+    if (color !== undefined) updateData.color = color;
+    if (favorite !== undefined) updateData.favorite = favorite;
+
+    await db
+      .update(notes)
+      .set(updateData)
+      .where(eq(notes.id, parseInt(id)));
+
+    // Get the updated note with user data
+    const [note] = await db
+      .select({
+        id: notes.id,
+        title: notes.title,
+        content: notes.content,
+        color: notes.color,
+        userId: notes.userId,
+        createdAt: notes.createdAt,
+        updatedAt: notes.updatedAt,
+        favorite: notes.favorite,
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role
         }
-      }
-    });
+      })
+      .from(notes)
+      .leftJoin(users, eq(notes.userId, users.id))
+      .where(eq(notes.id, parseInt(id)))
+      .limit(1);
 
     res.status(200).json({
       success: true,
@@ -177,9 +218,11 @@ export const deleteNote = async (req: Request, res: Response): Promise<void> => 
     const { id } = req.params;
 
     // Check if note exists
-    const existingNote = await prisma.note.findUnique({
-      where: { id: parseInt(id) }
-    });
+    const [existingNote] = await db
+      .select()
+      .from(notes)
+      .where(eq(notes.id, parseInt(id)))
+      .limit(1);
 
     if (!existingNote) {
       res.status(404).json({
@@ -189,9 +232,9 @@ export const deleteNote = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    await prisma.note.delete({
-      where: { id: parseInt(id) }
-    });
+    await db
+      .delete(notes)
+      .where(eq(notes.id, parseInt(id)));
 
     res.status(200).json({
       success: true,
