@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, MoreHorizontal, Smile, FileText, Edit3, ChevronDown, X, Download, Upload, ArrowUpDown, Search } from 'lucide-react';
+import { Plus, MoreHorizontal, Smile, FileText, Edit3, ChevronDown, X, Download, Upload, ArrowUpDown, Search, Columns3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Database, DatabaseRow } from '../../types/database';
@@ -97,6 +97,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [wrapText, setWrapText] = useState(false); // Excel-like wrap text toggle
   const horizontalScrollRef = useRef<HTMLDivElement>(null); // Ref for external horizontal scrollbar
   const [searchQuery, setSearchQuery] = useState(''); // Search query state
+  const [showSearchInput, setShowSearchInput] = useState(false); // Toggle search input visibility on mobile
 
   // Calculate table width - Update whenever columnWidths changes
   useEffect(() => {
@@ -918,17 +919,50 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   // Get sorted rows using utility function
   const sortedRows = getSortedRows(database.rows, database.columns, sortConfig);
 
+  // Helper function to format date to Indonesian format for search
+  const formatDateForSearch = (dateValue: string): string => {
+    if (!dateValue) return '';
+
+    try {
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return dateValue;
+
+      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+      const dayName = days[date.getDay()];
+      const day = date.getDate();
+      const month = months[date.getMonth()];
+      const year = date.getFullYear();
+
+      // Return multiple formats for matching: "Senin", "22", "Des", "2025", "22 Des", "Senin, 22 Des 2025"
+      return `${dayName} ${day} ${month} ${year} ${day} ${month} ${dayName}, ${day} ${month} ${year}`.toLowerCase();
+    } catch {
+      return dateValue;
+    }
+  };
+
   // Filter rows based on search query
   const filteredRows = sortedRows.filter((row) => {
     if (!searchQuery.trim()) return true;
+
+    const query = searchQuery.toLowerCase();
 
     // Search in all column values
     return database.columns.some((col) => {
       const property = row.properties[col.key];
       if (!property) return false;
 
-      const value = property.value?.toString().toLowerCase() || '';
-      return value.includes(searchQuery.toLowerCase());
+      let searchableValue = '';
+
+      // For date columns, format to Indonesian format for search
+      if (col.type === 'date') {
+        searchableValue = formatDateForSearch(property.value?.toString() || '');
+      } else {
+        searchableValue = property.value?.toString().toLowerCase() || '';
+      }
+
+      return searchableValue.includes(query);
     });
   });
 
@@ -1280,6 +1314,54 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           )}
         </div>
 
+        {/* Mobile Search Input - Below title, only visible when toggled */}
+        {showSearchInput && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="lg:hidden mb-3 mt-2"
+          >
+            <div className={`relative rounded-lg ${
+              darkMode ? 'bg-gray-800' : 'bg-white border border-gray-300'
+            }`}>
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onBlur={() => {
+                  // Close search input if empty when user clicks outside
+                  if (!searchQuery.trim()) {
+                    setTimeout(() => setShowSearchInput(false), 200);
+                  }
+                }}
+                placeholder="Search"
+                autoFocus
+                className={`w-full pl-9 pr-10 py-2 rounded-lg text-sm ${
+                  darkMode
+                    ? 'bg-gray-800 text-white placeholder-gray-500 border-0'
+                    : 'bg-white text-gray-900 placeholder-gray-400 border-0'
+                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              />
+              {/* Clear button */}
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setShowSearchInput(false);
+                  }}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded ${
+                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+                  }`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {/* Table Header */}
         <div className="flex items-center justify-between mb-3 mt-2">
           <div className="flex items-center gap-3">
@@ -1298,30 +1380,55 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               </span>
             </div>
 
-            {/* Search Bar */}
-            <div className={`relative rounded-lg ${
-              darkMode ? 'bg-gray-800' : 'bg-white border border-gray-300'
-            }`}>
-              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search"
-                className={`w-48 sm:w-64 pl-9 pr-3 py-2 rounded-lg text-sm ${
-                  darkMode
-                    ? 'bg-gray-800 text-white placeholder-gray-500 border-0'
-                    : 'bg-white text-gray-900 placeholder-gray-400 border-0'
-                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              />
+            {/* Search Bar - Desktop: Always visible, Mobile: Icon that toggles input */}
+            <div className="relative">
+              {/* Mobile: Search Icon Button */}
+              <button
+                onClick={() => setShowSearchInput(!showSearchInput)}
+                className={`lg:hidden p-2 rounded-lg ${
+                  darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+                } ${showSearchInput ? (darkMode ? 'bg-gray-800' : 'bg-gray-100') : ''}`}
+                title="Search"
+              >
+                <Search className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+              </button>
+
+              {/* Desktop: Always visible search bar */}
+              <div className={`hidden lg:block relative rounded-lg ${
+                darkMode ? 'bg-gray-800' : 'bg-white border border-gray-300'
+              }`}>
+                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search"
+                  className={`w-64 pl-9 pr-10 py-2 rounded-lg text-sm ${
+                    darkMode
+                      ? 'bg-gray-800 text-white placeholder-gray-500 border-0'
+                      : 'bg-white text-gray-900 placeholder-gray-400 border-0'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
+                {/* Clear button */}
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded ${
+                      darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+                    }`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             {/* Wrap Text Toggle - Excel-like */}
             <button
               onClick={() => setWrapText(!wrapText)}
-              className={`flex items-center gap-2 px-2 sm:px-3 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${
                 wrapText
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : darkMode
@@ -1330,24 +1437,22 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               }`}
               title={wrapText ? "Disable text wrapping" : "Enable text wrapping (Excel-like)"}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
               </svg>
-              <span className="hidden sm:inline">Wrap</span>
+              <span className="hidden md:inline text-xs sm:text-sm">Wrap</span>
             </button>
 
             {/* Sort Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setShowSortDropdown(!showSortDropdown)}
-                className="flex items-center gap-2 px-2 sm:px-3 py-2 rounded-full text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                className="flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
               >
-                <ArrowUpDown className="w-4 h-4" />
-                <span className="hidden sm:inline">Sort{sortConfig.length > 0 ? ` ${sortConfig.length}` : ' 1'}</span>
-                {/* Mobile: Show count badge */}
-                {sortConfig.length > 0 && (
-                  <span className="sm:hidden text-xs">{sortConfig.length}</span>
-                )}
+                <ArrowUpDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden md:inline text-xs sm:text-sm">Sort</span>
+                {/* Mobile & Tablet: Show count */}
+                <span className="md:hidden text-xs">{sortConfig.length > 0 ? sortConfig.length : '1'}</span>
               </button>
 
               {/* Sort Dropdown Component */}
@@ -1369,16 +1474,15 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             {canEdit && (
               <button
                 onClick={handleAddRow}
-                className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${
                   darkMode
                     ? 'bg-white hover:bg-gray-100 text-gray-900'
                     : 'bg-gray-900 hover:bg-gray-800 text-white'
                 }`}
                 title="Add a new row"
               >
-                <Plus className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden sm:inline">New rows</span>
-                <span className="sm:hidden">Rows</span>
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="hidden md:inline text-xs sm:text-sm">Rows</span>
               </button>
             )}
 
@@ -1394,7 +1498,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 setShowAddProperty(true);
               }}
               type="button"
-              className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${
                 !canEdit
                   ? darkMode
                     ? 'bg-white text-gray-900 cursor-not-allowed opacity-40 pointer-events-auto'
@@ -1403,11 +1507,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     ? 'bg-white hover:bg-gray-100 text-gray-900'
                     : 'bg-gray-900 hover:bg-gray-800 text-white'
               }`}
-              title={!canEdit ? 'Only ADMIN and SUPERUSER can add properties' : 'Add a new property'}
+              title={!canEdit ? 'Only ADMIN and SUPERUSER can add properties' : 'Add a new column'}
             >
-              <Plus className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden sm:inline">Add Property</span>
-              <span className="sm:hidden">Property</span>
+              <Columns3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="hidden md:inline text-xs sm:text-sm">Property</span>
             </button>
           </div>
         </div>
