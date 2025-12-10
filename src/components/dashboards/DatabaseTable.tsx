@@ -161,7 +161,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     const tableContainer = tableContainerRef.current;
     const horizontalScroll = horizontalScrollRef.current;
 
-    if (!tableContainer || !horizontalScroll) return;
+    // Only setup sync if horizontal scroll is needed and refs are available
+    if (!needsHorizontalScroll || !tableContainer || !horizontalScroll) return;
 
     // Sync from table to scrollbar
     const handleTableScroll = () => {
@@ -184,7 +185,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       tableContainer.removeEventListener('scroll', handleTableScroll);
       horizontalScroll.removeEventListener('scroll', handleScrollbarScroll);
     };
-  }, []);
+  }, [needsHorizontalScroll]);
 
   // Inject styles for date input calendar icon
   useEffect(() => {
