@@ -107,16 +107,38 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [showSearchInput, setShowSearchInput] = useState(false); // Toggle search input visibility on mobile
   const [showRowActionMenu, setShowRowActionMenu] = useState<string | null>(null); // Row ID for showing action menu
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null); // Popup menu position
+  const [needsHorizontalScroll, setNeedsHorizontalScroll] = useState(false); // Track if horizontal scroll is needed
 
-  // Calculate table width - Update whenever columnWidths changes
+  // Calculate table width - Update whenever columnWidths changes or container resizes
   useEffect(() => {
-    if (database.columns.length > 0) {
-      const totalWidth = database.columns.reduce((sum, col) => sum + (columnWidths[col.key] || 150), 0);
-      const containerWidth = tableContainerRef.current?.offsetWidth || 0;
-      const newTableWidth = Math.max(totalWidth, containerWidth);
-      setTableWidth(newTableWidth);
-      console.log('📐 Table width updated:', newTableWidth, 'from column widths:', columnWidths);
+    const updateTableWidth = () => {
+      if (database.columns.length > 0) {
+        const totalWidth = database.columns.reduce((sum, col) => sum + (columnWidths[col.key] || 150), 0);
+        const containerWidth = tableContainerRef.current?.offsetWidth || 0;
+        const newTableWidth = Math.max(totalWidth, containerWidth);
+        setTableWidth(newTableWidth);
+
+        // Check if horizontal scroll is needed
+        setNeedsHorizontalScroll(totalWidth > containerWidth);
+
+        console.log('📐 Table width updated:', newTableWidth, 'from column widths:', columnWidths);
+      }
+    };
+
+    updateTableWidth();
+
+    // Add resize observer to detect container width changes
+    const resizeObserver = new ResizeObserver(() => {
+      updateTableWidth();
+    });
+
+    if (tableContainerRef.current) {
+      resizeObserver.observe(tableContainerRef.current);
     }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, [columnWidths, database.columns]);
 
   // Close row action menu when clicking outside
@@ -2034,17 +2056,19 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             )}
           </div>
 
-          {/* External Horizontal Scrollbar - Excel-like */}
-          <div
-            ref={horizontalScrollRef}
-            className={`overflow-x-auto custom-scrollbar mt-2 ${darkMode ? 'bg-[#191919]' : 'bg-white'}`}
-            style={{
-              height: '12px',
-              overflowY: 'hidden'
-            }}
-          >
-            <div style={{ width: `${tableWidth}px`, height: '1px' }} />
-          </div>
+          {/* External Horizontal Scrollbar - Excel-like - Only show when needed */}
+          {needsHorizontalScroll && (
+            <div
+              ref={horizontalScrollRef}
+              className={`overflow-x-auto custom-scrollbar mt-2 ${darkMode ? 'bg-[#191919]' : 'bg-white'}`}
+              style={{
+                height: '12px',
+                overflowY: 'hidden'
+              }}
+            >
+              <div style={{ width: `${tableWidth}px`, height: '1px' }} />
+            </div>
+          )}
         </div>
       </div>
 
