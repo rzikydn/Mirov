@@ -535,7 +535,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
       // Show success toast for row deletion - Red background with checkmark
       toast.success(
-        `Successfully deleted 1 row! (${firstColumnLabel}: "${firstColumnValue}")`,
+        'Successfully deleted 1 row!',
         {
           duration: 3000,
           position: 'top-right',
@@ -625,9 +625,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       return { ...db, rows: newRows };
     });
 
-    // Show success toast with row details - Green background with checkmark
+    // Show success toast - Green background with checkmark
     toast.success(
-      `Successfully duplicated 1 row! (${firstColumnLabel}: "${firstColumnValue}")`,
+      'Successfully duplicated 1 row!',
       {
         duration: 3000,
         position: 'top-right',
