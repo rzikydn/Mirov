@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, MoreHorizontal, Smile, FileText, Edit3, ChevronDown, X, Download, Upload, ArrowUpDown } from 'lucide-react';
+import { Plus, MoreHorizontal, Smile, FileText, Edit3, ChevronDown, X, Download, Upload, ArrowUpDown, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Database, DatabaseRow } from '../../types/database';
@@ -96,6 +96,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [tableWidth, setTableWidth] = useState<number>(0);
   const [wrapText, setWrapText] = useState(false); // Excel-like wrap text toggle
   const horizontalScrollRef = useRef<HTMLDivElement>(null); // Ref for external horizontal scrollbar
+  const [searchQuery, setSearchQuery] = useState(''); // Search query state
 
   // Calculate table width - Update whenever columnWidths changes
   useEffect(() => {
@@ -917,9 +918,23 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   // Get sorted rows using utility function
   const sortedRows = getSortedRows(database.rows, database.columns, sortConfig);
 
+  // Filter rows based on search query
+  const filteredRows = sortedRows.filter((row) => {
+    if (!searchQuery.trim()) return true;
+
+    // Search in all column values
+    return database.columns.some((col) => {
+      const property = row.properties[col.key];
+      if (!property) return false;
+
+      const value = property.value?.toString().toLowerCase() || '';
+      return value.includes(searchQuery.toLowerCase());
+    });
+  });
+
   // Virtual scrolling setup - Only render visible rows for performance
   const rowVirtualizer = useVirtualizer({
-    count: sortedRows.length,
+    count: filteredRows.length,
     getScrollElement: () => tableContainerRef.current,
     estimateSize: () => wrapText ? 80 : 42, // Dynamic row height: 80px for wrapped text, 42px for normal
     overscan: 10, // Render 10 extra items above and below viewport for smooth scrolling
@@ -1267,18 +1282,37 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
         {/* Table Header */}
         <div className="flex items-center justify-between mb-3 mt-2">
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded ${
-            darkMode ? 'bg-gray-800' : 'bg-gray-100'
-          }`}>
-            <div className="w-4 h-4 grid grid-cols-2 gap-0.5">
-              <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-400'} rounded-sm`}></div>
-              <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-400'} rounded-sm`}></div>
-              <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-400'} rounded-sm`}></div>
-              <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-400'} rounded-sm`}></div>
+          <div className="flex items-center gap-3">
+            {/* Table Label */}
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded ${
+              darkMode ? 'bg-gray-800' : 'bg-gray-100'
+            }`}>
+              <div className="w-4 h-4 grid grid-cols-2 gap-0.5">
+                <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-400'} rounded-sm`}></div>
+                <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-400'} rounded-sm`}></div>
+                <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-400'} rounded-sm`}></div>
+                <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-400'} rounded-sm`}></div>
+              </div>
+              <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Table
+              </span>
             </div>
-            <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-              Table
-            </span>
+
+            {/* Search Bar */}
+            <div className={`relative ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-sm`}>
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search"
+                className={`w-48 sm:w-64 pl-9 pr-3 py-2 rounded-lg text-sm ${
+                  darkMode
+                    ? 'bg-gray-800 text-white placeholder-gray-500'
+                    : 'bg-white text-gray-900 placeholder-gray-400'
+                } border-0 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -1531,7 +1565,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 )}
 
                 {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const row = sortedRows[virtualRow.index];
+                  const row = filteredRows[virtualRow.index];
                   const rowIndex = virtualRow.index;
 
                   return (
@@ -1701,6 +1735,18 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 )}
               </tbody>
             </table>
+
+            {/* Empty State for Search */}
+            {filteredRows.length === 0 && searchQuery.trim() && (
+              <div className={`text-center py-12 ${darkMode ? 'bg-[#191919]' : 'bg-white'}`}>
+                <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  No data found for "{searchQuery}"
+                </p>
+                <p className={`text-sm mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                  Try a different search term
+                </p>
+              </div>
+            )}
           </div>
 
           {/* External Horizontal Scrollbar - Excel-like */}
