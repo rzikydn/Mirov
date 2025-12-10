@@ -522,10 +522,35 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         });
       }
     } else {
+      // Get row details before deleting for toast notification
+      const rowToDelete = database.rows.find(r => r.id === deleteTarget.id);
+      const firstColumnKey = database.columns[0]?.key;
+      const firstColumnLabel = database.columns[0]?.label || 'Column';
+      const firstColumnValue = rowToDelete?.properties[firstColumnKey]?.value || '(empty)';
+
       await updateThisDb((db) => ({
         ...db,
         rows: db.rows.filter((r) => r.id !== deleteTarget.id)
       }));
+
+      // Show success toast for row deletion - Red background with checkmark
+      toast.success(
+        `Successfully deleted 1 row! (${firstColumnLabel}: "${firstColumnValue}")`,
+        {
+          duration: 3000,
+          position: 'top-right',
+          style: {
+            background: '#ef4444',
+            color: '#fff',
+            fontWeight: '500',
+            border: 'none',
+          },
+          iconTheme: {
+            primary: '#fff',
+            secondary: '#ef4444',
+          },
+        }
+      );
 
       // Add specific history entry for row deletion
       if (user) {
@@ -535,7 +560,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           action: 'delete',
           target: 'database',
           targetName: database.name,
-          description: `${user.name} deleted a row from database "${database.name}"`
+          description: `${user.name} deleted a row (${firstColumnLabel}: "${firstColumnValue}") from database "${database.name}"`
         });
       }
     }
@@ -569,6 +594,70 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }
 
     setShowRowActionMenu(null);
+  };
+
+  const handleDuplicateRow = async (rowId: string) => {
+    if (!canEdit) return;
+
+    // Find the row to duplicate
+    const rowToDuplicate = database.rows.find(r => r.id === rowId);
+    if (!rowToDuplicate) return;
+
+    // Get the first column value for better identification in toast
+    const firstColumnKey = database.columns[0]?.key;
+    const firstColumnLabel = database.columns[0]?.label || 'Column';
+    const firstColumnValue = rowToDuplicate.properties[firstColumnKey]?.value || '(empty)';
+
+    // Create a new row with the same properties but new ID
+    const duplicatedRow: DatabaseRow = {
+      id: `row-${Date.now()}`,
+      properties: { ...rowToDuplicate.properties },
+      highlightColor: rowToDuplicate.highlightColor
+    };
+
+    // Find the index of the original row
+    const originalIndex = database.rows.findIndex(r => r.id === rowId);
+
+    // Insert the duplicated row right above the original row (same index)
+    await updateThisDb((db) => {
+      const newRows = [...db.rows];
+      newRows.splice(originalIndex, 0, duplicatedRow);
+      return { ...db, rows: newRows };
+    });
+
+    // Show success toast with row details - Green background with checkmark
+    toast.success(
+      `Successfully duplicated 1 row! (${firstColumnLabel}: "${firstColumnValue}")`,
+      {
+        duration: 3000,
+        position: 'top-right',
+        style: {
+          background: '#10b981',
+          color: '#fff',
+          fontWeight: '500',
+          border: 'none',
+        },
+        iconTheme: {
+          primary: '#fff',
+          secondary: '#10b981',
+        },
+      }
+    );
+
+    // Add history entry
+    if (user) {
+      await addHistory({
+        userName: user.name,
+        userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
+        action: 'create',
+        target: 'database',
+        targetName: database.name,
+        description: `${user.name} duplicated a row (${firstColumnLabel}: "${firstColumnValue}") in database "${database.name}"`
+      });
+    }
+
+    setShowRowActionMenu(null);
+    setMenuPosition(null);
   };
 
   const handleAddRow = async () => {
@@ -1732,13 +1821,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       data-row-id={row.id}
                       onMouseEnter={(e) => {
                         if (!resizingColumn) {
-                          console.log('🖱️ Mouse entered row:', row.id);
                           setHoveredRow(row.id);
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (!resizingColumn) {
-                          console.log('🖱️ Mouse left row:', row.id);
                           setHoveredRow(null);
                         }
                       }}
@@ -1791,17 +1878,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             }}
                           >
                             {/* Row Action Menu Button - Only show on hover for last column and only for users with edit permission */}
-                            {colIndex === database.columns.length - 1 && canEdit && (() => {
-                              const shouldShow = hoveredRow === row.id;
-                              if (shouldShow) {
-                                console.log('✅ Rendering button for row:', row.id, 'hoveredRow:', hoveredRow);
-                              }
-                              return shouldShow;
-                            })() && (
+                            {colIndex === database.columns.length - 1 && canEdit && hoveredRow === row.id && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  console.log('🔘 Button clicked for row:', row.id);
                                   if (showRowActionMenu === row.id) {
                                     // Close menu if already open
                                     setShowRowActionMenu(null);
@@ -1811,7 +1891,6 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                     const rowElement = document.querySelector(`[data-row-id="${row.id}"]`) as HTMLElement;
                                     if (rowElement) {
                                       const rect = rowElement.getBoundingClientRect();
-                                      console.log('📍 Position calculated:', { top: rect.bottom + 4, right: 20 });
                                       setMenuPosition({
                                         top: rect.bottom + 4, // 4px below the row
                                         right: 20 // 20px from right edge
@@ -1964,13 +2043,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       </div>
 
       {/* Row Action Popup Menu - Rendered at document level for proper z-index */}
-      {(() => {
-        const shouldShowPopup = showRowActionMenu && menuPosition;
-        if (shouldShowPopup) {
-          console.log('🎯 Rendering popup for row:', showRowActionMenu, 'at position:', menuPosition);
-        }
-        return shouldShowPopup;
-      })() && (
+      {showRowActionMenu && menuPosition && (
         <div
           className={`fixed w-48 rounded-lg shadow-2xl border ${
             darkMode
@@ -2026,6 +2099,21 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               )}
             </div>
           </div>
+
+          {/* Duplicate Row Option */}
+          <button
+            onClick={() => handleDuplicateRow(showRowActionMenu)}
+            className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors border-b ${
+              darkMode
+                ? 'text-gray-300 hover:bg-gray-700 border-gray-700'
+                : 'text-gray-700 hover:bg-gray-50 border-gray-200'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            Duplicate Row
+          </button>
 
           {/* Delete Row Option */}
           <button
