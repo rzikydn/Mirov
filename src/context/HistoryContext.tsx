@@ -38,7 +38,8 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
   // Fetch history from backend
   const refreshHistory = async () => {
     try {
-      const response = await fetch(API_URL, {
+      // Fetch with higher limit to show more history (1000 entries)
+      const response = await fetch(`${API_URL}?limit=1000`, {
         headers: getAuthHeaders()
       });
 
