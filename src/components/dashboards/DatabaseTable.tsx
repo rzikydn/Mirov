@@ -1899,16 +1899,15 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                     setShowRowActionMenu(row.id);
                                   }
                                 }}
-                                className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded transition-colors ${
-                                  row.highlightColor
-                                    ? 'bg-white hover:bg-gray-100 text-gray-700'
-                                    : darkMode
-                                      ? 'bg-[#191919] hover:bg-gray-700 text-gray-400'
-                                      : 'bg-white hover:bg-gray-100 text-gray-600'
-                                }`}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:opacity-70 transition-opacity"
                                 style={{ zIndex: 60 }}
                               >
-                                <MoreHorizontal className="w-3.5 h-3.5" />
+                                {/* 3 Dots Icon - Custom SVG */}
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <circle cx="8" cy="3" r="1.5" fill={row.highlightColor ? '#374151' : (darkMode ? '#9ca3af' : '#6b7280')} />
+                                  <circle cx="8" cy="8" r="1.5" fill={row.highlightColor ? '#374151' : (darkMode ? '#9ca3af' : '#6b7280')} />
+                                  <circle cx="8" cy="13" r="1.5" fill={row.highlightColor ? '#374151' : (darkMode ? '#9ca3af' : '#6b7280')} />
+                                </svg>
                               </button>
                             )}
                             {prop.type === 'text' && (
@@ -1922,9 +1921,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                   placeholder=""
                                   rows={1}
                                   className={`w-full text-sm resize-none ${
-                                    darkMode
-                                      ? 'bg-transparent text-gray-300'
-                                      : 'bg-transparent text-gray-900'
+                                    row.highlightColor && darkMode
+                                      ? 'bg-transparent text-gray-900'
+                                      : darkMode
+                                        ? 'bg-transparent text-gray-300'
+                                        : 'bg-transparent text-gray-900'
                                   } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                                   style={{
                                     whiteSpace: 'pre-wrap',
@@ -1945,9 +1946,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                   disabled={!canEdit}
                                   placeholder=""
                                   className={`w-full text-sm ${
-                                    darkMode
-                                      ? 'bg-transparent text-gray-300'
-                                      : 'bg-transparent text-gray-900'
+                                    row.highlightColor && darkMode
+                                      ? 'bg-transparent text-gray-900'
+                                      : darkMode
+                                        ? 'bg-transparent text-gray-300'
+                                        : 'bg-transparent text-gray-900'
                                   } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                                 />
                               )
@@ -1962,9 +1965,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                 disabled={!canEdit}
                                 placeholder=""
                                 className={`w-full text-sm ${
-                                  darkMode
-                                    ? 'bg-transparent text-gray-300'
-                                    : 'bg-transparent text-gray-900'
+                                  row.highlightColor && darkMode
+                                    ? 'bg-transparent text-gray-900'
+                                    : darkMode
+                                      ? 'bg-transparent text-gray-300'
+                                      : 'bg-transparent text-gray-900'
                                 } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                               />
                             )}
@@ -1976,6 +1981,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                 onBlur={(value) => handleCellBlur(row.id, col.key, value)}
                                 disabled={!canEdit}
                                 darkMode={darkMode}
+                                highlightColor={row.highlightColor}
                               />
                             )}
                             {prop.type === 'checkbox' && (

@@ -12,6 +12,7 @@ interface DateInputProps {
   onBlur?: (value: string) => void;
   disabled?: boolean;
   darkMode: boolean;
+  highlightColor?: string;
 }
 
 const DateInput: React.FC<DateInputProps> = ({
@@ -20,7 +21,8 @@ const DateInput: React.FC<DateInputProps> = ({
   onFocus,
   onBlur,
   disabled,
-  darkMode
+  darkMode,
+  highlightColor
 }) => {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -56,14 +58,20 @@ const DateInput: React.FC<DateInputProps> = ({
       <div
         onClick={handleDisplayClick}
         className={`flex items-center gap-2 w-full text-sm ${
-          darkMode
-            ? 'bg-transparent text-gray-300'
-            : 'bg-transparent text-gray-900'
+          highlightColor && darkMode
+            ? 'bg-transparent text-gray-900'
+            : darkMode
+              ? 'bg-transparent text-gray-300'
+              : 'bg-transparent text-gray-900'
         } ${disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
       >
         <span className="flex-1">{displayValue || ''}</span>
         <Calendar className={`w-4 h-4 flex-shrink-0 ${
-          darkMode ? 'text-gray-400' : 'text-gray-500'
+          highlightColor && darkMode
+            ? 'text-gray-700'
+            : darkMode
+              ? 'text-gray-400'
+              : 'text-gray-500'
         }`} />
       </div>
 
