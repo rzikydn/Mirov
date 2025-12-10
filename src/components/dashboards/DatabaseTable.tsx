@@ -1299,7 +1299,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             </div>
 
             {/* Search Bar */}
-            <div className={`relative ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-sm`}>
+            <div className={`relative rounded-lg ${
+              darkMode ? 'bg-gray-800' : 'bg-white border border-gray-300'
+            }`}>
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
               <input
                 type="text"
@@ -1308,9 +1310,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 placeholder="Search"
                 className={`w-48 sm:w-64 pl-9 pr-3 py-2 rounded-lg text-sm ${
                   darkMode
-                    ? 'bg-gray-800 text-white placeholder-gray-500'
-                    : 'bg-white text-gray-900 placeholder-gray-400'
-                } border-0 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    ? 'bg-gray-800 text-white placeholder-gray-500 border-0'
+                    : 'bg-white text-gray-900 placeholder-gray-400 border-0'
+                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
             </div>
           </div>
