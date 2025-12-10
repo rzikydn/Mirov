@@ -5,33 +5,39 @@ Sistem manajemen internal yang aman dan modern untuk mengelola jadwal, catatan, 
 ## Features
 
 ### Core Features
-- **Authentication & Authorization**: Login sistem dengan JWT dan role-based access (SUPERUSER, ADMIN, UMUM)
+- **🔐 Authentication & Authorization**: Login sistem dengan JWT dan role-based access (SUPERUSER, ADMIN, UMUM)
   - Protected routes dengan automatic redirect
   - Browser back/forward button protection
   - Session validation on navigation
-- **Schedule Management**: Kelola jadwal meeting, event, dan kegiatan tim
-- **Team Notes**: Sistem catatan kolaboratif dengan warna custom dan keyboard shortcuts (Ctrl+Enter)
+- **📅 Schedule Management**: Kelola jadwal meeting, event, dan kegiatan tim
+- **📝 Team Notes**: Sistem catatan kolaboratif dengan warna custom dan keyboard shortcuts (Ctrl+Enter)
   - Support 3 warna post-it: Red, Yellow, Green (cycling order)
   - Favorite notes feature (⭐ ADMIN & SUPERUSER only)
-- **Database Manager**: Kelola database internal dengan interface Notion-style yang powerful
+- **🗄️ Database Manager**: Kelola database internal dengan interface Notion-style yang powerful
   - Support multiple column types (Text, Number, Date, Checkbox)
   - Multi-level sorting dengan default descending untuk date columns
+  - **🔍 Search Feature**: Pencarian cepat di semua kolom (termasuk format tanggal Indonesia)
+  - **🎨 Row Highlight**: Highlight baris dengan 3 pilihan warna (Red, Yellow, Green)
+  - **📋 Duplicate Row**: Salin baris dengan satu klik (muncul di atas baris asli)
+  - **⋮ Row Actions Menu**: Three-dot menu untuk highlight & duplicate rows
   - Flexible column resize (minimum 40px width)
   - Freeze first column untuk navigasi mudah
   - Freeze header (sticky header) saat scroll vertical
+  - **📊 Smart Horizontal Scrollbar**: Muncul otomatis hanya saat diperlukan
   - Export to JSON & Excel (XLSX) dengan formatting
   - Real-time sync dengan backend
   - Auto-create 4 default rows untuk database baru
   - Dynamic table width calculation (no empty space)
-- **History & Audit Trail**: Tracking semua aktivitas user dengan detail lengkap (khusus ADMIN & SUPERUSER)
-  - Detailed activity logging (Create, Edit, Delete)
+- **📜 History & Audit Trail**: Tracking semua aktivitas user dengan detail lengkap (khusus ADMIN & SUPERUSER)
+  - Detailed activity logging (Create, Edit, Delete, Duplicate)
   - Smart history tracking - hanya mencatat perubahan final (tidak per keystroke)
   - Visual row position tracking dengan identifier kolom pertama
-  - History format: "User updated 'Column' in row X (FirstColumn: 'Value') from 'old' to 'new'"
+  - History limit: 1000 entries (dapat disesuaikan)
   - Add Property action tracking
   - Bulk delete untuk history management (SUPERUSER only)
-- **Dark Mode**: Tema gelap untuk kenyamanan mata
-- **Responsive Design**: Optimized untuk desktop, tablet, dan mobile (iOS/Android)
+- **🌙 Dark Mode**: Tema gelap untuk kenyamanan mata
+  - Auto text color pada highlighted rows (hitam di dark mode)
+- **📱 Responsive Design**: Optimized untuk desktop, tablet, dan mobile (iOS/Android)
 
 ### Security Features
 - **Rate Limiting**: Pembatasan request per IP address
@@ -283,31 +289,42 @@ Aplikasi akan berjalan di:
 - Frontend: http://localhost:5173
 - Backend: http://localhost:5000
 
-## Default Users
+## 👥 Default Users
 
 Setelah seed database, Anda bisa login dengan kredensial berikut:
 
-### SUPERUSER (3 users)
-| Name    | Username     | Password    |
-|---------|--------------|-------------|
-| Taufan  | usertaufan   | taufan123   |
-| Hans    | userhans     | hans123     |
-| Jelly   | userjelly    | jelly123    |
+### 🔴 SUPERUSER (5 users)
+| Name      | Username     | Email              | Password    | Status |
+|-----------|--------------|-------------------|-------------|--------|
+| Taufan    | usertaufan   | -                  | taufan123   | ✅ Active |
+| Hans      | userhans     | -                  | hans123     | ✅ Active |
+| Jelly     | userjelly    | -                  | jelly123    | ✅ Active |
+| superuser | superuser    | -                  | superuser   | ✅ Active |
+| ian       | ian          | -                  | ian         | ✅ Active |
 
-### ADMIN (4 users)
-| Name    | Username       | Password     |
-|---------|----------------|--------------|
-| Agung   | adminagung     | agung123     |
-| Amin    | adminamin      | amin123      |
-| Syaiful | adminsyaiful   | syaiful123   |
-| Dea     | admindea       | dea123       |
+**Permissions**: Full system access, manage users, delete history, manage database structure
 
-### UMUM (1 user)
-| Name | Username   | Password |
-|------|------------|----------|
-| Alfi | umumalfi   | alfi123  |
+### 🟡 ADMIN (4 users)
+| Name    | Username       | Email              | Password     | Status |
+|---------|----------------|-------------------|--------------|--------|
+| Agung   | adminagung     | -                  | agung123     | ✅ Active |
+| Amin    | adminamin      | -                  | amin123      | ✅ Active |
+| Syaiful | adminsyaiful   | -                  | syaiful123   | ✅ Active |
+| Dea     | admindea       | -                  | dea123       | ✅ Active |
 
-Lihat [docs/KREDENSIAL-USER.md](docs/KREDENSIAL-USER.md) untuk detail lengkap.
+**Permissions**: Create/edit content, manage schedules, favorite notes, view history
+
+### 🟢 UMUM (2 users)
+| Name | Username   | Email              | Password | Status |
+|------|------------|-------------------|----------|--------|
+| Alfi | umumalfi   | -                  | alfi123  | ✅ Active |
+| umum | umum       | -                  | umum     | ✅ Active |
+
+**Permissions**: View-only access, basic note editing (own notes only)
+
+> 💡 **Tip**: Password dapat diubah setelah login pertama kali untuk keamanan yang lebih baik
+>
+> 📖 Lihat [docs/KREDENSIAL-USER.md](docs/KREDENSIAL-USER.md) untuk detail lengkap dan cara menambah user baru
 
 ## User Roles & Permissions
 
@@ -527,13 +544,45 @@ If you discover a security vulnerability:
 ### General
 - Semua user dapat menggunakan keyboard shortcuts untuk mempercepat workflow
 
-## Database Manager - Detailed Features
+## 🗄️ Database Manager - Detailed Features
 
-### Column Types
-1. **Text** - Text bebas, cocok untuk nama, deskripsi, dll
-2. **Number** - Angka, cocok untuk jumlah, harga, score, dll
-3. **Date** - Tanggal dengan date picker, cocok untuk deadline, event date, dll
-4. **Checkbox** - True/False, cocok untuk status completion, approval, dll
+### 📊 Column Types
+1. **📝 Text** - Text bebas, cocok untuk nama, deskripsi, dll
+2. **🔢 Number** - Angka, cocok untuk jumlah, harga, score, dll
+3. **📅 Date** - Tanggal dengan date picker Indonesia, cocok untuk deadline, event date, dll
+4. **✅ Checkbox** - True/False, cocok untuk status completion, approval, dll
+
+### 🔍 Search Feature
+- **Quick Search**: Pencarian real-time di semua kolom
+- **Indonesian Date Support**: Cari dengan format "22 Des", "Senin", "2025"
+- **Responsive UI**: Icon-only di mobile, full search bar di desktop
+- **Empty State**: Pesan "No data found" jika tidak ada hasil
+- **Clear Button**: Tombol X untuk clear search dengan cepat
+
+### 🎨 Row Actions Menu (Three-Dot Button)
+**Cara Akses**: Hover pada baris → Klik tombol ⋮ di kanan
+
+**Fitur yang Tersedia**:
+1. **Highlight Color** - Pilih warna highlight untuk baris
+   - 🔴 Red (#FFA896) - Urgent/Priority tinggi
+   - 🟡 Yellow (#FFD89B) - Medium priority
+   - 🟢 Green (#C4F5A4) - Completed/Success
+   - ⬜ Remove - Hapus highlight
+
+2. **📋 Duplicate Row** - Salin seluruh baris
+   - Baris duplikat muncul tepat di atas baris asli
+   - Semua properties dan highlight color ikut tersalin
+   - Notifikasi sukses: "Successfully duplicated 1 row!"
+
+3. **🗑️ Delete Row** - Hapus baris (dengan konfirmasi)
+   - Modal konfirmasi untuk mencegah penghapusan tidak sengaja
+   - Notifikasi sukses: "Successfully deleted 1 row!"
+
+**Design Notes**:
+- Tombol ⋮ menggunakan 3 titik bulatan (minimal design)
+- Popup menu dengan z-index 9999 (selalu di atas)
+- Dynamic positioning dengan getBoundingClientRect()
+- Text hitam otomatis pada highlighted rows di dark mode
 
 ### Sorting Features
 - **Multi-level sorting**: Sort berdasarkan multiple columns sekaligus
@@ -774,10 +823,48 @@ This project is private and proprietary. All rights reserved.
 - **Recovery Time Objective (RTO)**: < 4 hours
 - **Recovery Point Objective (RPO)**: < 24 hours
 
-## Changelog
+## 📋 Changelog
 
-### [Current] - 2025-01-12
-#### Added
+### [1.3.0] - 2025-12-10 (Latest)
+#### ✨ Added
+- **🔍 Search Feature**: Pencarian cepat di semua kolom database
+  - Indonesian date format support ("22 Des", "Senin", dll)
+  - Responsive design (icon-only mobile, full bar desktop)
+  - Real-time search dengan empty state
+- **🎨 Row Highlight Feature**: Highlight baris dengan 3 pilihan warna
+  - Red (#FFA896), Yellow (#FFD89B), Green (#C4F5A4)
+  - Auto text color hitam di dark mode untuk highlighted rows
+  - Remove highlight option
+- **📋 Duplicate Row Feature**: Salin baris dengan satu klik
+  - Baris duplikat muncul di atas baris asli
+  - Copy semua properties dan highlight color
+  - Toast notification dengan background hijau
+- **⋮ Row Actions Menu**: Three-dot button untuk row operations
+  - 3 titik bulatan minimal design
+  - Popup menu dengan z-index 9999
+  - Dynamic positioning dengan getBoundingClientRect()
+  - Highlight, Duplicate, dan Delete dalam satu menu
+- **📊 Smart Horizontal Scrollbar**: Conditional rendering
+  - Hanya muncul ketika table overflow
+  - Auto-hide saat table muat dalam container
+  - ResizeObserver untuk responsive behavior
+  - Sync scroll 2-arah (table ↔ scrollbar)
+- **🔔 Toast Notifications**: Notifikasi untuk row operations
+  - Green toast untuk duplicate (✓ Successfully duplicated 1 row!)
+  - Red toast untuk delete (✓ Successfully deleted 1 row!)
+  - Consistent design dengan history notifications
+- **📜 History Enhancement**: Extended limit dari 50 to 1000 entries
+  - Frontend mengirim `?limit=1000` parameter
+  - Semua row operations tercatat di history
+
+#### 🐛 Fixed
+- Horizontal scrollbar tidak berfungsi (dependency issue)
+- Three-dot button tidak muncul di database dengan banyak rows
+- Popup menu tertutup oleh table rows (z-index issue)
+- Text sulit dibaca pada highlighted rows di dark mode
+
+### [1.2.0] - 2025-01-12
+#### ✨ Added
 - **Browser Navigation Protection**: Popstate event listeners untuk prevent auth bypass
   - Token validation on browser back/forward navigation
   - Replace history instead of push to prevent back button bypass
@@ -866,5 +953,16 @@ Jika ada pertanyaan atau issue, silakan hubungi tim IT kantor atau buat issue di
 
 **Made with ❤️ by Team Mirov**
 
-Last Updated: January 12, 2025
-Version: 1.2.0 (In Development)
+```
+███╗   ███╗██╗██████╗  ██████╗ ██╗   ██╗
+████╗ ████║██║██╔══██╗██╔═══██╗██║   ██║
+██╔████╔██║██║██████╔╝██║   ██║██║   ██║
+██║╚██╔╝██║██║██╔══██╗██║   ██║╚██╗ ██╔╝
+██║ ╚═╝ ██║██║██║  ██║╚██████╔╝ ╚████╔╝
+╚═╝     ╚═╝╚═╝╚═╝  ╚═╝ ╚═════╝   ╚═══╝
+```
+
+**Last Updated**: December 10, 2025
+**Current Version**: 1.3.0
+**Status**: ✅ Production Ready
+**Maintained By**: IT Team - Internal Management Division
