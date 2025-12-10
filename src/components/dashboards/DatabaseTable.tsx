@@ -28,6 +28,13 @@ import { dateInputStyles } from '../../styles/dateInputStyles';
 import { SortConfig, getSortedRows, addSort, updateSortDirection, deleteSort, clearAllSorts } from '../../utils/sortingUtils';
 import { updateDatabase } from '../../utils/databaseUtils';
 
+// Highlight colors for rows (same as TeamNotes)
+const highlightColors = [
+  '#FFA896', // Red
+  '#FFD89B', // Yellow
+  '#C4F5A4', // Green
+];
+
 interface DatabaseTableProps {
   database: Database;
   setDatabases: React.Dispatch<React.SetStateAction<Database[]>>;
@@ -98,6 +105,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const horizontalScrollRef = useRef<HTMLDivElement>(null); // Ref for external horizontal scrollbar
   const [searchQuery, setSearchQuery] = useState(''); // Search query state
   const [showSearchInput, setShowSearchInput] = useState(false); // Toggle search input visibility on mobile
+  const [showRowActionMenu, setShowRowActionMenu] = useState<string | null>(null); // Row ID for showing action menu
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null); // Popup menu position
 
   // Calculate table width - Update whenever columnWidths changes
   useEffect(() => {
@@ -109,6 +118,21 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       console.log('📐 Table width updated:', newTableWidth, 'from column widths:', columnWidths);
     }
   }, [columnWidths, database.columns]);
+
+  // Close row action menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showRowActionMenu) {
+        setShowRowActionMenu(null);
+        setMenuPosition(null);
+      }
+    };
+
+    if (showRowActionMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showRowActionMenu]);
 
   // Sync scroll between table container and horizontal scrollbar
   useEffect(() => {
@@ -517,6 +541,34 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }
     setShowConfirmDelete(false);
     setDeleteTarget(null);
+  };
+
+  const handleSetRowHighlight = async (rowId: string, color: string | null) => {
+    if (!canEdit) return;
+
+    await updateThisDb((db) => ({
+      ...db,
+      rows: db.rows.map((row) =>
+        row.id === rowId
+          ? { ...row, highlightColor: color || undefined }
+          : row
+      )
+    }));
+
+    // Add history entry
+    if (user) {
+      const action = color ? 'highlighted' : 'removed highlight from';
+      await addHistory({
+        userName: user.name,
+        userRole: user.role as 'SUPERUSER' | 'ADMIN' | 'UMUM',
+        action: 'edit',
+        target: 'database',
+        targetName: database.name,
+        description: `${user.name} ${action} a row in database "${database.name}"`
+      });
+    }
+
+    setShowRowActionMenu(null);
   };
 
   const handleAddRow = async () => {
@@ -1677,14 +1729,25 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     <tr
                       key={row.id}
                       ref={rowIndex === 0 ? newRowRef : null}
-                      onMouseEnter={() => !resizingColumn && setHoveredRow(row.id)}
-                      onMouseLeave={() => !resizingColumn && setHoveredRow(null)}
+                      data-row-id={row.id}
+                      onMouseEnter={(e) => {
+                        if (!resizingColumn) {
+                          console.log('🖱️ Mouse entered row:', row.id);
+                          setHoveredRow(row.id);
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!resizingColumn) {
+                          console.log('🖱️ Mouse left row:', row.id);
+                          setHoveredRow(null);
+                        }
+                      }}
                       className={`group border-b ${
                         darkMode ? 'hover:bg-[#202020] border-gray-800' : 'hover:bg-gray-50 border-gray-200'
                       }`}
                       style={{
                         height: `${virtualRow.size}px`,
-                        contain: 'layout style paint',
+                        backgroundColor: row.highlightColor || undefined,
                       }}
                     >
                       {database.columns.map((col, colIndex) => {
@@ -1702,6 +1765,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             wordWrap: wrapText ? 'break-word' : 'normal',
                             verticalAlign: 'top',
                             zIndex: colIndex === 0 ? 50 : 1,
+                            backgroundColor: colIndex === 0 ? (row.highlightColor || undefined) : undefined,
                             ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                           }}
                         ></td>;
@@ -1709,28 +1773,59 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         return (
                           <td
                             key={col.key}
-                            className={`py-2 relative ${
+                            className={`py-2 ${
                               colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
-                            } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''}`}
+                            } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''} ${
+                              colIndex === database.columns.length - 1 ? 'relative' : ''
+                            }`}
                             style={{
                               padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : colIndex === database.columns.length - 1 ? '0.5rem 2.5rem 0.5rem 0.25rem' : '0.5rem 0.25rem',
                               whiteSpace: wrapText ? 'normal' : 'nowrap',
-                              overflow: 'hidden',
+                              overflow: colIndex === database.columns.length - 1 ? 'visible' : 'hidden',
                               textOverflow: wrapText ? 'clip' : 'ellipsis',
                               wordWrap: wrapText ? 'break-word' : 'normal',
                               verticalAlign: 'top',
                               zIndex: colIndex === 0 ? 50 : 1,
+                              backgroundColor: colIndex === 0 ? (row.highlightColor || undefined) : undefined,
                               ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                             }}
                           >
-                            {/* Delete Row Button - Only show on hover for last column and only for users with edit permission */}
-                            {colIndex === database.columns.length - 1 && canEdit && hoveredRow === row.id && (
+                            {/* Row Action Menu Button - Only show on hover for last column and only for users with edit permission */}
+                            {colIndex === database.columns.length - 1 && canEdit && (() => {
+                              const shouldShow = hoveredRow === row.id;
+                              if (shouldShow) {
+                                console.log('✅ Rendering button for row:', row.id, 'hoveredRow:', hoveredRow);
+                              }
+                              return shouldShow;
+                            })() && (
                               <button
-                                onClick={() => handleDeleteRow(row.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  console.log('🔘 Button clicked for row:', row.id);
+                                  if (showRowActionMenu === row.id) {
+                                    // Close menu if already open
+                                    setShowRowActionMenu(null);
+                                    setMenuPosition(null);
+                                  } else {
+                                    // Open menu and calculate position
+                                    const rowElement = document.querySelector(`[data-row-id="${row.id}"]`) as HTMLElement;
+                                    if (rowElement) {
+                                      const rect = rowElement.getBoundingClientRect();
+                                      console.log('📍 Position calculated:', { top: rect.bottom + 4, right: 20 });
+                                      setMenuPosition({
+                                        top: rect.bottom + 4, // 4px below the row
+                                        right: 20 // 20px from right edge
+                                      });
+                                    }
+                                    setShowRowActionMenu(row.id);
+                                  }
+                                }}
                                 className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded transition-colors ${
-                                  darkMode
-                                    ? 'bg-[#191919] hover:bg-gray-700 text-gray-400'
-                                    : 'bg-white hover:bg-gray-100 text-gray-600'
+                                  row.highlightColor
+                                    ? 'bg-white hover:bg-gray-100 text-gray-700'
+                                    : darkMode
+                                      ? 'bg-[#191919] hover:bg-gray-700 text-gray-400'
+                                      : 'bg-white hover:bg-gray-100 text-gray-600'
                                 }`}
                                 style={{ zIndex: 60 }}
                               >
@@ -1867,6 +1962,91 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Row Action Popup Menu - Rendered at document level for proper z-index */}
+      {(() => {
+        const shouldShowPopup = showRowActionMenu && menuPosition;
+        if (shouldShowPopup) {
+          console.log('🎯 Rendering popup for row:', showRowActionMenu, 'at position:', menuPosition);
+        }
+        return shouldShowPopup;
+      })() && (
+        <div
+          className={`fixed w-48 rounded-lg shadow-2xl border ${
+            darkMode
+              ? 'bg-gray-800 border-gray-700'
+              : 'bg-white border-gray-200'
+          }`}
+          style={{
+            zIndex: 9999,
+            top: `${menuPosition.top}px`,
+            right: `${menuPosition.right}px`
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Highlight Color Section */}
+          <div className={`p-3 border-b ${
+            darkMode ? 'border-gray-700' : 'border-gray-200'
+          }`}>
+            <p className={`text-xs font-medium mb-2 ${
+              darkMode ? 'text-gray-400' : 'text-gray-600'
+            }`}>
+              Highlight Color
+            </p>
+            <div className="flex gap-2">
+              {highlightColors.map((color) => {
+                const currentRow = database.rows.find(r => r.id === showRowActionMenu);
+                return (
+                  <button
+                    key={color}
+                    onClick={() => handleSetRowHighlight(showRowActionMenu, color)}
+                    className={`w-8 h-8 rounded transition-all ${
+                      currentRow?.highlightColor === color
+                        ? 'ring-2 ring-blue-500 scale-110'
+                        : 'hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    title="Apply highlight"
+                  />
+                );
+              })}
+              {/* Remove Highlight Button */}
+              {database.rows.find(r => r.id === showRowActionMenu)?.highlightColor && (
+                <button
+                  onClick={() => handleSetRowHighlight(showRowActionMenu, null)}
+                  className={`w-8 h-8 rounded border-2 flex items-center justify-center transition-all hover:scale-105 ${
+                    darkMode
+                      ? 'border-gray-600 hover:bg-gray-700'
+                      : 'border-gray-300 hover:bg-gray-100'
+                  }`}
+                  title="Remove highlight"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Delete Row Option */}
+          <button
+            onClick={() => {
+              handleDeleteRow(showRowActionMenu);
+              setShowRowActionMenu(null);
+              setMenuPosition(null);
+            }}
+            className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
+              darkMode
+                ? 'text-red-400 hover:bg-gray-700'
+                : 'text-red-600 hover:bg-gray-50'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete Row
+          </button>
+        </div>
+      )}
 
       {/* Modals */}
       <AddPropertyModal

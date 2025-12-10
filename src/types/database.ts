@@ -8,6 +8,7 @@ export interface Property {
 export interface DatabaseRow {
   id: string;
   properties: { [key: string]: Property };
+  highlightColor?: string; // ✨ Added for row highlight/stabilo color
 }
 
 export interface Column {
