@@ -38,8 +38,8 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
   // Fetch history from backend
   const refreshHistory = async () => {
     try {
-      // Fetch with higher limit to show more history (1000 entries)
-      const response = await fetch(`${API_URL}?limit=1000`, {
+      // Fetch with reasonable limit (500 entries)
+      const response = await fetch(`${API_URL}?limit=500`, {
         headers: getAuthHeaders()
       });
 
@@ -50,7 +50,15 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
             ...entry,
             action: entry.action.toLowerCase(), // Convert to lowercase
             target: entry.target.toLowerCase(), // Convert to lowercase
-            createdAt: new Date(entry.createdAt)
+            // Fix timezone: MySQL CURRENT_TIMESTAMP stores local time,
+            // but Drizzle serializes with 'Z' (UTC) suffix.
+            // Strip the Z to parse as local time instead of UTC.
+            createdAt: (() => {
+              const raw = String(entry.createdAt);
+              // If it ends with Z, remove it so it's parsed as local time
+              const cleaned = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
+              return new Date(cleaned);
+            })()
           }));
           setHistory(historyWithDates);
         }

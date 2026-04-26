@@ -2,11 +2,12 @@
 // Property type icons mapping for database columns
 
 import React from 'react';
-import { Type, Hash, Calendar, CheckSquare } from 'lucide-react';
+import { Type, Hash, Calendar, CheckSquare, CircleDot } from 'lucide-react';
 
 export const propertyTypeIcons: Record<string, React.ReactNode> = {
   text: <Type className="w-3 h-3" />,
   number: <Hash className="w-3 h-3" />,
   date: <Calendar className="w-3 h-3" />,
   checkbox: <CheckSquare className="w-3 h-3" />,
+  status: <CircleDot className="w-3 h-3" />,
 };

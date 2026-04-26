@@ -20,6 +20,7 @@ export default function AuthPage() {
   const navigate = useNavigate();
 
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: ''
@@ -27,6 +28,24 @@ export default function AuthPage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Load saved "Remember Me" credentials on mount
+  useEffect(() => {
+    const savedCredentials = localStorage.getItem('rememberedUser');
+    if (savedCredentials) {
+      try {
+        const { email, password } = JSON.parse(savedCredentials);
+        setFormData({
+          email: email || '',
+          password: password ? atob(password) : ''
+        });
+        setRememberMe(true);
+      } catch (e) {
+        console.error('Failed to parse remembered credentials:', e);
+        localStorage.removeItem('rememberedUser');
+      }
+    }
+  }, []);
 
   // Check if user is already logged in, redirect to dashboard
   useEffect(() => {
@@ -101,6 +120,17 @@ export default function AuthPage() {
 
       localStorage.setItem("token", tokenData);
       localStorage.setItem("user", JSON.stringify(userData));
+      localStorage.setItem("lastActivity", Date.now().toString());
+
+      // Handle Remember Me: save or remove credentials
+      if (rememberMe) {
+        localStorage.setItem('rememberedUser', JSON.stringify({
+          email: formData.email,
+          password: btoa(formData.password)
+        }));
+      } else {
+        localStorage.removeItem('rememberedUser');
+      }
 
       setTimeout(() => {
         navigate("/dashboard");
@@ -123,8 +153,156 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800">
-      {/* Left Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center py-8 px-6 lg:px-12 bg-white overflow-y-auto">
+      {/* ==================== MOBILE LAYOUT ==================== */}
+      <div className="flex flex-col w-full lg:hidden min-h-screen">
+        {/* Mobile Hero Header */}
+        <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 pt-12 pb-24 px-6 overflow-hidden">
+
+
+          {/* Logo & Welcome */}
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-white rounded-xl p-2.5 shadow-lg shadow-blue-900/20">
+                <img
+                  src={BsmrLogoSvg}
+                  alt="BSMR Logo"
+                  className="h-10 w-auto object-contain"
+                />
+              </div>
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">
+              Welcome Back
+            </h1>
+            <p className="text-blue-200 text-sm">
+              Sign in to continue to your workspace
+            </p>
+          </div>
+        </div>
+
+        {/* Mobile Form Card - Overlaps header */}
+        <div
+          className="relative z-10 -mt-16 flex-1 bg-white rounded-t-[2rem] px-6 pt-8 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]"
+        >
+          <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
+
+          <h2 className="text-2xl font-bold text-gray-900 mb-1">
+            Get Started Now
+          </h2>
+          <p className="text-gray-500 text-sm mb-6">
+            Enter your credentials to access your account
+          </p>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
+            {/* User Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                User
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  name="mirov_user_field"
+                  autoComplete="off"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  placeholder="Enter your username"
+                  className={`w-full pl-10 pr-4 py-3 border rounded-xl bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${errors.email ? 'border-red-500' : 'border-gray-200'
+                    }`}
+                />
+              </div>
+              {errors.email && (
+                <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+              )}
+            </div>
+
+            {/* Password Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="mirov_pass_field"
+                  autoComplete="new-password"
+                  value={formData.password}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
+                  placeholder="Enter your password"
+                  className={`w-full pl-10 pr-12 py-3 border rounded-xl bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${errors.password ? 'border-red-500' : 'border-gray-200'
+                    }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              {errors.password && (
+                <p className="text-red-500 text-xs mt-1">{errors.password}</p>
+              )}
+            </div>
+
+            {/* Remember Me Checkbox */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="rememberMeMobile"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer accent-blue-600"
+              />
+              <label
+                htmlFor="rememberMeMobile"
+                className="text-sm text-gray-600 cursor-pointer select-none hover:text-gray-800 transition-colors"
+              >
+                Remember me
+              </label>
+            </div>
+
+            {/* Error/Success Message */}
+            <AnimatePresence>
+              {message && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className={`p-3 rounded-xl text-sm ${message.type === 'success'
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : 'bg-red-50 text-red-700 border border-red-200'
+                    }`}
+                >
+                  {message.text}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3.5 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30 active:scale-[0.98]"
+            >
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Processing...
+                </span>
+              ) : (
+                'Login'
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* ==================== DESKTOP LAYOUT ==================== */}
+      {/* Left Side - Form (Desktop) */}
+      <div className="hidden lg:flex w-1/2 items-center justify-center py-8 px-12 bg-white overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, x: -30 }}
           animate={{ opacity: 1, x: 0 }}
@@ -151,7 +329,7 @@ export default function AuthPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
             {/* User Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -161,12 +339,13 @@ export default function AuthPage() {
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
+                  name="mirov_user_field_desktop"
+                  autoComplete="off"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   placeholder="Enter your username"
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${errors.email ? 'border-red-500' : 'border-gray-300'
+                    }`}
                 />
               </div>
               {errors.email && (
@@ -183,12 +362,13 @@ export default function AuthPage() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  name="mirov_pass_field_desktop"
+                  autoComplete="new-password"
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
                   placeholder="Enter your password"
-                  className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
-                    errors.password ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${errors.password ? 'border-red-500' : 'border-gray-300'
+                    }`}
                 />
                 <button
                   type="button"
@@ -203,6 +383,23 @@ export default function AuthPage() {
               )}
             </div>
 
+            {/* Remember Me Checkbox */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer accent-blue-600"
+              />
+              <label
+                htmlFor="rememberMe"
+                className="text-sm text-gray-600 cursor-pointer select-none hover:text-gray-800 transition-colors"
+              >
+                Remember me
+              </label>
+            </div>
+
             {/* Error/Success Message */}
             <AnimatePresence>
               {message && (
@@ -210,11 +407,10 @@ export default function AuthPage() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className={`p-3 rounded-lg text-sm ${
-                    message.type === 'success'
-                      ? 'bg-green-50 text-green-700 border border-green-200'
-                      : 'bg-red-50 text-red-700 border border-red-200'
-                  }`}
+                  className={`p-3 rounded-lg text-sm ${message.type === 'success'
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : 'bg-red-50 text-red-700 border border-red-200'
+                    }`}
                 >
                   {message.text}
                 </motion.div>
@@ -240,7 +436,7 @@ export default function AuthPage() {
         </motion.div>
       </div>
 
-      {/* Right Side - Dashboard Preview */}
+      {/* Right Side - Dashboard Preview (Desktop) */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 items-center justify-center p-12 relative overflow-hidden">
         {/* Background decoration */}
         <div className="absolute inset-0 opacity-10">

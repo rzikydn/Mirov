@@ -51,9 +51,9 @@ export default function DebugDashboard() {
             </div>
           </div>
 
-          {/* LocalStorage State */}
+          {/* SessionStorage State */}
           <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
-            <h2 className="text-xl font-semibold mb-3 text-blue-900">LocalStorage State</h2>
+            <h2 className="text-xl font-semibold mb-3 text-blue-900">SessionStorage State</h2>
             <div className="space-y-2 text-sm font-mono">
               <p><span className="font-bold">user:</span></p>
               <pre className="bg-white p-2 rounded border text-xs overflow-auto">

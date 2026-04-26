@@ -28,11 +28,11 @@ export const updateDatabase = async (
   }) => Promise<void>,
   userName?: string,
   userRole?: string
-): Promise<boolean> => {
+): Promise<{ success: boolean; status?: number; error?: string }> => {
   // Sync with backend if database has a numeric ID (already saved)
   if (typeof database.id === 'number') {
     try {
-      console.log('🔄 Sending to backend - columnWidths:', database.columnWidths);
+      console.log('🔄 Sending to backend - Rows count:', database.rows.length);
       const response = await fetch(`${API_URL}/${database.id}`, {
         method: 'PUT',
         headers: getAuthHeaders(token),
@@ -55,20 +55,25 @@ export const updateDatabase = async (
             action: 'edit',
             target: 'database',
             targetName: database.name,
-            description: `${userName} changed database "${database.name}"`
+            description: `${userName} updated database "${database.name}"`
           });
         }
-        return true;
+        return { success: true };
       } else {
-        console.error('Failed to sync database with backend');
-        return false;
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to sync database:', response.status, response.statusText);
+        return {
+          success: false,
+          status: response.status,
+          error: errorData.message || response.statusText || `Server error (${response.status})`
+        };
       }
     } catch (error) {
       console.error('Error syncing database:', error);
-      return false;
+      return { success: false, error: 'Network connection error or timeout' };
     }
   }
-  return true;
+  return { success: true };
 };
 
 // Generate unique key from label

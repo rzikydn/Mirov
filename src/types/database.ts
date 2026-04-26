@@ -5,6 +5,8 @@ export interface Property {
   type: string;
 }
 
+
+
 export interface DatabaseRow {
   id: string;
   properties: { [key: string]: Property };
@@ -15,7 +17,11 @@ export interface Column {
   key: string;
   label: string;
   type: string;
+
 }
+
+// Alias used across the codebase
+export type DatabaseColumn = Column;
 
 export interface Database {
   id: string | number;

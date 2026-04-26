@@ -20,26 +20,83 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const INACTIVITY_LIMIT = 8 * 60 * 60 * 1000; // 8 jam (waktu maksimal tidak beraktifitas sebelum auto-logout)
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
-  useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    const savedToken = localStorage.getItem('token');
-    
-    if (savedUser && savedToken) {
-      setUser(JSON.parse(savedUser));
-      setToken(savedToken);
-    }
-  }, []);
-
-  const logout = () => {
+  const performLogout = () => {
     setUser(null);
     setToken(null);
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    localStorage.removeItem('lastActivity');
     window.location.href = '/auth';
+  };
+
+  const updateActivity = () => {
+    if (localStorage.getItem('token')) {
+      localStorage.setItem('lastActivity', Date.now().toString());
+    }
+  };
+
+  useEffect(() => {
+    // Bersihkan sisa sesi lama yang pake sessionStorage jika masih ada
+    if (sessionStorage.getItem('token') || sessionStorage.getItem('user')) {
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+    }
+
+    const savedUser = localStorage.getItem('user');
+    const savedToken = localStorage.getItem('token');
+    const lastActivityStr = localStorage.getItem('lastActivity');
+
+    if (savedUser && savedToken) {
+      const lastActivity = lastActivityStr ? parseInt(lastActivityStr, 10) : 0;
+      const isExpired = Date.now() - lastActivity > INACTIVITY_LIMIT;
+
+      // Jika sudah melewati batas batas tidak aktif, paksa login ulang
+      if (isExpired && lastActivity !== 0) {
+        console.log('⏰ Sesi kedaluwarsa karena sudah lama tidak diakses');
+        performLogout();
+        return;
+      }
+
+      try {
+        setUser(JSON.parse(savedUser));
+        setToken(savedToken);
+        updateActivity(); // refresh waktu aktif
+      } catch (e) {
+        console.error('Failed to parse user:', e);
+        performLogout();
+      }
+    }
+  }, []);
+
+  // Update lastActivity saat ada interaksi user supaya sesi tidak mati kalau web terbuka & dipakai
+  useEffect(() => {
+    if (!token) return;
+
+    let timeout: NodeJS.Timeout;
+    const handleActivity = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        updateActivity();
+      }, 5000); // Throttled to prevent too many writes
+    };
+
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(event => window.addEventListener(event, handleActivity));
+
+    return () => {
+      events.forEach(event => window.removeEventListener(event, handleActivity));
+      clearTimeout(timeout);
+    };
+  }, [token]);
+
+  const logout = () => {
+    performLogout();
   };
 
   const hasRole = (roles: Array<'SUPERUSER' | 'ADMIN' | 'UMUM'>): boolean => {

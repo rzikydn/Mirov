@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, MoreHorizontal, Smile, FileText, Edit3, ChevronDown, X, Download, Upload, ArrowUpDown, Search, Columns3 } from 'lucide-react';
+import { Plus, MoreHorizontal, Smile, FileText, Edit3, ChevronDown, X, Download, Upload, ArrowUpDown, Search, Columns3, Save, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Database, DatabaseRow } from '../../types/database';
@@ -19,6 +19,7 @@ import ExportModal from './modals/ExportModal';
 import ImportModal from './modals/ImportModal';
 import WarningModal from './modals/WarningModal';
 import DateInput from './DateInput';
+
 
 // Import constants
 import { propertyTypeIcons } from '../../constants/propertyTypeIcons';
@@ -100,7 +101,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     return widths;
   });
   const [resizingColumn, setResizingColumn] = useState<{ key: string; startX: number; startWidth: number } | null>(null);
-  const [tableWidth, setTableWidth] = useState<number>(0);
+  const [totalColumnWidth, setTotalColumnWidth] = useState<number>(0);
   const [wrapText, setWrapText] = useState(false); // Excel-like wrap text toggle
   const horizontalScrollRef = useRef<HTMLDivElement>(null); // Ref for external horizontal scrollbar
   const [searchQuery, setSearchQuery] = useState(''); // Search query state
@@ -115,21 +116,23 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       if (database.columns.length > 0) {
         const totalWidth = database.columns.reduce((sum, col) => sum + (columnWidths[col.key] || 150), 0);
         const containerWidth = tableContainerRef.current?.offsetWidth || 0;
-        const newTableWidth = Math.max(totalWidth, containerWidth);
-        setTableWidth(newTableWidth);
+        setTotalColumnWidth(totalWidth);
 
         // Check if horizontal scroll is needed
         setNeedsHorizontalScroll(totalWidth > containerWidth);
-
-        console.log('📐 Table width updated:', newTableWidth, 'from column widths:', columnWidths);
       }
     };
 
     updateTableWidth();
 
     // Add resize observer to detect container width changes
+    let resizeTimer: NodeJS.Timeout;
     const resizeObserver = new ResizeObserver(() => {
-      updateTableWidth();
+      // Debounce table resize to prevent heavy JS re-renders during sidebar animation
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        updateTableWidth();
+      }, 100); // Small delay to batch resize events
     });
 
     if (tableContainerRef.current) {
@@ -137,6 +140,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }
 
     return () => {
+      clearTimeout(resizeTimer);
       resizeObserver.disconnect();
     };
   }, [columnWidths, database.columns]);
@@ -304,31 +308,21 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     });
   };
 
-  const updateThisDb = async (mutator: (db: Database) => Database) => {
-    const updatedDb = mutator(database);
+  const updateThisDb = (mutator: (db: Database) => Database) => {
+    // Use functional update to ensure we always work with the latest state
+    setDatabases((prev) => {
+      const dbIndex = prev.findIndex((d) => d.id === database.id);
+      if (dbIndex === -1) return prev;
 
-    // Update local state immediately for responsive UI
-    setDatabases((prev) => prev.map((d) => (d.id === database.id ? updatedDb : d)));
+      const latestDb = prev[dbIndex];
+      const updatedDb = mutator(latestDb);
 
-    // Sync with backend if database has a numeric ID (already saved)
-    // Note: We don't pass addHistory here anymore because we handle specific history entries in each handler
-    if (typeof updatedDb.id === 'number') {
-      try {
-        await updateDatabase(
-          updatedDb,
-          token,
-          undefined, // Don't use generic history
-          user?.name,
-          user?.role as 'SUPERUSER' | 'ADMIN' | 'UMUM'
-        );
-        console.log('✅ Database updated successfully on backend');
-      } catch (error) {
-        console.error('❌ Failed to save to backend:', error);
-        alert('Failed to save changes to server. Please try again.');
-      }
-    } else {
-      console.warn('⚠️ Database ID is not numeric, skipping backend sync:', updatedDb.id);
-    }
+      const newDatabases = [...prev];
+      newDatabases[dbIndex] = updatedDb;
+
+      console.log('📝 Local state updated for database:', updatedDb.name, 'Click "Save" to persist.');
+      return newDatabases;
+    });
   };
 
   const handleColumnLabelFocus = (key: string) => {
@@ -375,12 +369,19 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
     await updateThisDb((db) => ({
       ...db,
-      columns: db.columns.map((c) => (c.key === key ? { ...c, type } : c)),
+      columns: db.columns.map((c) => {
+        if (c.key !== key) return c;
+        const updated = { ...c, type };
+        return updated;
+      }),
       rows: db.rows.map((row) => ({
         ...row,
         properties: {
           ...row.properties,
-          [key]: { value: row.properties[key]?.value || '', type }
+          [key]: {
+            value: row.properties[key]?.value || '',
+            type
+          }
         },
       })),
     }));
@@ -447,12 +448,12 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       rows: db.rows.map((row) =>
         row.id === rowId
           ? {
-              ...row,
-              properties: {
-                ...row.properties,
-                [key]: { ...row.properties[key], value }
-              }
+            ...row,
+            properties: {
+              ...row.properties,
+              [key]: { ...row.properties[key], value }
             }
+          }
           : row
       ),
     }));
@@ -463,8 +464,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
     const newKey = `${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
 
-    // Update database first
-    await updateThisDb((db) => {
+    // Update database locally
+    updateThisDb((db) => {
       const updatedColumns = [...db.columns, { key: newKey, label: name, type }];
       const updatedRows = db.rows.map((row) => ({
         ...row,
@@ -717,6 +718,95 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     setTimeout(() => {
       newRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
+  };
+
+  const handleSaveDatabase = async () => {
+    if (!canEdit) {
+      toast.error('You do not have permission to save changes.');
+      return;
+    }
+
+    if (typeof database.id === 'number') {
+      const loadingToast = toast.loading('Saving changes to server...');
+      try {
+        console.log('📤 Manually saving database:', database.name, 'with', database.rows.length, 'rows');
+
+        const result = await updateDatabase(
+          database,
+          token,
+          undefined, // History handled individually in actions
+          user?.name,
+          user?.role as 'SUPERUSER' | 'ADMIN' | 'UMUM'
+        );
+
+        toast.dismiss(loadingToast);
+
+        if (result.success) {
+          toast.success(
+            'Successfully saved database!',
+            {
+              duration: 3000,
+              position: 'top-right',
+              style: {
+                background: '#10b981',
+                color: '#fff',
+                fontWeight: '500',
+                border: 'none',
+              },
+              iconTheme: {
+                primary: '#fff',
+                secondary: '#10b981',
+              },
+            }
+          );
+          console.log('✅ Database manually saved to backend');
+        } else {
+          // Check if it's a size issue (413 is Payload Too Large)
+          const errorMsg = result.status === 413
+            ? 'Data too large for server. Try uploading a smaller CSV or contact admin to increase limit.'
+            : `Failed: ${result.error || 'Server error'}`;
+
+          toast.error(errorMsg, { duration: 5000 });
+        }
+      } catch (error) {
+        toast.dismiss(loadingToast);
+        console.error('❌ Failed to save to backend:', error);
+        toast.error('Failed to save changes: Network error or server timeout.');
+      }
+    } else {
+      toast.error('Cannot save: Database ID is invalid.');
+    }
+  };
+
+  const handleRefresh = async () => {
+    const loadingToast = toast.loading('Refreshing data...');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/databases/${database.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          // Update the database in the parent state
+          setDatabases((prev) => prev.map((d) => (d.id === database.id ? result.data : d)));
+          toast.dismiss(loadingToast);
+          toast.success('Data refreshed from server');
+        } else {
+          throw new Error('Failed to parse response');
+        }
+      } else {
+        throw new Error('Server returned an error');
+      }
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      console.error('Error refreshing database:', error);
+      toast.error('Failed to refresh data. Check your connection.');
+    }
   };
 
   const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1130,12 +1220,16 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     });
   });
 
-  // Virtual scrolling setup - Only render visible rows for performance
+  // Virtual scrolling setup - Supporting dynamic row heights like Excel
   const rowVirtualizer = useVirtualizer({
     count: filteredRows.length,
     getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => wrapText ? 80 : 42, // Dynamic row height: 80px for wrapped text, 42px for normal
-    overscan: 10, // Render 10 extra items above and below viewport for smooth scrolling
+    estimateSize: () => (wrapText ? 60 : 42),
+    overscan: 10,
+    measureElement: (el) => {
+      if (!el) return 0;
+      return el.getBoundingClientRect().height;
+    },
   });
 
   return (
@@ -1157,9 +1251,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               onBlur={handleDatabaseNameChange}
               onKeyDown={handleNameKeyPress}
               autoFocus
-              className={`text-2xl sm:text-3xl lg:text-4xl font-bold w-full ${
-                darkMode ? 'bg-[#191919] text-white' : 'bg-white text-gray-900'
-              } border-0 focus:outline-none p-0`}
+              className={`text-2xl sm:text-3xl lg:text-4xl font-bold w-full ${darkMode ? 'bg-[#191919] text-white' : 'bg-white text-gray-900'
+                } border-0 focus:outline-none p-0`}
               placeholder="Untitled"
             />
           ) : (
@@ -1170,18 +1263,16 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 <div className="flex items-center gap-3 group">
                   <h1
                     onClick={() => canEdit && setIsEditingName(true)}
-                    className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${canEdit ? 'cursor-text' : 'cursor-default'} ${
-                      darkMode ? 'text-white' : 'text-gray-900'
-                    }`}
+                    className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${canEdit ? 'cursor-text' : 'cursor-default'} ${darkMode ? 'text-white' : 'text-gray-900'
+                      }`}
                   >
                     {database.name}
                   </h1>
                   {canEdit && (
                     <button
                       onClick={() => setIsEditingName(true)}
-                      className={`opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded ${
-                        darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
-                      }`}
+                      className={`opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+                        }`}
                       title="Edit title"
                     >
                       <Edit3 className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
@@ -1190,9 +1281,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   {canEdit && database.icon && (
                     <button
                       onClick={handleRemoveIcon}
-                      className={`opacity-0 group-hover:opacity-100 p-1.5 rounded transition-opacity ${
-                        darkMode ? 'hover:bg-gray-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
-                      }`}
+                      className={`opacity-0 group-hover:opacity-100 p-1.5 rounded transition-opacity ${darkMode ? 'hover:bg-gray-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
+                        }`}
                       title="Remove icon"
                     >
                       <X className="w-4 h-4" />
@@ -1218,15 +1308,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         });
                       }}
                       type="button"
-                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap transition-colors ${
-                        !canEdit
-                          ? darkMode
-                            ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
-                            : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
-                          : darkMode
-                            ? 'text-gray-400 hover:bg-gray-800'
-                            : 'text-gray-600 hover:bg-gray-100'
-                      }`}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap transition-colors ${!canEdit
+                        ? darkMode
+                          ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
+                          : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
+                        : darkMode
+                          ? 'text-gray-400 hover:bg-gray-800'
+                          : 'text-gray-600 hover:bg-gray-100'
+                        }`}
                       title={!canEdit ? 'Only ADMIN and SUPERUSER can change icon' : database.icon ? 'Change icon' : 'Add icon'}
                     >
                       <Smile className="w-4 h-4 flex-shrink-0" />
@@ -1255,15 +1344,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         handleAddDescription();
                       }}
                       type="button"
-                      className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
-                        !canEdit
-                          ? darkMode
-                            ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
-                            : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
-                          : darkMode
-                            ? 'text-gray-400 hover:bg-gray-800'
-                            : 'text-gray-600 hover:bg-gray-100'
-                      }`}
+                      className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${!canEdit
+                        ? darkMode
+                          ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
+                          : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
+                        : darkMode
+                          ? 'text-gray-400 hover:bg-gray-800'
+                          : 'text-gray-600 hover:bg-gray-100'
+                        }`}
                       title={!canEdit ? 'Only ADMIN and SUPERUSER can add description' : 'Add description'}
                     >
                       <FileText className="w-4 h-4 flex-shrink-0" />
@@ -1284,15 +1372,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       setShowImportModal(true);
                     }}
                     type="button"
-                    className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
-                      !canEdit
-                        ? darkMode
-                          ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
-                          : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
-                        : darkMode
-                          ? 'text-gray-400 hover:bg-gray-800'
-                          : 'text-gray-600 hover:bg-gray-100'
-                    }`}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${!canEdit
+                      ? darkMode
+                        ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
+                        : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
+                      : darkMode
+                        ? 'text-gray-400 hover:bg-gray-800'
+                        : 'text-gray-600 hover:bg-gray-100'
+                      }`}
                     title={!canEdit ? 'Only ADMIN and SUPERUSER can import data' : 'Import CSV file'}
                   >
                     <Upload className="w-4 h-4 flex-shrink-0" />
@@ -1302,9 +1389,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   {/* Export Button - Always visible and functional */}
                   <button
                     onClick={() => setShowExportModal(true)}
-                    className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
-                      darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
-                    }`}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
+                      }`}
                     title="Export data to CSV or JSON"
                   >
                     <Download className="w-4 h-4 flex-shrink-0" />
@@ -1325,9 +1411,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       autoFocus
                       placeholder="Add a description..."
                       rows={3}
-                      className={`w-full text-base ${
-                        darkMode ? 'bg-[#191919] text-gray-400' : 'bg-white text-gray-600'
-                      } border-0 focus:outline-none p-0 resize-none`}
+                      className={`w-full text-base ${darkMode ? 'bg-[#191919] text-gray-400' : 'bg-white text-gray-600'
+                        } border-0 focus:outline-none p-0 resize-none`}
                     />
                   ) : (
                     <div className="flex items-start gap-3 group">
@@ -1338,9 +1423,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             setEditedDescription(database.description || '');
                           }
                         }}
-                        className={`text-base ${canEdit ? 'cursor-text' : 'cursor-default'} ${
-                          darkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}
+                        className={`text-base ${canEdit ? 'cursor-text' : 'cursor-default'} ${darkMode ? 'text-gray-400' : 'text-gray-600'
+                          }`}
                       >
                         {database.description}
                       </p>
@@ -1350,9 +1434,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             setIsEditingDescription(true);
                             setEditedDescription(database.description || '');
                           }}
-                          className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${
-                            darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
-                          }`}
+                          className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+                            }`}
                           title="Edit description"
                         >
                           <Edit3 className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
@@ -1381,15 +1464,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       });
                     }}
                     type="button"
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap transition-colors ${
-                      !canEdit
-                        ? darkMode
-                          ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
-                          : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
-                        : darkMode
-                          ? 'text-gray-400 hover:bg-gray-800'
-                          : 'text-gray-600 hover:bg-gray-100'
-                    }`}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap transition-colors ${!canEdit
+                      ? darkMode
+                        ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
+                        : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
+                      : darkMode
+                        ? 'text-gray-400 hover:bg-gray-800'
+                        : 'text-gray-600 hover:bg-gray-100'
+                      }`}
                     title={!canEdit ? 'Only ADMIN and SUPERUSER can change icon' : database.icon ? 'Change icon' : 'Add icon'}
                   >
                     <Smile className="w-4 h-4 flex-shrink-0" />
@@ -1418,15 +1500,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       handleAddDescription();
                     }}
                     type="button"
-                    className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
-                      !canEdit
-                        ? darkMode
-                          ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
-                          : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
-                        : darkMode
-                          ? 'text-gray-400 hover:bg-gray-800'
-                          : 'text-gray-600 hover:bg-gray-100'
-                    }`}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${!canEdit
+                      ? darkMode
+                        ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
+                        : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
+                      : darkMode
+                        ? 'text-gray-400 hover:bg-gray-800'
+                        : 'text-gray-600 hover:bg-gray-100'
+                      }`}
                     title={!canEdit ? 'Only ADMIN and SUPERUSER can add description' : 'Add description'}
                   >
                     <FileText className="w-4 h-4 flex-shrink-0" />
@@ -1447,15 +1528,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     setShowImportModal(true);
                   }}
                   type="button"
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
-                    !canEdit
-                      ? darkMode
-                        ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
-                        : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
-                      : darkMode
-                        ? 'text-gray-400 hover:bg-gray-800'
-                        : 'text-gray-600 hover:bg-gray-100'
-                  }`}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${!canEdit
+                    ? darkMode
+                      ? 'text-gray-500 cursor-not-allowed opacity-50 pointer-events-auto'
+                      : 'text-gray-400 cursor-not-allowed opacity-50 pointer-events-auto'
+                    : darkMode
+                      ? 'text-gray-400 hover:bg-gray-800'
+                      : 'text-gray-600 hover:bg-gray-100'
+                    }`}
                   title={!canEdit ? 'Only ADMIN and SUPERUSER can import data' : 'Import CSV file'}
                 >
                   <Upload className="w-4 h-4 flex-shrink-0" />
@@ -1465,9 +1545,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 {/* Export Button - Always visible and functional */}
                 <button
                   onClick={() => setShowExportModal(true)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${
-                    darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-xs sm:text-sm whitespace-nowrap ${darkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
                   title="Export data to CSV or JSON"
                 >
                   <Download className="w-4 h-4 flex-shrink-0" />
@@ -1486,9 +1565,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             exit={{ opacity: 0, height: 0 }}
             className="lg:hidden mb-3 mt-2"
           >
-            <div className={`relative rounded-lg ${
-              darkMode ? 'bg-gray-800' : 'bg-white border border-gray-300'
-            }`}>
+            <div className={`relative rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white border border-gray-300'
+              }`}>
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
               <input
                 type="text"
@@ -1502,11 +1580,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 }}
                 placeholder="Search"
                 autoFocus
-                className={`w-full pl-9 pr-10 py-2 rounded-lg text-sm ${
-                  darkMode
-                    ? 'bg-gray-800 text-white placeholder-gray-500 border-0'
-                    : 'bg-white text-gray-900 placeholder-gray-400 border-0'
-                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`w-full pl-9 pr-10 py-2 rounded-lg text-sm ${darkMode
+                  ? 'bg-gray-800 text-white placeholder-gray-500 border-0'
+                  : 'bg-white text-gray-900 placeholder-gray-400 border-0'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
               {/* Clear button */}
               {searchQuery && (
@@ -1515,9 +1592,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     setSearchQuery('');
                     setShowSearchInput(false);
                   }}
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded ${
-                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-                  }`}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+                    }`}
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -1530,9 +1606,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         <div className="flex items-center justify-between mb-3 mt-2">
           <div className="flex items-center gap-3">
             {/* Table Label */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded ${
-              darkMode ? 'bg-gray-800' : 'bg-gray-100'
-            }`}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded ${darkMode ? 'bg-gray-800' : 'bg-gray-100'
+              }`}>
               <div className="w-4 h-4 grid grid-cols-2 gap-0.5">
                 <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-400'} rounded-sm`}></div>
                 <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-400'} rounded-sm`}></div>
@@ -1549,37 +1624,33 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               {/* Mobile: Search Icon Button */}
               <button
                 onClick={() => setShowSearchInput(!showSearchInput)}
-                className={`lg:hidden p-2 rounded-lg ${
-                  darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
-                } ${showSearchInput ? (darkMode ? 'bg-gray-800' : 'bg-gray-100') : ''}`}
+                className={`lg:hidden p-2 rounded-lg ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+                  } ${showSearchInput ? (darkMode ? 'bg-gray-800' : 'bg-gray-100') : ''}`}
                 title="Search"
               >
                 <Search className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
               </button>
 
               {/* Desktop: Always visible search bar */}
-              <div className={`hidden lg:block relative rounded-lg ${
-                darkMode ? 'bg-gray-800' : 'bg-white border border-gray-300'
-              }`}>
+              <div className={`hidden lg:block relative rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white border border-gray-300'
+                }`}>
                 <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search"
-                  className={`w-64 pl-9 pr-10 py-2 rounded-lg text-sm ${
-                    darkMode
-                      ? 'bg-gray-800 text-white placeholder-gray-500 border-0'
-                      : 'bg-white text-gray-900 placeholder-gray-400 border-0'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  className={`w-64 pl-9 pr-10 py-2 rounded-lg text-sm ${darkMode
+                    ? 'bg-gray-800 text-white placeholder-gray-500 border-0'
+                    : 'bg-white text-gray-900 placeholder-gray-400 border-0'
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 />
                 {/* Clear button */}
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded ${
-                      darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-                    }`}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+                      }`}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -1589,16 +1660,40 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
+            {/* Refresh Button */}
+            <button
+              onClick={handleRefresh}
+              className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${darkMode
+                ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              title="Refresh data from server"
+            >
+              <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="hidden md:inline text-xs sm:text-sm">Refresh</span>
+            </button>
+
+            {/* Save Button - Positioned to the left of Wrap */}
+            {canEdit && (
+              <button
+                onClick={handleSaveDatabase}
+                className="flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                title="Save changes"
+              >
+                <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="hidden md:inline text-xs sm:text-sm">Save</span>
+              </button>
+            )}
+
             {/* Wrap Text Toggle - Excel-like */}
             <button
               onClick={() => setWrapText(!wrapText)}
-              className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${
-                wrapText
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : darkMode
-                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+              className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${wrapText
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : darkMode
+                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
               title={wrapText ? "Disable text wrapping" : "Enable text wrapping (Excel-like)"}
             >
               <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1638,11 +1733,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
             {canEdit && (
               <button
                 onClick={handleAddRow}
-                className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${
-                  darkMode
-                    ? 'bg-white hover:bg-gray-100 text-gray-900'
-                    : 'bg-gray-900 hover:bg-gray-800 text-white'
-                }`}
+                className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${darkMode
+                  ? 'bg-white hover:bg-gray-100 text-gray-900'
+                  : 'bg-gray-900 hover:bg-gray-800 text-white'
+                  }`}
                 title="Add a new row"
               >
                 <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
@@ -1662,15 +1756,14 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 setShowAddProperty(true);
               }}
               type="button"
-              className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${
-                !canEdit
-                  ? darkMode
-                    ? 'bg-white text-gray-900 cursor-not-allowed opacity-40 pointer-events-auto'
-                    : 'bg-gray-900 text-white cursor-not-allowed opacity-40 pointer-events-auto'
-                  : darkMode
-                    ? 'bg-white hover:bg-gray-100 text-gray-900'
-                    : 'bg-gray-900 hover:bg-gray-800 text-white'
-              }`}
+              className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${!canEdit
+                ? darkMode
+                  ? 'bg-white text-gray-900 cursor-not-allowed opacity-40 pointer-events-auto'
+                  : 'bg-gray-900 text-white cursor-not-allowed opacity-40 pointer-events-auto'
+                : darkMode
+                  ? 'bg-white hover:bg-gray-100 text-gray-900'
+                  : 'bg-gray-900 hover:bg-gray-800 text-white'
+                }`}
               title={!canEdit ? 'Only ADMIN and SUPERUSER can add properties' : 'Add a new column'}
             >
               <Columns3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
@@ -1682,21 +1775,21 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
       {/* Table - Notion Style with Scroll */}
       <div className="px-4 sm:px-6 lg:px-12 pb-12">
-        <div className={`border rounded-lg overflow-hidden ${
-          darkMode ? 'border-gray-800' : 'border-gray-200'
-        }`}>
-            {/* Scrollable container - both horizontal and vertical scroll */}
-            <div
-              ref={tableContainerRef}
-              className="overflow-auto hide-scrollbar max-h-[calc(100vh-300px)]"
-              style={{
-                willChange: 'transform',
-                transform: 'translateZ(0)',
-                WebkitOverflowScrolling: 'touch'
-              }}
-            >
+        <div className={`border rounded-lg overflow-hidden ${darkMode ? 'border-gray-800' : 'border-gray-200'
+          }`}>
+          {/* Scrollable container - both horizontal and vertical scroll */}
+          <div
+            ref={tableContainerRef}
+            className="overflow-auto hide-scrollbar max-h-[calc(100vh-300px)]"
+            style={{
+              willChange: 'transform',
+              transform: 'translateZ(0)',
+              WebkitOverflowScrolling: 'touch'
+            }}
+          >
             <table className="border-collapse" style={{
-              width: tableWidth > 0 ? `${tableWidth}px` : '100%',
+              width: '100%',
+              minWidth: totalColumnWidth > 0 ? `${totalColumnWidth}px` : undefined,
               tableLayout: 'fixed' // Fixed layout for consistent column widths
             }}>
               {/* Column width definitions - PERFORMANCE: Define widths once here instead of on every cell */}
@@ -1714,7 +1807,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               </colgroup>
               {/* Table Header - Sticky */}
               <thead
-                className={`sticky top-0 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}`}
+                className={`sticky top-0 ${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'}`}
                 style={{
                   zIndex: 100,
                   willChange: 'transform',
@@ -1726,9 +1819,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                     <th
                       key={col.key}
                       ref={index === database.columns.length - 1 ? newColumnRef : null}
-                      className={`group text-left py-2 font-normal relative ${
-                        index !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
-                      } ${index === 0 ? `sticky left-0 ${darkMode ? 'bg-[#202020]' : 'bg-gray-50'}` : ''}`}
+                      className={`group text-left py-2 font-normal relative ${index !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
+                        } ${index === 0 ? `sticky left-0 ${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'}` : ''}`}
                       style={{
                         padding: index === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
                         whiteSpace: 'nowrap',
@@ -1745,11 +1837,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                           <button
                             onClick={() => canManageColumns && setTypeDropdownOpen(typeDropdownOpen === col.key ? null : col.key)}
                             disabled={!canManageColumns}
-                            className={`flex items-center gap-1 px-1 py-0.5 rounded ${
-                              canManageColumns
-                                ? (darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200')
-                                : 'cursor-not-allowed opacity-60'
-                            }`}
+                            className={`flex items-center gap-1 px-1 py-0.5 rounded ${canManageColumns
+                              ? (darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200')
+                              : 'cursor-not-allowed opacity-60'
+                              }`}
                             title={canManageColumns ? 'Change column type' : 'Only SUPERUSER can change column type'}
                           >
                             <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -1776,9 +1867,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                           onChange={(e) => canManageColumns && handleColumnLabelChange(col.key, e.target.value)}
                           onBlur={(e) => canManageColumns && handleColumnLabelBlur(col.key, e.target.value)}
                           disabled={!canManageColumns}
-                          className={`text-sm font-medium ${
-                            darkMode ? 'text-gray-300 bg-transparent' : 'text-gray-700 bg-transparent'
-                          } border-0 focus:outline-none px-0 py-0 flex-1 ${!canManageColumns ? 'cursor-not-allowed' : ''}`}
+                          className={`text-sm font-medium ${darkMode ? 'text-gray-300 bg-transparent' : 'text-gray-700 bg-transparent'
+                            } border-0 focus:outline-none px-0 py-0 flex-1 min-w-0 ${!canManageColumns ? 'cursor-not-allowed' : ''}`}
                           placeholder="Name"
                           title={canManageColumns ? 'Edit column name' : 'Only SUPERUSER can edit column name'}
                         />
@@ -1787,9 +1877,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         {canManageColumns && (
                           <button
                             onClick={() => handleDeleteProperty(col.key)}
-                            className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity ${
-                              darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-                            }`}
+                            className={`p-1 rounded transition-opacity flex-shrink-0 ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+                              }`}
                             title="Delete column (SUPERUSER only)"
                           >
                             <MoreHorizontal className={`w-3 h-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
@@ -1801,11 +1890,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                       {index !== database.columns.length - 1 && (
                         <div
                           onMouseDown={(e) => handleResizeStart(e, col.key)}
-                          className={`resize-handle absolute right-0 top-0 bottom-0 cursor-col-resize ${
-                            resizingColumn?.key === col.key
-                              ? 'w-1 bg-blue-500 opacity-100'
-                              : 'w-1 hover:bg-blue-400 hover:opacity-80 opacity-0'
-                          }`}
+                          className={`resize-handle absolute right-0 top-0 bottom-0 cursor-col-resize ${resizingColumn?.key === col.key
+                            ? 'w-1 bg-blue-500 opacity-100'
+                            : 'w-1 hover:bg-blue-400 hover:opacity-80 opacity-0'
+                            }`}
                           style={{
                             zIndex: 30,
                             marginRight: '-0.5px',
@@ -1840,23 +1928,29 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   return (
                     <tr
                       key={row.id}
-                      ref={rowIndex === 0 ? newRowRef : null}
+                      data-index={virtualRow.index}
+                      ref={(el) => {
+                        rowVirtualizer.measureElement(el);
+                        if (rowIndex === 0) {
+                          // @ts-ignore - Handle read-only ref assignment if necessary
+                          newRowRef.current = el;
+                        }
+                      }}
                       data-row-id={row.id}
-                      onMouseEnter={(e) => {
+                      onMouseEnter={() => {
                         if (!resizingColumn) {
                           setHoveredRow(row.id);
                         }
                       }}
-                      onMouseLeave={(e) => {
+                      onMouseLeave={() => {
                         if (!resizingColumn) {
                           setHoveredRow(null);
                         }
                       }}
-                      className={`group border-b ${
-                        darkMode ? 'hover:bg-[#202020] border-gray-800' : 'hover:bg-gray-50 border-gray-200'
-                      }`}
+                      className={`group border-b transition-colors ${darkMode ? 'hover:bg-[#202020] border-gray-800' : 'hover:bg-gray-50 border-gray-200'
+                        }`}
                       style={{
-                        height: `${virtualRow.size}px`,
+                        // height: wrapText ? 'auto' : `${virtualRow.size}px`,
                         backgroundColor: row.highlightColor || undefined,
                       }}
                     >
@@ -1864,9 +1958,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         const prop = row.properties[col.key];
                         if (!prop) return <td
                           key={col.key}
-                          className={`py-2 ${
-                            colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
-                          } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''}`}
+                          className={`py-2 ${colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
+                            } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''}`}
                           style={{
                             padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : '0.5rem 0.25rem',
                             whiteSpace: wrapText ? 'normal' : 'nowrap',
@@ -1883,11 +1976,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         return (
                           <td
                             key={col.key}
-                            className={`py-2 ${
-                              colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
-                            } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''} ${
-                              colIndex === database.columns.length - 1 ? 'relative' : ''
-                            }`}
+                            className={`py-2 ${colIndex !== database.columns.length - 1 ? (darkMode ? 'border-r border-gray-800' : 'border-r border-gray-200') : ''
+                              } ${colIndex === 0 ? `sticky left-0 ${darkMode ? 'bg-[#191919] group-hover:bg-[#202020]' : 'bg-white group-hover:bg-gray-50'}` : ''} ${colIndex === database.columns.length - 1 ? 'relative' : ''
+                              }`}
                             style={{
                               padding: colIndex === 0 ? '0.5rem 0.25rem 0.5rem 0.75rem' : colIndex === database.columns.length - 1 ? '0.5rem 2.5rem 0.5rem 0.25rem' : '0.5rem 0.25rem',
                               whiteSpace: wrapText ? 'normal' : 'nowrap',
@@ -1935,30 +2026,61 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             )}
                             {prop.type === 'text' && (
                               wrapText ? (
-                                <textarea
-                                  value={prop.value}
-                                  onFocus={() => handleCellFocus(row.id, col.key, prop.value)}
-                                  onChange={(e) => canEdit && handleValueChange(row.id, col.key, e.target.value)}
-                                  onBlur={(e) => handleCellBlur(row.id, col.key, e.target.value)}
-                                  disabled={!canEdit}
-                                  placeholder=""
-                                  rows={1}
-                                  className={`w-full text-sm resize-none ${
-                                    row.highlightColor && darkMode
-                                      ? 'bg-transparent text-gray-900'
-                                      : darkMode
-                                        ? 'bg-transparent text-gray-300'
-                                        : 'bg-transparent text-gray-900'
-                                  } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
-                                  style={{
-                                    whiteSpace: 'pre-wrap',
-                                    wordBreak: 'break-word',
-                                    overflowWrap: 'break-word',
-                                    minHeight: '1.5rem',
-                                    maxHeight: '10rem',
-                                    overflow: 'auto'
-                                  }}
-                                />
+                                <div className="w-full relative min-h-[1.5rem]">
+                                  {editingCell?.rowId === row.id && editingCell?.key === col.key ? (
+                                    <textarea
+                                      value={prop.value}
+                                      autoFocus
+                                      onChange={(e) => {
+                                        if (canEdit) {
+                                          handleValueChange(row.id, col.key, e.target.value);
+                                          e.target.style.height = 'auto';
+                                          e.target.style.height = `${e.target.scrollHeight}px`;
+                                        }
+                                      }}
+                                      onBlur={(e) => {
+                                        handleCellBlur(row.id, col.key, e.target.value);
+                                        setEditingCell(null);
+                                      }}
+                                      className={`w-full text-sm resize-none overflow-hidden ${row.highlightColor && darkMode
+                                        ? 'text-gray-900 bg-transparent'
+                                        : darkMode
+                                          ? 'text-gray-300 bg-transparent'
+                                          : 'text-gray-900 bg-transparent'
+                                        } border-0 focus:outline-none p-0`}
+                                      style={{
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word',
+                                        height: 'auto',
+                                        display: 'block'
+                                      }}
+                                      ref={(el) => {
+                                        if (el) {
+                                          el.style.height = 'auto';
+                                          el.style.height = `${el.scrollHeight}px`;
+                                        }
+                                      }}
+                                    />
+                                  ) : (
+                                    <div
+                                      onClick={() => canEdit && setEditingCell({ rowId: row.id, key: col.key, oldValue: prop.value })}
+                                      className={`w-full text-sm ${row.highlightColor && darkMode
+                                        ? 'text-gray-900'
+                                        : darkMode
+                                          ? 'text-gray-300'
+                                          : 'text-gray-900'
+                                        } ${canEdit ? 'cursor-text' : ''}`}
+                                      style={{
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word',
+                                        overflowWrap: 'break-word',
+                                        minHeight: '1.5rem'
+                                      }}
+                                    >
+                                      {prop.value || (canEdit ? '' : '')}
+                                    </div>
+                                  )}
+                                </div>
                               ) : (
                                 <input
                                   type="text"
@@ -1968,13 +2090,12 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                   onBlur={(e) => handleCellBlur(row.id, col.key, e.target.value)}
                                   disabled={!canEdit}
                                   placeholder=""
-                                  className={`w-full text-sm ${
-                                    row.highlightColor && darkMode
-                                      ? 'bg-transparent text-gray-900'
-                                      : darkMode
-                                        ? 'bg-transparent text-gray-300'
-                                        : 'bg-transparent text-gray-900'
-                                  } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                                  className={`w-full text-sm ${row.highlightColor && darkMode
+                                    ? 'bg-transparent text-gray-900'
+                                    : darkMode
+                                      ? 'bg-transparent text-gray-300'
+                                      : 'bg-transparent text-gray-900'
+                                    } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                                 />
                               )
                             )}
@@ -1987,13 +2108,12 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                 onBlur={(e) => handleCellBlur(row.id, col.key, e.target.valueAsNumber)}
                                 disabled={!canEdit}
                                 placeholder=""
-                                className={`w-full text-sm ${
-                                  row.highlightColor && darkMode
-                                    ? 'bg-transparent text-gray-900'
-                                    : darkMode
-                                      ? 'bg-transparent text-gray-300'
-                                      : 'bg-transparent text-gray-900'
-                                } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                                className={`w-full text-sm ${row.highlightColor && darkMode
+                                  ? 'bg-transparent text-gray-900'
+                                  : darkMode
+                                    ? 'bg-transparent text-gray-300'
+                                    : 'bg-transparent text-gray-900'
+                                  } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                               />
                             )}
                             {prop.type === 'date' && (
@@ -2023,6 +2143,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                 className={`custom-checkbox ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                               />
                             )}
+
                           </td>
                         );
                       })}
@@ -2033,10 +2154,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 {/* Spacer for virtual scrolling - bottom padding */}
                 {rowVirtualizer.getVirtualItems().length > 0 && (
                   <tr style={{
-                    height: `${
-                      rowVirtualizer.getTotalSize() -
+                    height: `${rowVirtualizer.getTotalSize() -
                       (rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1]?.end || 0)
-                    }px`
+                      }px`
                   }}>
                     <td colSpan={database.columns.length} style={{ padding: 0, border: 'none' }} />
                   </tr>
@@ -2067,7 +2187,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 overflowY: 'hidden'
               }}
             >
-              <div style={{ width: `${tableWidth}px`, height: '1px' }} />
+              <div style={{ width: `${totalColumnWidth}px`, height: '1px' }} />
             </div>
           )}
         </div>
@@ -2076,11 +2196,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       {/* Row Action Popup Menu - Rendered at document level for proper z-index */}
       {showRowActionMenu && menuPosition && (
         <div
-          className={`fixed w-48 rounded-lg shadow-2xl border ${
-            darkMode
-              ? 'bg-gray-800 border-gray-700'
-              : 'bg-white border-gray-200'
-          }`}
+          className={`fixed w-48 rounded-lg shadow-2xl border ${darkMode
+            ? 'bg-gray-800 border-gray-700'
+            : 'bg-white border-gray-200'
+            }`}
           style={{
             zIndex: 9999,
             top: `${menuPosition.top}px`,
@@ -2089,12 +2208,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Highlight Color Section */}
-          <div className={`p-3 border-b ${
-            darkMode ? 'border-gray-700' : 'border-gray-200'
-          }`}>
-            <p className={`text-xs font-medium mb-2 ${
-              darkMode ? 'text-gray-400' : 'text-gray-600'
+          <div className={`p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'
             }`}>
+            <p className={`text-xs font-medium mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'
+              }`}>
               Highlight Color
             </p>
             <div className="flex gap-2">
@@ -2104,11 +2221,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   <button
                     key={color}
                     onClick={() => handleSetRowHighlight(showRowActionMenu, color)}
-                    className={`w-8 h-8 rounded transition-all ${
-                      currentRow?.highlightColor === color
-                        ? 'ring-2 ring-blue-500 scale-110'
-                        : 'hover:scale-105'
-                    }`}
+                    className={`w-8 h-8 rounded transition-all ${currentRow?.highlightColor === color
+                      ? 'ring-2 ring-blue-500 scale-110'
+                      : 'hover:scale-105'
+                      }`}
                     style={{ backgroundColor: color }}
                     title="Apply highlight"
                   />
@@ -2118,11 +2234,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               {database.rows.find(r => r.id === showRowActionMenu)?.highlightColor && (
                 <button
                   onClick={() => handleSetRowHighlight(showRowActionMenu, null)}
-                  className={`w-8 h-8 rounded border-2 flex items-center justify-center transition-all hover:scale-105 ${
-                    darkMode
-                      ? 'border-gray-600 hover:bg-gray-700'
-                      : 'border-gray-300 hover:bg-gray-100'
-                  }`}
+                  className={`w-8 h-8 rounded border-2 flex items-center justify-center transition-all hover:scale-105 ${darkMode
+                    ? 'border-gray-600 hover:bg-gray-700'
+                    : 'border-gray-300 hover:bg-gray-100'
+                    }`}
                   title="Remove highlight"
                 >
                   <X className="w-4 h-4" />
@@ -2134,11 +2249,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           {/* Duplicate Row Option */}
           <button
             onClick={() => handleDuplicateRow(showRowActionMenu)}
-            className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors border-b ${
-              darkMode
-                ? 'text-gray-300 hover:bg-gray-700 border-gray-700'
-                : 'text-gray-700 hover:bg-gray-50 border-gray-200'
-            }`}
+            className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors border-b ${darkMode
+              ? 'text-gray-300 hover:bg-gray-700 border-gray-700'
+              : 'text-gray-700 hover:bg-gray-50 border-gray-200'
+              }`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -2153,11 +2267,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               setShowRowActionMenu(null);
               setMenuPosition(null);
             }}
-            className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
-              darkMode
-                ? 'text-red-400 hover:bg-gray-700'
-                : 'text-red-600 hover:bg-gray-50'
-            }`}
+            className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${darkMode
+              ? 'text-red-400 hover:bg-gray-700'
+              : 'text-red-600 hover:bg-gray-50'
+              }`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

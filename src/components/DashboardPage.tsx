@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './dashboards/Sidebar';
 import Header from './dashboards/Header';
 import DatabaseTable from './dashboards/DatabaseTable';
 import TeamNotes from './dashboards/TeamNotes';
+import HistoryPage from './dashboards/HistoryPage';
+
 import { Database } from '../types/database';
 import { menuItems } from '../constants/dashboard';
 import { useDarkMode } from '../hooks/useDarkMode';
@@ -19,7 +21,17 @@ export default function DashboardPage() {
   const [selectedDatabase, setSelectedDatabase] = useState<string | null>(null);
   const [selectedMenu, setSelectedMenu] = useState<string | null>(menuItems[0].id);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const { darkMode, toggleDarkMode } = useDarkMode();
+
+  // Track desktop vs mobile for sidebar margin
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
 
   // 🧩 Ambil data user dari localStorage
   const [user, setUser] = useState<{ name: string; email: string; role: 'SUPERUSER' | 'ADMIN' | 'UMUM' } | null>(null);
@@ -36,6 +48,8 @@ export default function DashboardPage() {
       try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
+
+
       } catch (error) {
         console.error('❌ Error parsing user:', error);
         navigate('/auth', { replace: true });
@@ -178,8 +192,11 @@ export default function DashboardPage() {
 
   const currentDb = databases.find((d) => d.id.toString() === selectedDatabase) || null;
 
+
+
   return (
     <div className={`flex h-screen relative overflow-hidden ${darkMode ? 'bg-gray-900' : ''}`}>
+
       <Sidebar
         databases={databases}
         selectedDatabase={selectedDatabase}
@@ -194,15 +211,27 @@ export default function DashboardPage() {
         darkMode={darkMode}
         toggleDarkMode={toggleDarkMode}
         user={user}
+        isCollapsed={isCollapsed}
+        setIsCollapsed={setIsCollapsed}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div
+        className="flex-1 flex flex-col min-w-0"
+        style={{
+          marginLeft: isDesktop ? (isCollapsed ? 72 : 192) : 0,
+          transition: 'margin-left 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
         <Header onMenuClick={() => setSidebarOpen(true)} darkMode={darkMode} user={user} />
 
         <main className={`flex-1 relative overflow-hidden ${darkMode ? 'bg-gray-900' : 'bg-slate-100'}`}>
           <AnimatePresence mode="wait">
             {!selectedDatabase ? (
-              <TeamNotes key="notes" darkMode={darkMode} />
+              selectedMenu === '1' ? (
+                <TeamNotes key="notes" darkMode={darkMode} />
+              ) : selectedMenu === 'history' ? (
+                <HistoryPage key="history" darkMode={darkMode} />
+              ) : null
             ) : currentDb ? (
               <DatabaseTable
                 key={currentDb.id}

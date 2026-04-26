@@ -35,6 +35,10 @@ export const exportToXLSX = (database: Database): void => {
         return prop.value ? 'Yes' : 'No';
       }
 
+      if (prop.type === 'status') {
+        return prop.value || '';
+      }
+
       return prop.value || '';
     });
     worksheetData.push(rowData);

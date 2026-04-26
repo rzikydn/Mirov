@@ -11,4 +11,5 @@ export const propertyTypes = [
   { value: 'number', label: 'Number' },
   { value: 'date', label: 'Date' },
   { value: 'checkbox', label: 'Checkbox' },
+  { value: 'status', label: 'Status' },
 ];

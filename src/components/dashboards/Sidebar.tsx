@@ -10,20 +10,20 @@ import {
   Trash2,
   Moon,
   Sun,
-  User,
   Clock,
   Menu,
   StickyNote,
   Database as DatabaseIcon,
   Calendar as CalendarIcon,
+  Settings,
 } from 'lucide-react';
 import { Database } from '../../types/database';
 import { menuItems } from '../../constants/dashboard';
 import DeleteModal from './modals/DeleteModal';
 import LogoutModal from './modals/LogoutModal';
-import HistoryModal from './modals/HistoryModal';
-import { useHistory } from '../../context/HistoryContext';
+import AvatarPickerModal from './modals/AvatarPickerModal';
 import BsmrLogo from '../BsmrLogo';
+import { useHistory } from '../../context/HistoryContext';
 
 interface SidebarProps {
   databases: Database[];
@@ -37,8 +37,10 @@ interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (v: boolean) => void;
   darkMode: boolean;
-  toggleDarkMode: () => void;
+  toggleDarkMode: (e?: React.MouseEvent) => void;
   user?: { name: string; email: string; role: 'SUPERUSER' | 'ADMIN' | 'UMUM' } | null;
+  isCollapsed: boolean;
+  setIsCollapsed: (v: boolean) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -55,13 +57,62 @@ const Sidebar: React.FC<SidebarProps> = ({
   darkMode,
   toggleDarkMode,
   user,
+  isCollapsed,
+  setIsCollapsed,
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteDbId, setDeleteDbId] = useState<string | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(true); // Default collapsed on desktop
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  
+  // Persist avatar selection in localStorage simulating a backend
+  // React state initialization only runs once. So we must use useEffect below to catch user changes mapping.
+  const [userAvatar, setUserAvatar] = useState<string>('');
+
+  // Re-fetch avatar when user logs in/changes
+  React.useEffect(() => {
+    const safeParams = '&mouth=default,smile,twinkle&eyes=default,happy,wink';
+    if (!user) {
+      setUserAvatar(`https://api.dicebear.com/7.x/avataaars/svg?seed=User&backgroundColor=b6e3f4${safeParams}`);
+      return;
+    }
+    
+    const userKey = user.name || user.email || 'User';
+    // Get personal choice
+    const personalSaved = localStorage.getItem(`user_avatar_${userKey}`);
+    
+    // Manage Global Map
+    const globalMapStr = localStorage.getItem('global_used_avatars');
+    const globalMap = globalMapStr ? JSON.parse(globalMapStr) : {};
+    
+    const activeAvatar = personalSaved || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userKey}&backgroundColor=b6e3f4${safeParams}`;
+    
+    // Ensure it's in the global map for this user
+    if (globalMap[userKey] !== activeAvatar) {
+      globalMap[userKey] = activeAvatar;
+      localStorage.setItem('global_used_avatars', JSON.stringify(globalMap));
+    }
+    
+    setUserAvatar(activeAvatar);
+  }, [user]);
+
+  // Calculate disabled avatars just in time for the modal
+  const getDisabledAvatars = () => {
+    if (!user) return [];
+    const userKey = user.name || user.email || 'User';
+    const globalMapStr = localStorage.getItem('global_used_avatars');
+    const globalMap = globalMapStr ? JSON.parse(globalMapStr) : {};
+    
+    // Return all values from global map EXCEPT this user's avatar
+    return Object.entries(globalMap)
+      .filter(([key, _]) => key !== userKey)
+      .map(([_, url]) => url as string);
+  };
+
   const { history } = useHistory();
+
+  const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
+  const collapsed = isCollapsed && isDesktop;
 
   const handleDeleteClick = (e: React.MouseEvent, dbId: string) => {
     e.stopPropagation();
@@ -85,37 +136,30 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       <AnimatePresence>
-        {(isOpen || window.innerWidth >= 1024) && (
+        {(isOpen || isDesktop) && (
           <motion.aside
-            initial={{ x: -320 }}
-            animate={{
-              x: 0,
-              width: isCollapsed && window.innerWidth >= 1024 ? '72px' : '192px'
-            }}
-            exit={{ x: -320 }}
+            initial={isDesktop ? false : { x: -280, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -280, opacity: 0 }}
             transition={{
               duration: 0.15,
-              ease: "easeOut"
+              ease: [0.16, 1, 0.3, 1],
             }}
-            className={`fixed lg:static z-40 top-0 left-0 lg:inset-auto ${
+            className={`fixed z-40 top-0 left-0 bottom-0 ${
               darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-            } border-r flex flex-col ${isOpen ? 'shadow-xl' : ''}`}
+            } border-r flex flex-col ${isOpen && !isDesktop ? 'shadow-xl' : ''}`}
             style={{
-              height: window.innerWidth < 1024 ? '100svh' : 'auto',
-              maxHeight: window.innerWidth < 1024 ? '100svh' : 'none',
-              bottom: window.innerWidth < 1024 ? 0 : 'auto',
-              willChange: 'transform, width',
-              transform: 'translateZ(0)',
-              backfaceVisibility: 'hidden',
-              contain: 'layout style paint'
+              width: collapsed ? 72 : 192,
+              transition: 'width 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+              overflow: 'hidden',
             }}
           >
             <div className="p-3 flex flex-col flex-1 overflow-y-auto custom-scrollbar">
-              <div className={`flex items-center mb-6 ${isCollapsed && window.innerWidth >= 1024 ? 'justify-center' : 'justify-between'}`}>
-                <div className={`flex items-center gap-3 ${isCollapsed && window.innerWidth >= 1024 ? 'flex-col' : 'flex-1'}`}>
+              <div className={`flex items-center mb-6 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+                <div className={`flex items-center gap-3 ${collapsed ? 'flex-col' : 'flex-1'}`}>
                   {/* BSMR Logo */}
                   <BsmrLogo
-                    collapsed={isCollapsed && window.innerWidth >= 1024}
+                    collapsed={collapsed}
                     darkMode={darkMode}
                   />
 
@@ -151,31 +195,34 @@ const Sidebar: React.FC<SidebarProps> = ({
                       onSelectDatabase(null);
                       setIsOpen(false);
                     }}
-                    className={`w-full ${isCollapsed && window.innerWidth >= 1024 ? 'flex justify-center' : 'text-left'} px-2 py-1.5 rounded-lg transition-colors duration-150 text-sm ${
+                    className={`w-full ${collapsed ? 'flex justify-center' : 'text-left'} px-2 py-1.5 rounded-lg transition-colors duration-150 text-sm ${
                       selectedMenu === item.id && !selectedDatabase
                         ? darkMode
                           ? 'bg-blue-900 text-blue-300'
                           : 'bg-blue-50 text-[#2563eb]'
                         : darkMode
-                        ? 'text-gray-300 hover:bg-gray-700 hover:text-blue-300'
-                        : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
+                          ? 'text-gray-300 hover:bg-gray-700 hover:text-blue-300'
+                          : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
                     }`}
-                    title={isCollapsed && window.innerWidth >= 1024 ? item.name : undefined}
+                    title={collapsed ? item.name : undefined}
                   >
-                    {isCollapsed && window.innerWidth >= 1024 ? (
+                    {collapsed ? (
                       item.id === '1' ? <StickyNote className="w-5 h-5" /> : <CalendarIcon className="w-5 h-5" />
                     ) : (
-                      item.name
+                      <span className="whitespace-nowrap flex items-center gap-2">
+                        {item.id === '1' ? <StickyNote className="w-4 h-4" /> : <CalendarIcon className="w-4 h-4" />}
+                        <span className="overflow-hidden">{item.name}</span>
+                      </span>
                     )}
                   </button>
                 ))}
               </nav>
 
               <div className="mb-3 flex-1">
-                {!(isCollapsed && window.innerWidth >= 1024) ? (
+                {!collapsed ? (
                   <>
                     <div className="flex items-center justify-between mb-3 mt-2">
-                      <span className={`text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <span className={`text-sm font-semibold whitespace-nowrap ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                         Databases
                       </span>
                       <button
@@ -200,8 +247,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 ? 'bg-blue-900 text-blue-300'
                                 : 'bg-blue-50 text-[#2563eb]'
                               : darkMode
-                              ? 'text-gray-300 hover:bg-gray-700 hover:text-blue-300'
-                              : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
+                                ? 'text-gray-300 hover:bg-gray-700 hover:text-blue-300'
+                                : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
                           }`}
                         >
                           <button
@@ -259,8 +306,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                               ? 'bg-blue-900 text-blue-300'
                               : 'bg-blue-50 text-[#2563eb]'
                             : darkMode
-                            ? 'text-gray-300 hover:bg-gray-700 hover:text-blue-300'
-                            : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
+                              ? 'text-gray-300 hover:bg-gray-700 hover:text-blue-300'
+                              : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
                         }`}
                         title={db.name}
                       >
@@ -274,24 +321,45 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className={`border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} pt-2 space-y-1`}>
                 {/* User Profile Display */}
                 {user && (
-                  <div className={`${isCollapsed && window.innerWidth >= 1024 ? 'flex justify-center' : 'px-2'} py-2 mb-1 rounded-lg ${
-                    darkMode ? 'bg-gray-700/50' : 'bg-gray-100'
+                  <div className={`${collapsed ? 'flex justify-center' : 'px-2'} py-2 mb-1 rounded-lg transition-colors relative group ${
+                    darkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'
                   }`}>
-                    {isCollapsed && window.innerWidth >= 1024 ? (
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          darkMode ? 'bg-blue-600' : 'bg-blue-500'
-                        }`}
-                        title={`${user.name} - ${user.role === 'SUPERUSER' ? 'Superuser' : user.role === 'ADMIN' ? 'Admin' : 'Umum'}`}
-                      >
-                        <User className="w-4 h-4 text-white" />
+                    {collapsed ? (
+                      <div className="relative">
+                        <div
+                          className={`w-9 h-9 rounded-full flex items-center justify-center overflow-hidden border-2 ${
+                            darkMode ? 'border-gray-600 bg-gray-800' : 'border-gray-200 bg-white'
+                          }`}
+                          title={`${user.name} - ${user.role === 'SUPERUSER' ? 'Superuser' : user.role === 'ADMIN' ? 'Admin' : 'Umum'}`}
+                        >
+                          <img src={userAvatar} alt={user.name} className="w-full h-full object-cover" />
+                        </div>
+                        <button
+                          onClick={() => setShowAvatarPicker(true)}
+                          className={`absolute -bottom-1 -right-1 p-1 rounded-full shadow-sm cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity ${
+                            darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Settings className="w-3 h-3" />
+                        </button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          darkMode ? 'bg-blue-600' : 'bg-blue-500'
-                        }`}>
-                          <User className="w-4 h-4 text-white" />
+                        <div className="relative">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden border-2 ${
+                            darkMode ? 'border-gray-600 bg-gray-800' : 'border-gray-200 bg-white'
+                          }`}>
+                            <img src={userAvatar} alt={user.name} className="w-full h-full object-cover" />
+                          </div>
+                          <button
+                            onClick={() => setShowAvatarPicker(true)}
+                            className={`absolute -bottom-1 -right-1 p-1 rounded-full shadow-sm cursor-pointer transition-opacity opacity-0 group-hover:opacity-100 ${
+                              darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                            }`}
+                            title="Tukar Avatar"
+                          >
+                            <Settings className="w-3 h-3" />
+                          </button>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className={`text-xs font-semibold truncate ${
@@ -313,18 +381,26 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {/* History Button - Only for ADMIN and SUPERUSER */}
                 {user && user.role !== 'UMUM' && (
                   <button
-                    onClick={() => setShowHistory(true)}
-                    className={`w-full flex items-center ${isCollapsed && window.innerWidth >= 1024 ? 'justify-center' : 'gap-2'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
-                      darkMode
-                        ? 'text-gray-300 hover:bg-gray-700'
-                        : 'text-gray-700 hover:bg-gray-100'
+                    onClick={() => {
+                      onSelectMenu('history');
+                      onSelectDatabase(null);
+                      setIsOpen(false);
+                    }}
+                    className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-2'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
+                      selectedMenu === 'history' && !selectedDatabase
+                        ? darkMode
+                          ? 'bg-blue-900 text-blue-300'
+                          : 'bg-blue-50 text-[#2563eb]'
+                        : darkMode
+                          ? 'text-gray-300 hover:bg-gray-700'
+                          : 'text-gray-700 hover:bg-gray-100'
                     }`}
-                    title={isCollapsed && window.innerWidth >= 1024 ? 'History' : undefined}
+                    title={collapsed ? 'History' : undefined}
                   >
                     <Clock className="w-4 h-4" />
-                    {!(isCollapsed && window.innerWidth >= 1024) && (
+                    {!collapsed && (
                       <>
-                        <span className="font-medium">History</span>
+                        <span className="font-medium whitespace-nowrap">History</span>
                         {history.length > 0 && (
                           <span className={`ml-auto text-xs px-1.5 py-0.5 rounded-full ${
                             darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-600'
@@ -339,15 +415,15 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                 {/* Dark Mode Toggle */}
                 <button
-                  onClick={toggleDarkMode}
-                  className={`w-full flex items-center ${isCollapsed && window.innerWidth >= 1024 ? 'justify-center' : 'justify-between'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
+                  onClick={(e) => toggleDarkMode(e)}
+                  className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-between'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
                     darkMode
                       ? 'text-gray-300 hover:bg-gray-700'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
-                  title={isCollapsed && window.innerWidth >= 1024 ? (darkMode ? 'Light mode' : 'Dark mode') : undefined}
+                  title={collapsed ? (darkMode ? 'Light mode' : 'Dark mode') : undefined}
                 >
-                  {isCollapsed && window.innerWidth >= 1024 ? (
+                  {collapsed ? (
                     darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />
                   ) : (
                     <>
@@ -357,7 +433,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         ) : (
                           <Moon className="w-4 h-4" />
                         )}
-                        <span className="font-medium">
+                        <span className="font-medium whitespace-nowrap">
                           {darkMode ? 'Light' : 'Dark'}
                         </span>
                       </div>
@@ -379,19 +455,33 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {/* Logout Button */}
                 <button
                   onClick={() => setShowLogoutConfirm(true)}
-                  className={`w-full flex items-center ${isCollapsed && window.innerWidth >= 1024 ? 'justify-center' : 'gap-2'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
+                  className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-2'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
                     darkMode
                       ? 'text-gray-300 hover:bg-red-900 hover:text-red-300'
                       : 'text-gray-700 hover:bg-red-50 hover:text-red-600'
                   }`}
-                  title={isCollapsed && window.innerWidth >= 1024 ? 'Logout' : undefined}
+                  title={collapsed ? 'Logout' : undefined}
                 >
                   <Home className="w-4 h-4" />
-                  {!(isCollapsed && window.innerWidth >= 1024) && <span className="font-medium">Logout</span>}
+                  {!collapsed && <span className="font-medium whitespace-nowrap">Logout</span>}
                 </button>
               </div>
             </div>
           </motion.aside>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile overlay backdrop */}
+      <AnimatePresence>
+        {isOpen && !isDesktop && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 bg-black/30 z-30 lg:hidden"
+            onClick={() => setIsOpen(false)}
+          />
         )}
       </AnimatePresence>
 
@@ -413,12 +503,26 @@ const Sidebar: React.FC<SidebarProps> = ({
         onCancel={() => setShowLogoutConfirm(false)}
       />
 
-      {/* History Modal */}
-      <HistoryModal
-        show={showHistory}
+      {/* Avatar Picker Modal */}
+      <AvatarPickerModal
+        show={showAvatarPicker}
         darkMode={darkMode}
-        history={history}
-        onClose={() => setShowHistory(false)}
+        currentAvatar={userAvatar}
+        disabledAvatars={getDisabledAvatars()}
+        onSelect={(newAvatar) => {
+          if (!user) return;
+          const userKey = user.name || user.email || 'User';
+          
+          setUserAvatar(newAvatar);
+          // Save personal
+          localStorage.setItem(`user_avatar_${userKey}`, newAvatar);
+          // Update global
+          const globalMapStr = localStorage.getItem('global_used_avatars');
+          const globalMap = globalMapStr ? JSON.parse(globalMapStr) : {};
+          globalMap[userKey] = newAvatar;
+          localStorage.setItem('global_used_avatars', JSON.stringify(globalMap));
+        }}
+        onClose={() => setShowAvatarPicker(false)}
       />
     </>
   );

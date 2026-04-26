@@ -33,6 +33,18 @@ export const compareValues = (
     return direction === 'asc' ? aBool - bBool : bBool - aBool;
   }
 
+  if (columnType === 'status') {
+    // Sort by status order: Not started < In progress < Done
+    const statusOrder: Record<string, number> = {
+      'Not started': 0,
+      'In progress': 1,
+      'Done': 2
+    };
+    const aOrder = statusOrder[aValue?.toString() || ''] ?? 99;
+    const bOrder = statusOrder[bValue?.toString() || ''] ?? 99;
+    return direction === 'asc' ? aOrder - bOrder : bOrder - aOrder;
+  }
+
   // Default text comparison
   const aStr = (aValue?.toString() || '').toLowerCase();
   const bStr = (bValue?.toString() || '').toLowerCase();

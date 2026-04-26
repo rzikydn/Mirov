@@ -22,6 +22,7 @@ const TypeChangeDropdown: React.FC<TypeChangeDropdownProps> = ({
     { value: 'number', label: 'Number', icon: <Hash className="w-4 h-4" /> },
     { value: 'date', label: 'Date', icon: <Calendar className="w-4 h-4" /> },
     { value: 'checkbox', label: 'Checkbox', icon: <CheckSquare className="w-4 h-4" /> },
+
   ];
 
   return (
@@ -33,11 +34,10 @@ const TypeChangeDropdown: React.FC<TypeChangeDropdownProps> = ({
             onTypeChange(type.value);
             onClose();
           }}
-          className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
-            currentType === type.value
+          className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${currentType === type.value
               ? darkMode ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-900'
               : darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
-          }`}
+            }`}
         >
           {type.icon}
           {type.label}

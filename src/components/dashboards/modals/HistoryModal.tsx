@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { X, Clock, FileText, Database as DatabaseIcon, Calendar, Trash2, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { HistoryEntry, useHistory } from '../../../context/HistoryContext';
-import { getTimeAgo } from '../../../utils/timeAgo';
 import { useAuth } from '../../../context/AuthContext';
 import DeleteModal from './DeleteModal';
+import { ContributionGraph } from '../ContributionGraph';
 
 interface HistoryModalProps {
   show: boolean;
@@ -14,394 +14,451 @@ interface HistoryModalProps {
   onClose: () => void;
 }
 
+// ── Constants ──
+const ITEMS_PER_PAGE = 30;
+
+// ── Helper: format time (24-hour Indonesian format) ──
+const formatTime = (date: Date): string => {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  return `${hours.toString().padStart(2, '0')}.${minutes.toString().padStart(2, '0')} WIB`;
+};
+
+// ── Helper: format date label ──
+const formatDateLabel = (date: Date): string => {
+  const MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  return `${MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+};
+
+// ── Helper: get date key (YYYY-MM-DD) ──
+const getDateKey = (date: Date): string => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
+// ── Helper: check if same day ──
+const isSameDay = (a: Date, b: Date): boolean => {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+};
+
+// ── Helper: truncate long description ──
+const truncateDescription = (text: string, maxLength: number = 100): string => {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength).trimEnd() + '…';
+};
+
+// ── Single Timeline Entry (memoized for perf) ──
+const TimelineEntry = React.memo(({
+  entry,
+  darkMode,
+  canDelete,
+  isSelected,
+  isDeleting,
+  isExpanded,
+  onToggleSelect,
+  onDelete,
+  onToggleExpand
+}: {
+  entry: HistoryEntry;
+  darkMode: boolean;
+  canDelete: boolean;
+  isSelected: boolean;
+  isDeleting: boolean;
+  isExpanded: boolean;
+  onToggleSelect: (id: number) => void;
+  onDelete: (id: number, name: string) => void;
+  onToggleExpand: (id: number) => void;
+}) => {
+  const isFav = entry.description.includes('added note to favorites');
+  const isUnfav = entry.description.includes('removed note from favorites');
+  const isLongText = entry.description.length > 100;
+
+  const getIcon = () => {
+    if (isFav) return <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />;
+    if (isUnfav) return <Star className="w-3.5 h-3.5 fill-red-400 text-red-400" />;
+    switch (entry.target) {
+      case 'note': return <FileText className="w-3.5 h-3.5" />;
+      case 'database': return <DatabaseIcon className="w-3.5 h-3.5" />;
+      case 'schedule': return <Calendar className="w-3.5 h-3.5" />;
+    }
+  };
+
+  const getIconBg = () => {
+    if (isFav) return darkMode ? 'bg-yellow-900/40 text-yellow-400' : 'bg-yellow-100 text-yellow-600';
+    if (isUnfav) return darkMode ? 'bg-red-900/40 text-red-400' : 'bg-red-100 text-red-600';
+    switch (entry.action) {
+      case 'create': return darkMode ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-600';
+      case 'edit': return darkMode ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-100 text-blue-600';
+      case 'delete': return darkMode ? 'bg-red-900/40 text-red-400' : 'bg-red-100 text-red-600';
+      case 'added': return darkMode ? 'bg-purple-900/40 text-purple-400' : 'bg-purple-100 text-purple-600';
+      default: return darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600';
+    }
+  };
+
+  const getActionLabel = () => {
+    if (isFav) return { text: 'Favorited', color: darkMode ? 'text-yellow-400' : 'text-yellow-600' };
+    if (isUnfav) return { text: 'Unfavorited', color: darkMode ? 'text-red-400' : 'text-red-600' };
+    switch (entry.action) {
+      case 'create': return { text: 'Created', color: darkMode ? 'text-emerald-400' : 'text-emerald-600' };
+      case 'edit': return { text: 'Changed', color: darkMode ? 'text-blue-400' : 'text-blue-600' };
+      case 'delete': return { text: 'Deleted', color: darkMode ? 'text-red-400' : 'text-red-600' };
+      case 'added': return { text: 'Added', color: darkMode ? 'text-purple-400' : 'text-purple-600' };
+      default: return { text: entry.action, color: darkMode ? 'text-gray-400' : 'text-gray-600' };
+    }
+  };
+
+  const time = formatTime(new Date(entry.createdAt));
+  const actionLabel = getActionLabel();
+  const displayDescription = isExpanded ? entry.description : truncateDescription(entry.description);
+
+  return (
+    <div className={`group flex items-start gap-3 py-3.5 px-4 rounded-xl transition-colors duration-100 mb-1.5
+      ${isSelected
+        ? darkMode ? 'bg-blue-900/20 border border-blue-800/50' : 'bg-blue-50 border border-blue-200'
+        : darkMode ? 'hover:bg-gray-700/40 border border-transparent' : 'hover:bg-gray-50 border border-transparent'
+      }
+      ${isDeleting ? 'opacity-40 pointer-events-none' : ''}
+    `}>
+      {/* Checkbox */}
+      {canDelete && (
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelect(entry.id)}
+          disabled={isDeleting}
+          className="custom-checkbox mt-1.5 flex-shrink-0"
+        />
+      )}
+
+      {/* Icon */}
+      <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${getIconBg()}`}>
+        {getIcon()}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        {/* First line: User + Action + Time */}
+        <div className="flex items-center gap-2 flex-wrap mb-1.5">
+          <span className={`text-sm font-semibold ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+            {entry.userName}
+          </span>
+          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${actionLabel.color} ${darkMode ? 'bg-gray-700/60' : 'bg-gray-100'}`}>
+            {actionLabel.text}
+          </span>
+          <span className={`text-xs font-mono ml-auto ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+            {time}
+          </span>
+        </div>
+
+        {/* Second line: Description (truncated) */}
+        <p
+          className={`text-sm leading-relaxed ${darkMode ? 'text-gray-300' : 'text-gray-600'}
+            ${isLongText && !isExpanded ? 'cursor-pointer' : ''}
+          `}
+          onClick={isLongText ? () => onToggleExpand(entry.id) : undefined}
+        >
+          {displayDescription}
+          {isLongText && !isExpanded && (
+            <span className={`ml-1 text-xs font-medium ${darkMode ? 'text-blue-400' : 'text-blue-500'}`}>
+              Show more
+            </span>
+          )}
+          {isLongText && isExpanded && (
+            <span
+              className={`ml-1 text-xs font-medium cursor-pointer ${darkMode ? 'text-blue-400' : 'text-blue-500'}`}
+              onClick={(e) => { e.stopPropagation(); onToggleExpand(entry.id); }}
+            >
+              Show less
+            </span>
+          )}
+        </p>
+
+        {/* Third line: Target info */}
+        {entry.targetName && (
+          <p className={`text-xs mt-1.5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+            <span className="capitalize">{entry.target}</span>
+            {' · '}
+            <span className={`font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>{entry.targetName}</span>
+          </p>
+        )}
+      </div>
+
+      {/* Delete */}
+      {canDelete && (
+        <button
+          onClick={() => onDelete(entry.id, entry.description)}
+          className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-md transition-all flex-shrink-0 mt-1
+            ${darkMode ? 'hover:bg-red-900/50 text-red-400' : 'hover:bg-red-50 text-red-500'}
+          `}
+          title="Delete"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+});
+
+TimelineEntry.displayName = 'TimelineEntry';
+
+
+// ══════════════════════════════════════════════
+// ██ MAIN COMPONENT
+// ══════════════════════════════════════════════
 const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, onClose }) => {
   const { deleteHistory } = useHistory();
   const { user } = useAuth();
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  // State
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<{ id: number; name: string } | null>(null);
-
-  // Bulk delete state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Check if user is SUPERUSER only
   const canDelete = user?.role === 'SUPERUSER';
 
-  if (!show) return null;
-
-  const handleDeleteClick = (id: number, entryName: string) => {
-    if (!canDelete) {
-      toast.error('Only SUPERUSER can delete history entries', {
-        icon: '🔒',
-      });
-      return;
+  // ── Pre-compute: activity count per day (Map) ──
+  const activityCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const entry of history) {
+      const key = getDateKey(new Date(entry.createdAt));
+      map.set(key, (map.get(key) || 0) + 1);
     }
+    return map;
+  }, [history]);
 
-    setEntryToDelete({ id, name: entryName });
-    setShowDeleteConfirm(true);
-  };
+  // ── Filtered entries for selected date ──
+  const filteredEntries = useMemo(() => {
+    return history.filter(entry =>
+      isSameDay(new Date(entry.createdAt), selectedDate)
+    );
+  }, [history, selectedDate]);
 
-  const confirmDelete = async () => {
-    if (!entryToDelete) return;
+  // ── Visible entries (paginated) ──
+  const visibleEntries = useMemo(() => {
+    return filteredEntries.slice(0, visibleCount);
+  }, [filteredEntries, visibleCount]);
 
-    setShowDeleteConfirm(false);
-    setDeletingId(entryToDelete.id);
+  // Reset visible count when date changes
+  useEffect(() => {
+    setVisibleCount(ITEMS_PER_PAGE);
+    setExpandedIds(new Set());
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [selectedDate]);
 
-    // Show loading toast
-    const loadingToast = toast.loading('Deleting history entry...');
-
-    const success = await deleteHistory(entryToDelete.id);
-    setDeletingId(null);
-
-    // Dismiss loading toast
-    toast.dismiss(loadingToast);
-
-    if (success) {
-      toast.success('History entry deleted successfully!');
-    } else {
-      toast.error('Failed to delete history entry. Please try again.');
-    }
-
-    setEntryToDelete(null);
-  };
-
-  const cancelDelete = () => {
-    setShowDeleteConfirm(false);
-    setEntryToDelete(null);
-  };
-
-  // Bulk delete functions
-  const toggleSelect = (id: number) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedIds(newSelected);
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === history.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(history.map(entry => entry.id)));
-    }
-  };
-
-  const handleBulkDeleteClick = () => {
-    if (selectedIds.size === 0) {
-      toast.error('Please select at least one history entry');
-      return;
-    }
-    setShowBulkDeleteConfirm(true);
-  };
-
-  const confirmBulkDelete = async () => {
-    setShowBulkDeleteConfirm(false);
-    setIsDeleting(true);
-
-    const loadingToast = toast.loading(`Deleting ${selectedIds.size} history entries...`);
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const id of selectedIds) {
-      const success = await deleteHistory(id);
-      if (success) {
-        successCount++;
-      } else {
-        failCount++;
+  // ── Infinite scroll handler ──
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 100) {
+      if (visibleCount < filteredEntries.length) {
+        setVisibleCount(prev => Math.min(prev + ITEMS_PER_PAGE, filteredEntries.length));
       }
     }
+  }, [visibleCount, filteredEntries.length]);
 
+  // ── Toggle expand description ──
+  const toggleExpand = useCallback((id: number) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // ── Delete handlers ──
+  const handleDeleteClick = useCallback((id: number, entryName: string) => {
+    if (!canDelete) {
+      toast.error('Only SUPERUSER can delete history entries', { icon: '🔒' });
+      return;
+    }
+    setEntryToDelete({ id, name: entryName });
+    setShowDeleteConfirm(true);
+  }, [canDelete]);
+
+  const confirmDelete = useCallback(async () => {
+    if (!entryToDelete) return;
+    setShowDeleteConfirm(false);
+    setDeletingId(entryToDelete.id);
+    const loadingToast = toast.loading('Deleting history entry...');
+    const success = await deleteHistory(entryToDelete.id);
+    setDeletingId(null);
+    toast.dismiss(loadingToast);
+    if (success) toast.success('History entry deleted!');
+    else toast.error('Failed to delete. Please try again.');
+    setEntryToDelete(null);
+  }, [entryToDelete, deleteHistory]);
+
+  const toggleSelect = useCallback((id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === filteredEntries.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredEntries.map(e => e.id)));
+    }
+  }, [selectedIds.size, filteredEntries]);
+
+  const confirmBulkDelete = useCallback(async () => {
+    setShowBulkDeleteConfirm(false);
+    setIsDeleting(true);
+    const loadingToast = toast.loading(`Deleting ${selectedIds.size} entries...`);
+    let successCount = 0;
+    let failCount = 0;
+    for (const id of selectedIds) {
+      const success = await deleteHistory(id);
+      if (success) successCount++; else failCount++;
+    }
     setIsDeleting(false);
     setSelectedIds(new Set());
     toast.dismiss(loadingToast);
+    if (failCount === 0) toast.success(`Deleted ${successCount} entries!`);
+    else toast.error(`Deleted ${successCount}, ${failCount} failed`);
+  }, [selectedIds, deleteHistory]);
 
-    if (failCount === 0) {
-      toast.success(`Successfully deleted ${successCount} history entries!`);
-    } else {
-      toast.error(`Deleted ${successCount} entries, ${failCount} failed`);
-    }
-  };
-
-  const cancelBulkDelete = () => {
-    setShowBulkDeleteConfirm(false);
-  };
-
-  // Helper function to check if entry is a favorite action
-  const isFavoriteAction = (entry: HistoryEntry): boolean => {
-    return entry.description.includes('added note to favorites');
-  };
-
-  // Helper function to check if entry is an unfavorite action
-  const isUnfavoriteAction = (entry: HistoryEntry): boolean => {
-    return entry.description.includes('removed note from favorites');
-  };
-
-  const getIcon = (target: 'note' | 'database' | 'schedule', entry?: HistoryEntry) => {
-    // Show yellow star icon for favorite actions
-    if (entry && isFavoriteAction(entry)) {
-      return <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />;
-    }
-
-    // Show red star icon for unfavorite actions
-    if (entry && isUnfavoriteAction(entry)) {
-      return <Star className="w-4 h-4 fill-red-400 text-red-400" />;
-    }
-
-    switch (target) {
-      case 'note':
-        return <FileText className="w-4 h-4" />;
-      case 'database':
-        return <DatabaseIcon className="w-4 h-4" />;
-      case 'schedule':
-        return <Calendar className="w-4 h-4" />;
-    }
-  };
-
-  const getActionColor = (action: 'create' | 'edit' | 'delete' | 'added') => {
-    switch (action) {
-      case 'create':
-        return darkMode ? 'text-green-400' : 'text-green-600';
-      case 'added':
-        return darkMode ? 'text-purple-400' : 'text-purple-600';
-      case 'edit':
-        return darkMode ? 'text-blue-400' : 'text-blue-600';
-      case 'delete':
-        return darkMode ? 'text-red-400' : 'text-red-600';
-    }
-  };
-
-  const getActionBadgeClasses = (action: 'create' | 'edit' | 'delete' | 'added', entry?: HistoryEntry) => {
-    const baseClasses = 'inline-flex px-2 py-0.5 rounded-full text-xs font-semibold';
-
-    // Special styling for favorite actions (yellow)
-    if (entry && isFavoriteAction(entry)) {
-      return `${baseClasses} ${darkMode ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-600' : 'bg-yellow-100 text-yellow-700 border border-yellow-400'}`;
-    }
-
-    // Special styling for unfavorite actions (red)
-    if (entry && isUnfavoriteAction(entry)) {
-      return `${baseClasses} ${darkMode ? 'bg-red-900/50 text-red-300 border border-red-600' : 'bg-red-100 text-red-700 border border-red-400'}`;
-    }
-
-    switch (action) {
-      case 'create':
-        return `${baseClasses} ${darkMode ? 'bg-green-900/50 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-200'}`;
-      case 'added':
-        return `${baseClasses} ${darkMode ? 'bg-purple-900/50 text-purple-300 border border-purple-700' : 'bg-purple-100 text-purple-700 border border-purple-200'}`;
-      case 'edit':
-        return `${baseClasses} ${darkMode ? 'bg-blue-900/50 text-blue-300 border border-blue-700' : 'bg-blue-100 text-blue-700 border border-blue-200'}`;
-      case 'delete':
-        return `${baseClasses} ${darkMode ? 'bg-red-900/50 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-200'}`;
-    }
-  };
-
-  const getActionText = (action: 'create' | 'edit' | 'delete' | 'added', entry?: HistoryEntry) => {
-    // Special text for favorite actions
-    if (entry && isFavoriteAction(entry)) {
-      return 'Favorit';
-    }
-
-    // Special text for unfavorite actions
-    if (entry && isUnfavoriteAction(entry)) {
-      return 'Unfavorit';
-    }
-
-    switch (action) {
-      case 'create':
-        return 'Created';
-      case 'added':
-        return 'Added';
-      case 'edit':
-        return 'Changed';
-      case 'delete':
-        return 'Deleted';
-    }
-  };
+  if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className={`${
-          darkMode ? 'bg-[#2a2a2a]' : 'bg-white'
-        } rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col`}
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.97 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden`}
       >
-        {/* Header */}
-        <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <Clock className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-              <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                Activity History
-              </h2>
-            </div>
-            <button
-              onClick={onClose}
-              className={`p-1 rounded ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-            >
-              <X className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-            </button>
-          </div>
-
-          {/* Bulk actions - Only for SUPERUSER */}
-          {canDelete && history.length > 0 && (
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.size === history.length && history.length > 0}
-                    onChange={toggleSelectAll}
-                    className="custom-checkbox"
-                  />
-                  <span className={`text-sm font-medium transition-colors ${darkMode ? 'text-gray-300 group-hover:text-white' : 'text-gray-700 group-hover:text-gray-900'}`}>
-                    Select All ({selectedIds.size}/{history.length})
-                  </span>
-                </label>
-              </div>
-              {selectedIds.size > 0 && (
+        {/* ═══ Header ═══ */}
+        <div className={`px-5 pt-5 pb-4`}>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Daily Activity
+            </h2>
+            <div className="flex items-center gap-1">
+              {canDelete && selectedIds.size > 0 && (
                 <button
-                  onClick={handleBulkDeleteClick}
+                  onClick={() => setShowBulkDeleteConfirm(true)}
                   disabled={isDeleting}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                    isDeleting
-                      ? 'opacity-50 cursor-not-allowed'
-                      : darkMode
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium mr-2 transition-colors
+                    ${darkMode
                       ? 'bg-red-900/50 text-red-300 hover:bg-red-900 border border-red-700'
-                      : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
-                  }`}
+                      : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                    } ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}
+                  `}
                 >
-                  <Trash2 className="w-4 h-4" />
-                  Delete Selected ({selectedIds.size})
+                  <Trash2 className="w-3 h-3" />
+                  {selectedIds.size}
                 </button>
               )}
+              <button
+                onClick={onClose}
+                className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
+          </div>
+
+          {/* ═══ Contribution Graph ═══ */}
+          <div className="mb-4">
+            <ContributionGraph
+              activityCountMap={activityCountMap}
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+              darkMode={darkMode}
+              year={selectedDate.getFullYear()}
+            />
+          </div>
+
+          {/* Selected date label + count */}
+          <div className="flex items-center justify-between">
+            <p className={`text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              {formatDateLabel(selectedDate)}
+            </p>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium
+              ${filteredEntries.length > 0
+                ? darkMode ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-100 text-blue-600'
+                : darkMode ? 'bg-gray-700 text-gray-500' : 'bg-gray-100 text-gray-400'
+              }
+            `}>
+              {filteredEntries.length} {filteredEntries.length === 1 ? 'activity' : 'activities'}
+            </span>
+          </div>
+
+          {/* Select All (SUPERUSER only) */}
+          {canDelete && filteredEntries.length > 0 && (
+            <label className="flex items-center gap-2 cursor-pointer mt-2 group">
+              <input
+                type="checkbox"
+                checked={selectedIds.size === filteredEntries.length && filteredEntries.length > 0}
+                onChange={toggleSelectAll}
+                className="custom-checkbox"
+              />
+              <span className={`text-xs font-medium ${darkMode ? 'text-gray-400 group-hover:text-gray-200' : 'text-gray-500 group-hover:text-gray-700'}`}>
+                Select All ({selectedIds.size}/{filteredEntries.length})
+              </span>
+            </label>
           )}
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-          {history.length === 0 ? (
-            <div className="text-center py-12">
-              <Clock className={`w-12 h-12 mx-auto mb-4 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                No activity yet
+        {/* ═══ Timeline entries ═══ */}
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className={`flex-1 overflow-y-auto custom-scrollbar border-t ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}
+        >
+          {filteredEntries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-6">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                <Clock className={`w-6 h-6 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+              </div>
+              <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                No activity on this date
+              </p>
+              <p className={`text-xs mt-1 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+                Select a highlighted date to view activities
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {history.map((entry) => (
-                <motion.div
+            <div className="py-2 px-2">
+              {visibleEntries.map(entry => (
+                <TimelineEntry
                   key={entry.id}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                    scale: selectedIds.has(entry.id) ? 1.01 : 1
-                  }}
-                  transition={{ duration: 0.2 }}
-                  className={`group relative p-4 rounded-lg border transition-all duration-200 ${
-                    selectedIds.has(entry.id)
-                      ? darkMode
-                        ? 'bg-blue-900/20 border-blue-600 shadow-lg shadow-blue-900/20'
-                        : 'bg-blue-50 border-blue-400 shadow-lg shadow-blue-200/50'
-                      : darkMode
-                      ? 'bg-gray-800/50 border-gray-700 hover:bg-gray-800/70'
-                      : 'bg-gray-50 border-gray-200 hover:bg-gray-100/70'
-                  } ${deletingId === entry.id || isDeleting ? 'opacity-50 pointer-events-none' : ''}`}
-                >
-                  <div className="flex items-start gap-3">
-                    {/* Checkbox for SUPERUSER */}
-                    {canDelete && (
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(entry.id)}
-                        onChange={() => toggleSelect(entry.id)}
-                        disabled={isDeleting}
-                        className="custom-checkbox mt-2.5"
-                      />
-                    )}
-                    <div className={`p-2 rounded-lg ${
-                      darkMode ? 'bg-gray-700' : 'bg-white'
-                    }`}>
-                      {getIcon(entry.target, entry)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {entry.userName}
-                        </span>
-                        <span className={getActionBadgeClasses(entry.action, entry)}>
-                          {getActionText(entry.action, entry)}
-                        </span>
-                      </div>
-                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        <span className="capitalize">
-                          {entry.target === 'note'
-                            ? 'Note'
-                            : entry.target === 'database'
-                            ? 'Database'
-                            : 'Schedule'}
-                        </span>
-                        {entry.targetName && (
-                          <>
-                            {' - '}
-                            <span className={`font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                              "{entry.targetName}"
-                            </span>
-                          </>
-                        )}
-                      </p>
-                      {/* Description - Show what was changed/deleted */}
-                      <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'} italic`}>
-                        {entry.description}
-                      </p>
-                      <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                        {getTimeAgo(entry.createdAt)}
-                      </p>
-                    </div>
-                    {/* Delete button - Only for SUPERUSER */}
-                    {canDelete && (
-                      <button
-                        onClick={() => handleDeleteClick(entry.id, entry.description)}
-                        disabled={deletingId === entry.id}
-                        className={`opacity-0 group-hover:opacity-100 p-2 rounded transition-all ${
-                          darkMode
-                            ? 'hover:bg-red-900/50 text-red-400 hover:text-red-300'
-                            : 'hover:bg-red-50 text-red-600 hover:text-red-700'
-                        } ${deletingId === entry.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title="Delete history entry (SUPERUSER only)"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </motion.div>
+                  entry={entry}
+                  darkMode={darkMode}
+                  canDelete={canDelete}
+                  isSelected={selectedIds.has(entry.id)}
+                  isDeleting={deletingId === entry.id || isDeleting}
+                  isExpanded={expandedIds.has(entry.id)}
+                  onToggleSelect={toggleSelect}
+                  onDelete={handleDeleteClick}
+                  onToggleExpand={toggleExpand}
+                />
               ))}
+
+              {/* Load more indicator */}
+              {visibleCount < filteredEntries.length && (
+                <div className={`text-center py-3 text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                  Scroll for more ({filteredEntries.length - visibleCount} remaining)
+                </div>
+              )}
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className={`px-6 py-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <button
-            onClick={onClose}
-            className={`w-full px-4 py-2 rounded text-sm font-medium ${
-              darkMode
-                ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
-            }`}
-          >
-            Close
-          </button>
         </div>
       </motion.div>
 
@@ -412,7 +469,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
         title="Delete History Entry"
         message={`Are you sure you want to delete this history entry?\n\n"${entryToDelete?.name || ''}"\n\nThis action cannot be undone.`}
         onConfirm={confirmDelete}
-        onCancel={cancelDelete}
+        onCancel={() => { setShowDeleteConfirm(false); setEntryToDelete(null); }}
       />
 
       {/* Bulk Delete Confirmation Modal */}
@@ -422,7 +479,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ show, darkMode, history, on
         title="Delete Multiple History Entries"
         message={`Are you sure you want to delete ${selectedIds.size} history entries?\n\nThis action cannot be undone.`}
         onConfirm={confirmBulkDelete}
-        onCancel={cancelBulkDelete}
+        onCancel={() => setShowBulkDeleteConfirm(false)}
       />
     </div>
   );

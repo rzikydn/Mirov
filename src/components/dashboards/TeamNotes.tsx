@@ -1,6 +1,6 @@
 // src/components/dashboards/TeamNotes.tsx
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Edit3, Trash2, Star, Plus, Search, ChevronRight } from 'lucide-react';
 import { Note } from '../../types/database';
@@ -12,8 +12,13 @@ interface TeamNotesProps {
   darkMode: boolean;
 }
 
+// Update Note type to accept both string and number IDs to match API
+interface FlexibleNote extends Omit<Note, 'id'> {
+  id: string | number;
+}
+
 // Extended Note type with color
-interface ColoredNote extends Note {
+interface ColoredNote extends FlexibleNote {
   content?: string; // Field dari backend API
   color: string;
   favorite?: boolean;
@@ -121,7 +126,7 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
   };
 
   // Update note
-  const editNote = async (id: number, note: { text: string; color: string; favorite: boolean }) => {
+  const editNote = async (id: string | number, note: { text: string; color: string; favorite: boolean }) => {
     try {
       const res = await fetch(`${API_URL}/${id}`, {
         method: "PUT",
@@ -156,7 +161,7 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
   };
 
   // Hapus note
-  const removeNote = async (id: number) => {
+  const removeNote = async (id: string | number) => {
     try {
       const res = await fetch(`${API_URL}/${id}`, {
         method: "DELETE",
@@ -194,7 +199,7 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
   const [selectedColor, setSelectedColor] = useState(noteColors[0]);
   const [editingNote, setEditingNote] = useState<ColoredNote | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [noteToDelete, setNoteToDelete] = useState<{ id: number; text: string } | null>(null);
+  const [noteToDelete, setNoteToDelete] = useState<{ id: string | number; text: string } | null>(null);
   const [showDetailSidebar, setShowDetailSidebar] = useState(false);
   const [selectedNote, setSelectedNote] = useState<ColoredNote | null>(null);
 
@@ -336,7 +341,7 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
   });
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className={`h-full overflow-auto ${darkMode ? 'bg-[#191919]' : 'bg-gray-50'}`}
@@ -348,16 +353,15 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
             <h1 className={`text-5xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
               Notes
             </h1>
-            
+
             {/* Add Button - Only for ADMIN/SUPERUSER */}
             {canEdit && (
               <button
                 onClick={() => setShowAddModal(true)}
-                className={`w-14 h-14 rounded-full ${
-                  darkMode
-                    ? 'bg-white hover:bg-gray-100 text-gray-900'
-                    : 'bg-gray-900 hover:bg-gray-800 text-white'
-                } flex items-center justify-center shadow-lg transition-all hover:scale-105`}
+                className={`w-14 h-14 rounded-full ${darkMode
+                  ? 'bg-white hover:bg-gray-100 text-gray-900'
+                  : 'bg-gray-900 hover:bg-gray-800 text-white'
+                  } flex items-center justify-center shadow-lg transition-all hover:scale-105`}
                 title="Add new note"
               >
                 <Plus className="w-6 h-6" />
@@ -373,11 +377,10 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search"
-              className={`w-full pl-12 pr-4 py-3 rounded-lg ${
-                darkMode 
-                  ? 'bg-gray-800 text-white placeholder-gray-500' 
-                  : 'bg-white text-gray-900 placeholder-gray-400'
-              } border-0 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              className={`w-full pl-12 pr-4 py-3 rounded-lg ${darkMode
+                ? 'bg-gray-800 text-white placeholder-gray-500'
+                : 'bg-white text-gray-900 placeholder-gray-400'
+                } border-0 focus:outline-none focus:ring-2 focus:ring-blue-500`}
             />
           </div>
         </div>
@@ -399,9 +402,8 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
                     e.stopPropagation();
                     toggleFavorite(note);
                   }}
-                  className={`absolute top-4 right-4 w-10 h-10 rounded-full bg-black/80 flex items-center justify-center transition-all duration-300 hover:scale-110 ${
-                    note.favorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                  }`}
+                  className={`absolute top-4 right-4 w-10 h-10 rounded-full bg-black/80 flex items-center justify-center transition-all duration-300 hover:scale-110 ${note.favorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    }`}
                   title={note.favorite ? 'Remove from favorites' : 'Add to favorites'}
                 >
                   <Star
@@ -467,8 +469,8 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
               {searchQuery
                 ? 'No notes found'
                 : canEdit
-                ? 'No notes yet. Click the + button to add one!'
-                : 'No notes available yet.'}
+                  ? 'No notes yet. Click the + button to add one!'
+                  : 'No notes available yet.'}
             </p>
           </div>
         )}
@@ -480,9 +482,8 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className={`${
-              darkMode ? 'bg-gray-800' : 'bg-white'
-            } rounded-2xl p-6 w-full max-w-lg shadow-2xl`}
+            className={`${darkMode ? 'bg-gray-800' : 'bg-white'
+              } rounded-2xl p-6 w-full max-w-lg shadow-2xl`}
           >
             <h3 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
               {editingNote ? 'Edit Note' : 'Add New Note'}
@@ -504,11 +505,10 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
               placeholder="Write your note here... (Ctrl+Enter to save)"
               autoFocus
               rows={6}
-              className={`w-full px-4 py-3 rounded-lg border ${
-                darkMode
-                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                  : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-500'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
+              className={`w-full px-4 py-3 rounded-lg border ${darkMode
+                ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-500'
+                } focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
             />
 
             {/* Color Picker */}
@@ -521,11 +521,10 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
                   <button
                     key={color}
                     onClick={() => setSelectedColor(color)}
-                    className={`w-10 h-10 rounded-full transition-all ${
-                      selectedColor === color 
-                        ? 'ring-4 ring-blue-500 scale-110' 
-                        : 'hover:scale-105'
-                    }`}
+                    className={`w-10 h-10 rounded-full transition-all ${selectedColor === color
+                      ? 'ring-4 ring-blue-500 scale-110'
+                      : 'hover:scale-105'
+                      }`}
                     style={{ backgroundColor: color }}
                   />
                 ))}
@@ -543,11 +542,10 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
               </button>
               <button
                 onClick={cancelModal}
-                className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${
-                  darkMode
-                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
-                }`}
+                className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${darkMode
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
+                  }`}
               >
                 Cancel
               </button>
@@ -589,136 +587,127 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`fixed right-0 top-0 h-full w-full sm:w-96 z-50 shadow-2xl ${
-                darkMode ? 'bg-gray-800' : 'bg-white'
-              } overflow-y-auto`}
+              className={`fixed right-0 top-0 h-full w-full sm:w-96 z-50 shadow-2xl ${darkMode ? 'bg-gray-800' : 'bg-white'
+                } overflow-y-auto`}
             >
-            {/* Sidebar Header */}
-            <div className={`sticky top-0 z-10 px-6 py-4 border-b ${
-              darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-            }`}>
-              <div className="flex items-center justify-between">
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Note Details
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowDetailSidebar(false);
-                    setSelectedNote(null);
-                  }}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                    darkMode
+              {/* Sidebar Header */}
+              <div className={`sticky top-0 z-10 px-6 py-4 border-b ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                }`}>
+                <div className="flex items-center justify-between">
+                  <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Note Details
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setShowDetailSidebar(false);
+                      setSelectedNote(null);
+                    }}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${darkMode
                       ? 'hover:bg-gray-700 text-gray-400 hover:text-white'
                       : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Sidebar Content */}
-            <div className="px-6 py-6 space-y-6">
-              {/* Note Preview */}
-              <div>
-                <h3 className={`text-sm font-semibold mb-3 ${
-                  darkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  Content
-                </h3>
-                <div
-                  className="rounded-xl p-4 shadow-sm"
-                  style={{ backgroundColor: selectedNote.color }}
-                >
-                  <p className="text-gray-900 text-base leading-relaxed whitespace-pre-wrap">
-                    {selectedNote.content || selectedNote.text || ''}
-                  </p>
+                      }`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               </div>
 
-              {/* Creation Date */}
-              <div>
-                <h3 className={`text-sm font-semibold mb-2 ${
-                  darkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  Created
-                </h3>
-                <p className={`text-base ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {selectedNote.createdAt
-                    ? formatDateIndonesian(selectedNote.createdAt)
-                    : (selectedNote.date ? formatDateIndonesian(selectedNote.date) : 'N/A')}
-                </p>
-              </div>
-
-              {/* Last Updated */}
-              {selectedNote.updatedAt && (
+              {/* Sidebar Content */}
+              <div className="px-6 py-6 space-y-6">
+                {/* Note Preview */}
                 <div>
-                  <h3 className={`text-sm font-semibold mb-2 ${
-                    darkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>
-                    Last Updated
+                  <h3 className={`text-sm font-semibold mb-3 ${darkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                    Content
+                  </h3>
+                  <div
+                    className="rounded-xl p-4 shadow-sm"
+                    style={{ backgroundColor: selectedNote.color }}
+                  >
+                    <p className="text-gray-900 text-base leading-relaxed whitespace-pre-wrap">
+                      {selectedNote.content || selectedNote.text || ''}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Creation Date */}
+                <div>
+                  <h3 className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                    Created
                   </h3>
                   <p className={`text-base ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {formatDateIndonesian(selectedNote.updatedAt)}
+                    {selectedNote.createdAt
+                      ? formatDateIndonesian(selectedNote.createdAt)
+                      : (selectedNote.date ? formatDateIndonesian(selectedNote.date) : 'N/A')}
                   </p>
                 </div>
-              )}
 
-              {/* Creator Info */}
-              <div>
-                <h3 className={`text-sm font-semibold mb-2 ${
-                  darkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  Created By
-                </h3>
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-                    darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
-                  }`}>
-                    {(selectedNote as any).createdBy?.name?.charAt(0).toUpperCase() ||
-                     (selectedNote as any).userName?.charAt(0).toUpperCase() ||
-                     user?.name?.charAt(0).toUpperCase() ||
-                     'U'}
-                  </div>
+                {/* Last Updated */}
+                {selectedNote.updatedAt && (
                   <div>
-                    <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {(selectedNote as any).createdBy?.name ||
-                       (selectedNote as any).userName ||
-                       user?.name ||
-                       'Unknown User'}
-                    </p>
-                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {(selectedNote as any).createdBy?.role ||
-                       (selectedNote as any).userRole ||
-                       user?.role ||
-                       'User'}
+                    <h3 className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>
+                      Last Updated
+                    </h3>
+                    <p className={`text-base ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {formatDateIndonesian(selectedNote.updatedAt)}
                     </p>
                   </div>
-                </div>
-              </div>
+                )}
 
-              {/* Favorite Status */}
-              {selectedNote.favorite && (
+                {/* Creator Info */}
                 <div>
-                  <h3 className={`text-sm font-semibold mb-2 ${
-                    darkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>
-                    Status
+                  <h3 className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                    Created By
                   </h3>
-                  <div className="flex items-center gap-2">
-                    <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                    <span className={`text-base ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      Favorited
-                    </span>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                      {(selectedNote as any).createdBy?.name?.charAt(0).toUpperCase() ||
+                        (selectedNote as any).userName?.charAt(0).toUpperCase() ||
+                        user?.name?.charAt(0).toUpperCase() ||
+                        'U'}
+                    </div>
+                    <div>
+                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {(selectedNote as any).createdBy?.name ||
+                          (selectedNote as any).userName ||
+                          user?.name ||
+                          'Unknown User'}
+                      </p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {(selectedNote as any).createdBy?.role ||
+                          (selectedNote as any).userRole ||
+                          user?.role ||
+                          'User'}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-          </motion.div>
-        </>
-      )}
+
+                {/* Favorite Status */}
+                {selectedNote.favorite && (
+                  <div>
+                    <h3 className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>
+                      Status
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                      <span className={`text-base ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        Favorited
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
       </AnimatePresence>
     </motion.div>
   );
