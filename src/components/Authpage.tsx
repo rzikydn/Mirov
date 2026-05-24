@@ -29,17 +29,16 @@ export default function AuthPage() {
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load saved "Remember Me" credentials on mount
+  // Load saved "Remember Me" email on mount (secure, no password is stored)
   useEffect(() => {
     const savedCredentials = localStorage.getItem('rememberedUser');
     if (savedCredentials) {
       try {
-        const { email, password } = JSON.parse(savedCredentials);
-        setFormData({
-          email: email || '',
-          password: password ? atob(password) : ''
-        });
-        setRememberMe(true);
+        const { email } = JSON.parse(savedCredentials);
+        if (email) {
+          setFormData(prev => ({ ...prev, email }));
+          setRememberMe(true);
+        }
       } catch (e) {
         console.error('Failed to parse remembered credentials:', e);
         localStorage.removeItem('rememberedUser');
@@ -122,15 +121,17 @@ export default function AuthPage() {
       localStorage.setItem("user", JSON.stringify(userData));
       localStorage.setItem("lastActivity", Date.now().toString());
 
-      // Handle Remember Me: save or remove credentials
+      // Secure "Remember Me": save or remove ONLY email, NEVER save password
       if (rememberMe) {
         localStorage.setItem('rememberedUser', JSON.stringify({
-          email: formData.email,
-          password: btoa(formData.password)
+          email: formData.email
         }));
       } else {
         localStorage.removeItem('rememberedUser');
       }
+
+      // Password autofill is securely handled by the browser's credential manager
+      // No plain password storage in localStorage.
 
       setTimeout(() => {
         navigate("/dashboard");
@@ -193,7 +194,7 @@ export default function AuthPage() {
           </p>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {/* User Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -203,8 +204,8 @@ export default function AuthPage() {
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  name="mirov_user_field"
-                  autoComplete="off"
+                  name="username"
+                  autoComplete="username"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   placeholder="Enter your username"
@@ -226,8 +227,8 @@ export default function AuthPage() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  name="mirov_pass_field"
-                  autoComplete="new-password"
+                  name="password"
+                  autoComplete="current-password"
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
                   placeholder="Enter your password"
@@ -263,6 +264,8 @@ export default function AuthPage() {
                 Remember me
               </label>
             </div>
+
+
 
             {/* Error/Success Message */}
             <AnimatePresence>
@@ -329,7 +332,7 @@ export default function AuthPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* User Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -339,8 +342,8 @@ export default function AuthPage() {
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  name="mirov_user_field_desktop"
-                  autoComplete="off"
+                  name="username"
+                  autoComplete="username"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   placeholder="Enter your username"
@@ -362,8 +365,8 @@ export default function AuthPage() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  name="mirov_pass_field_desktop"
-                  autoComplete="new-password"
+                  name="password"
+                  autoComplete="current-password"
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
                   placeholder="Enter your password"
@@ -399,6 +402,8 @@ export default function AuthPage() {
                 Remember me
               </label>
             </div>
+
+
 
             {/* Error/Success Message */}
             <AnimatePresence>
