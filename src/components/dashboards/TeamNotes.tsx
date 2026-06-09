@@ -2,11 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Edit3, Trash2, Star, Plus, Search, ChevronRight } from 'lucide-react';
+import { Edit3, Trash2, Star, Plus, Search, ChevronRight, Clock } from 'lucide-react';
 import { Note } from '../../types/database';
 import { useAuth } from '../../context/AuthContext';
 import { useHistory } from '../../context/HistoryContext';
 import DeleteModal from './modals/DeleteModal';
+import {
+  Expandable,
+  ExpandableCard,
+  ExpandableCardContent,
+  ExpandableCardHeader,
+  ExpandableContent,
+  ExpandableTrigger,
+} from '@/components/ui/expandable';
 
 interface TeamNotesProps {
   darkMode: boolean;
@@ -50,6 +58,63 @@ const formatDateIndonesian = (dateString: string): string => {
   const year = date.getFullYear();
 
   return `${dayName}, ${day} ${month} ${year}`;
+};
+
+// Helper to render a visual badge with anchors for different note status/color
+const renderStatusBadge = (color: string, darkMode: boolean) => {
+  const normColor = color.toLowerCase();
+
+  if (normColor.includes('a896') || normColor.includes('red') || normColor.includes('rose')) {
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase border ${
+        darkMode
+          ? 'bg-red-500/10 border-red-500/20 text-red-400'
+          : 'bg-red-50 border-red-100 text-red-700'
+      }`}>
+        High Priority
+      </span>
+    );
+  }
+
+  if (normColor.includes('d89b') || normColor.includes('yellow') || normColor.includes('amber')) {
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase border ${
+        darkMode
+          ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+          : 'bg-amber-50 border-amber-100 text-amber-700'
+      }`}>
+        Medium Priority
+      </span>
+    );
+  }
+
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase border ${
+      darkMode
+        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+        : 'bg-emerald-50 border-emerald-100 text-emerald-700'
+    }`}>
+      Low Priority
+    </span>
+  );
+};
+
+// Helper to get DiceBear avatar URL for note creator based on global registry or fallback
+const getCreatorAvatar = (note: any, currentUser: any): string => {
+  const creatorName = note.user?.name || note.createdBy?.name || note.userName || currentUser?.name || 'Unknown';
+  const safeParams = '&mouth=default,smile,twinkle&eyes=default,happy,wink';
+
+  try {
+    const globalMapStr = localStorage.getItem('global_used_avatars');
+    const globalMap = globalMapStr ? JSON.parse(globalMapStr) : {};
+    if (globalMap[creatorName]) {
+      return globalMap[creatorName];
+    }
+  } catch (e) {
+    console.error('Error reading global_used_avatars:', e);
+  }
+
+  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${creatorName}&backgroundColor=b6e3f4${safeParams}`;
 };
 
 const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
@@ -344,9 +409,9 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={`h-full overflow-auto ${darkMode ? 'bg-[#191919]' : 'bg-gray-50'}`}
+      className={`h-full overflow-auto hide-scrollbar ${darkMode ? 'bg-[#191919]' : 'bg-gray-50'}`}
     >
-      <div className="px-4 sm:px-6 lg:px-12 py-12">
+      <div className="px-4 sm:px-6 lg:px-12 pt-6 pb-12">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
@@ -385,81 +450,174 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
           </div>
         </div>
 
-        {/* Notes Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredNotes.map((note) => (
-            <motion.div
-              key={note.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="group relative rounded-3xl p-6 shadow-md hover:shadow-xl transition-all duration-300 min-h-[280px] flex flex-col"
-              style={{ backgroundColor: note.color }}
-            >
-              {/* Favorite Star - Only for ADMIN/SUPERUSER */}
-              {canEdit && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(note);
-                  }}
-                  className={`absolute top-4 right-4 w-10 h-10 rounded-full bg-black/80 flex items-center justify-center transition-all duration-300 hover:scale-110 ${note.favorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                    }`}
-                  title={note.favorite ? 'Remove from favorites' : 'Add to favorites'}
+        {/* Notes Grid - Expandable Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {filteredNotes.map((note) => {
+            const noteText = note.content || note.text || '';
+            const truncatedText = noteText.length > 60 ? noteText.substring(0, 60) + '...' : noteText;
+            const noteDate = note.createdAt ? formatDateIndonesian(note.createdAt) : (note.date ? formatDateIndonesian(note.date) : '');
+
+            return (
+              <motion.div
+                key={note.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <Expandable
+                  expandDirection="vertical"
+                  expandBehavior="replace"
+                  initialDelay={0.05}
                 >
-                  <Star
-                    className={`w-5 h-5 transition-all duration-300 ${note.favorite ? 'fill-yellow-400 text-yellow-400 scale-110' : 'text-white scale-100'}`}
-                  />
-                </button>
-              )}
+                  {({ isExpanded }) => (
+                    <ExpandableTrigger>
+                      <ExpandableCard
+                        className="w-full"
+                        darkMode={darkMode}
+                        collapsedSize={{ height: 210 }}
+                        expandedSize={{ height: undefined }}
+                        hoverToExpand={false}
+                      >
+                        <ExpandableCardHeader className="p-0 mb-4 flex-shrink-0">
+                          <div className="flex justify-between items-center w-full">
+                            <div className="flex items-center">
+                              {renderStatusBadge(note.color, darkMode)}
+                            </div>
+                            <div className="flex gap-1">
+                              {canEdit && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleFavorite(note);
+                                  }}
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+                                    darkMode 
+                                      ? 'hover:bg-neutral-800 text-neutral-400 hover:text-amber-400' 
+                                      : 'hover:bg-amber-50 text-gray-400 hover:text-amber-500'
+                                  }`}
+                                  title={note.favorite ? 'Remove from favorites' : 'Add to favorites'}
+                                >
+                                  <Star
+                                    strokeWidth={1.5}
+                                    className={`w-4 h-4 transition-all duration-300 transform hover:scale-110 ${
+                                      note.favorite 
+                                        ? 'fill-amber-400 text-amber-400' 
+                                        : 'text-current'
+                                    }`}
+                                  />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </ExpandableCardHeader>
 
-              {/* Note Text */}
-              <p className="text-gray-900 text-lg leading-relaxed flex-1 pr-8">
-                {note.content || note.text || ''}
-              </p>
+                        <ExpandableCardContent className="p-0 overflow-hidden flex-grow flex flex-col justify-between">
+                          <div className="flex-grow flex flex-col justify-between h-full">
+                            <div className="mb-3">
+                              <p className={`text-base font-medium leading-snug tracking-tight ${darkMode ? 'text-neutral-100' : 'text-slate-900'}`}>
+                                {isExpanded ? noteText : truncatedText}
+                              </p>
+                            </div>
 
-              {/* Bottom Section */}
-              <div className="flex items-center justify-between mt-6">
-                <div className="flex flex-col gap-2">
-                  {/* ⭐ DIUBAH: Format tanggal menggunakan fungsi baru */}
-                  <span className="text-gray-700 text-sm font-medium">
-                    {note.createdAt ? formatDateIndonesian(note.createdAt) : (note.date ? formatDateIndonesian(note.date) : '')}
-                  </span>
+                            <div className={`flex items-center text-xs ${darkMode ? 'text-neutral-500' : 'text-slate-400'}`}>
+                              <Clock className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
+                              <span>{noteDate}</span>
+                            </div>
+                          </div>
 
-                  {/* Detail Button */}
-                  <button
-                    onClick={() => {
-                      setSelectedNote(note);
-                      setShowDetailSidebar(true);
-                    }}
-                    className="text-gray-700 hover:text-gray-900 transition-colors"
-                    title="View details"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
+                          <ExpandableContent preset="blur-md" stagger staggerChildren={0.1}>
+                            {note.updatedAt && (
+                              <div className={`mt-2 text-xs ${darkMode ? 'text-neutral-500' : 'text-slate-400'}`}>
+                                Updated: {formatDateIndonesian(note.updatedAt)}
+                              </div>
+                            )}
 
-                {/* Edit Button - Only for ADMIN/SUPERUSER */}
-                {canEdit && (
-                  <button
-                    onClick={() => startEdit(note)}
-                    className="w-10 h-10 rounded-full bg-black/80 hover:bg-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-                  >
-                    <Edit3 className="w-4 h-4 text-white" />
-                  </button>
-                )}
-              </div>
+                            <div className={`mt-4 flex items-center gap-3 border-t pt-4 ${darkMode ? 'border-neutral-800 text-neutral-300' : 'border-slate-100 text-slate-700'}`}>
+                              <div className={`w-8 h-8 rounded-full flex-shrink-0 overflow-hidden bg-neutral-100 dark:bg-neutral-800 border ${darkMode ? 'border-neutral-700' : 'border-slate-200'}`}>
+                                <img
+                                  src={getCreatorAvatar(note, user)}
+                                  alt={(note as any).user?.name || (note as any).createdBy?.name || (note as any).userName || user?.name || 'User'}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold truncate">
+                                  {(note as any).user?.name || (note as any).createdBy?.name || (note as any).userName || user?.name || 'Unknown'}
+                                </p>
+                                <p className={`text-xs ${darkMode ? 'text-neutral-500' : 'text-slate-400'}`}>
+                                  {(note as any).user?.role || (note as any).createdBy?.role || (note as any).userRole || user?.role || 'User'}
+                                </p>
+                              </div>
+                            </div>
 
-              {/* Delete Button - Top Left on Hover - Only for ADMIN/SUPERUSER */}
-              {canEdit && (
-                <button
-                  onClick={() => handleDeleteClick(note)}
-                  className="absolute top-4 left-4 w-10 h-10 rounded-full bg-red-500/90 hover:bg-red-600 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 className="w-4 h-4 text-white" />
-                </button>
-              )}
-            </motion.div>
-          ))}
+                            <div className="mt-4 space-y-2 flex-shrink-0">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedNote(note);
+                                  setShowDetailSidebar(true);
+                                }}
+                                className={`w-full py-2 px-4 rounded-xl text-sm font-semibold transition-all shadow-sm ${
+                                  darkMode
+                                    ? 'bg-neutral-800 text-neutral-100 hover:bg-neutral-700 border border-neutral-700'
+                                    : 'bg-slate-900 text-white hover:bg-slate-800'
+                                }`}
+                              >
+                                <span className="flex items-center justify-center gap-2">
+                                  <ChevronRight className="w-4 h-4" />
+                                  View Details
+                                </span>
+                              </button>
+
+                              {canEdit && (
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      startEdit(note);
+                                    }}
+                                    className={`flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all border ${
+                                      darkMode
+                                        ? 'border-neutral-700 text-neutral-300 hover:bg-neutral-800'
+                                        : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    <span className="flex items-center justify-center gap-1.5">
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                      Edit
+                                    </span>
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteClick(note);
+                                    }}
+                                    className="flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all bg-red-500 hover:bg-red-600 text-white"
+                                  >
+                                    <span className="flex items-center justify-center gap-1.5">
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                      Delete
+                                    </span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className={`flex items-center justify-between w-full mt-4 border-t pt-4 text-[11px] font-medium ${darkMode ? 'text-neutral-500' : 'text-slate-400'}`}>
+                              <span className="flex items-center gap-1">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: note.color }} />
+                                {note.favorite ? '⭐ Favorited' : 'Note'}
+                              </span>
+                              <span>Click to collapse</span>
+                            </div>
+                          </ExpandableContent>
+                        </ExpandableCardContent>
+                      </ExpandableCard>
+                    </ExpandableTrigger>
+                  )}
+                </Expandable>
+              </motion.div>
+            );
+          })}
         </div>
 
         {/* Empty State */}
@@ -665,22 +823,24 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
                     Created By
                   </h3>
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
-                      }`}>
-                      {(selectedNote as any).createdBy?.name?.charAt(0).toUpperCase() ||
-                        (selectedNote as any).userName?.charAt(0).toUpperCase() ||
-                        user?.name?.charAt(0).toUpperCase() ||
-                        'U'}
+                    <div className={`w-10 h-10 rounded-full flex-shrink-0 overflow-hidden bg-neutral-100 dark:bg-neutral-800 border ${darkMode ? 'border-neutral-700' : 'border-slate-200'}`}>
+                      <img
+                        src={getCreatorAvatar(selectedNote, user)}
+                        alt={(selectedNote as any).user?.name || (selectedNote as any).createdBy?.name || (selectedNote as any).userName || user?.name || 'User'}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div>
                       <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {(selectedNote as any).createdBy?.name ||
+                        {(selectedNote as any).user?.name ||
+                          (selectedNote as any).createdBy?.name ||
                           (selectedNote as any).userName ||
                           user?.name ||
                           'Unknown User'}
                       </p>
                       <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {(selectedNote as any).createdBy?.role ||
+                        {(selectedNote as any).user?.role ||
+                          (selectedNote as any).createdBy?.role ||
                           (selectedNote as any).userRole ||
                           user?.role ||
                           'User'}

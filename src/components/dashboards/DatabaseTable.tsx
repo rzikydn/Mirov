@@ -19,6 +19,10 @@ import ExportModal from './modals/ExportModal';
 import ImportModal from './modals/ImportModal';
 import WarningModal from './modals/WarningModal';
 import DateInput from './DateInput';
+import DateFilter from './DateFilter';
+import { Button } from '../ui/button';
+import { ButtonGroup } from '../ui/button-group';
+import { cn } from '../../lib/utils';
 
 
 // Import constants
@@ -35,6 +39,22 @@ const highlightColors = [
   '#FFD89B', // Yellow
   '#C4F5A4', // Green
 ];
+
+// Helper to map strong highlight colors to soft transparent-looking pastel colors
+const getHighlightBgColor = (color: string | undefined, darkMode: boolean) => {
+  if (!color) return undefined;
+  const upperColor = color.toUpperCase();
+  if (darkMode) {
+    if (upperColor === '#FFA896') return '#3C2E2C'; // Soft Dark Red/Orange
+    if (upperColor === '#FFD89B') return '#3C362D'; // Soft Dark Yellow/Amber
+    if (upperColor === '#C4F5A4') return '#333A2E'; // Soft Dark Green
+  } else {
+    if (upperColor === '#FFA896') return '#FFEEEA'; // Soft Light Red/Orange
+    if (upperColor === '#FFD89B') return '#FFF7EB'; // Soft Light Yellow
+    if (upperColor === '#C4F5A4') return '#F3FDED'; // Soft Light Green
+  }
+  return color;
+};
 
 interface DatabaseTableProps {
   database: Database;
@@ -105,6 +125,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [wrapText, setWrapText] = useState(false); // Excel-like wrap text toggle
   const horizontalScrollRef = useRef<HTMLDivElement>(null); // Ref for external horizontal scrollbar
   const [searchQuery, setSearchQuery] = useState(''); // Search query state
+  const [filterDate, setFilterDate] = useState(''); // Date filter state (YYYY-MM-DD)
   const [showSearchInput, setShowSearchInput] = useState(false); // Toggle search input visibility on mobile
   const [showRowActionMenu, setShowRowActionMenu] = useState<string | null>(null); // Row ID for showing action menu
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null); // Popup menu position
@@ -147,7 +168,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
   // Close row action menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = () => {
       if (showRowActionMenu) {
         setShowRowActionMenu(null);
         setMenuPosition(null);
@@ -1196,8 +1217,19 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }
   };
 
-  // Filter rows based on search query
+  // Filter rows based on search query and date picker filter
   const filteredRows = sortedRows.filter((row) => {
+    // 1. Apply date picker filter if a date is selected
+    if (filterDate) {
+      const matchesDate = database.columns.some((col) => {
+        if (col.type !== 'date') return false;
+        const property = row.properties[col.key];
+        return property && property.value === filterDate;
+      });
+      if (!matchesDate) return false;
+    }
+
+    // 2. Apply search query filter if search query is entered
     if (!searchQuery.trim()) return true;
 
     const query = searchQuery.toLowerCase();
@@ -1231,6 +1263,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       return el.getBoundingClientRect().height;
     },
   });
+
+  const buttonThemeClass = darkMode
+    ? "bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700 hover:text-white"
+    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:text-gray-900";
 
   return (
     <motion.div
@@ -1657,118 +1693,131 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 )}
               </div>
             </div>
+
+            {/* Date Picker Filter */}
+            <div className="relative">
+              <DateFilter
+                value={filterDate}
+                onChange={setFilterDate}
+                darkMode={darkMode}
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            {/* Refresh Button */}
-            <button
-              onClick={handleRefresh}
-              className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${darkMode
-                ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              title="Refresh data from server"
-            >
-              <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="hidden md:inline text-xs sm:text-sm">Refresh</span>
-            </button>
-
-            {/* Save Button - Positioned to the left of Wrap */}
-            {canEdit && (
-              <button
-                onClick={handleSaveDatabase}
-                className="flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
-                title="Save changes"
+            <ButtonGroup className="shadow-xs">
+              {/* Refresh Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                title="Refresh data from server"
+                className={cn("flex items-center gap-1.5", buttonThemeClass)}
               >
-                <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-                <span className="hidden md:inline text-xs sm:text-sm">Save</span>
-              </button>
-            )}
+                <RefreshCw className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="hidden md:inline">Refresh</span>
+              </Button>
 
-            {/* Wrap Text Toggle - Excel-like */}
-            <button
-              onClick={() => setWrapText(!wrapText)}
-              className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${wrapText
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : darkMode
-                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              title={wrapText ? "Disable text wrapping" : "Enable text wrapping (Excel-like)"}
-            >
-              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
-              </svg>
-              <span className="hidden md:inline text-xs sm:text-sm">Wrap</span>
-            </button>
-
-            {/* Sort Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setShowSortDropdown(!showSortDropdown)}
-                className="flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-              >
-                <ArrowUpDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span className="hidden md:inline text-xs sm:text-sm">Sort</span>
-                {/* Mobile & Tablet: Show count */}
-                <span className="md:hidden text-xs">{sortConfig.length > 0 ? sortConfig.length : '1'}</span>
-              </button>
-
-              {/* Sort Dropdown Component */}
-              {showSortDropdown && (
-                <SortDropdown
-                  darkMode={darkMode}
-                  sortConfig={sortConfig}
-                  columns={database.columns}
-                  onAddSort={handleAddSort}
-                  onUpdateDirection={handleUpdateSortDirection}
-                  onDeleteSort={handleDeleteSort}
-                  onClearAll={handleClearAllSorts}
-                  onClose={() => setShowSortDropdown(false)}
-                />
+              {/* Save Button - Positioned to the left of Wrap */}
+              {canEdit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSaveDatabase}
+                  title="Save changes"
+                  className={cn("flex items-center gap-1.5", buttonThemeClass)}
+                >
+                  <Save className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="hidden md:inline">Save</span>
+                </Button>
               )}
-            </div>
 
-            {/* New Rows Button - Positioned between Sort and Add Property */}
-            {canEdit && (
-              <button
-                onClick={handleAddRow}
-                className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${darkMode
-                  ? 'bg-white hover:bg-gray-100 text-gray-900'
-                  : 'bg-gray-900 hover:bg-gray-800 text-white'
-                  }`}
-                title="Add a new row"
+              {/* Wrap Text Toggle - Excel-like */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWrapText(!wrapText)}
+                title={wrapText ? "Disable text wrapping" : "Enable text wrapping (Excel-like)"}
+                className={cn(
+                  "flex items-center gap-1.5",
+                  wrapText
+                    ? (darkMode
+                        ? "bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border-blue-500/30"
+                        : "bg-blue-600/10 hover:bg-blue-600/20 text-blue-600 border-blue-600/20")
+                    : buttonThemeClass
+                )}
               >
-                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-                <span className="hidden md:inline text-xs sm:text-sm">Rows</span>
-              </button>
-            )}
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
+                </svg>
+                <span className="hidden md:inline">Wrap</span>
+              </Button>
 
-            {/* Add Property Button */}
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!canEdit) {
-                  toast.error('Only ADMIN and SUPERUSER can add properties');
-                  return;
-                }
-                setShowAddProperty(true);
-              }}
-              type="button"
-              className={`flex items-center gap-1 px-2 py-2 rounded-full text-xs font-medium transition-colors ${!canEdit
-                ? darkMode
-                  ? 'bg-white text-gray-900 cursor-not-allowed opacity-40 pointer-events-auto'
-                  : 'bg-gray-900 text-white cursor-not-allowed opacity-40 pointer-events-auto'
-                : darkMode
-                  ? 'bg-white hover:bg-gray-100 text-gray-900'
-                  : 'bg-gray-900 hover:bg-gray-800 text-white'
-                }`}
-              title={!canEdit ? 'Only ADMIN and SUPERUSER can add properties' : 'Add a new column'}
-            >
-              <Columns3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="hidden md:inline text-xs sm:text-sm">Property</span>
-            </button>
+              {/* Sort Dropdown */}
+              <div className="relative flex">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSortDropdown(!showSortDropdown)}
+                  className={cn("relative flex items-center gap-1.5 rounded-none border-l-0", buttonThemeClass)}
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">Sort</span>
+                  {sortConfig.length > 0 && (
+                    <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-blue-600 rounded-full" />
+                  )}
+                </Button>
+
+                {/* Sort Dropdown Component */}
+                {showSortDropdown && (
+                  <SortDropdown
+                    darkMode={darkMode}
+                    sortConfig={sortConfig}
+                    columns={database.columns}
+                    onAddSort={handleAddSort}
+                    onUpdateDirection={handleUpdateSortDirection}
+                    onDeleteSort={handleDeleteSort}
+                    onClearAll={handleClearAllSorts}
+                    onClose={() => setShowSortDropdown(false)}
+                  />
+                )}
+              </div>
+
+              {/* New Rows Button - Positioned between Sort and Add Property */}
+              {canEdit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddRow}
+                  title="Add a new row"
+                  className={cn("flex items-center gap-1.5", buttonThemeClass)}
+                >
+                  <Plus className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="hidden md:inline">Rows</span>
+                </Button>
+              )}
+
+              {/* Add Property Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!canEdit) {
+                    toast.error('Only ADMIN and SUPERUSER can add properties');
+                    return;
+                  }
+                  setShowAddProperty(true);
+                }}
+                disabled={!canEdit}
+                title={!canEdit ? 'Only ADMIN and SUPERUSER can add properties' : 'Add a new column'}
+                className={cn("flex items-center gap-1.5", buttonThemeClass)}
+              >
+                <Columns3 className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="hidden md:inline">Property</span>
+              </Button>
+            </ButtonGroup>
           </div>
         </div>
       </div>
@@ -1951,7 +2000,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                         }`}
                       style={{
                         // height: wrapText ? 'auto' : `${virtualRow.size}px`,
-                        backgroundColor: row.highlightColor || undefined,
+                        backgroundColor: getHighlightBgColor(row.highlightColor, darkMode),
                       }}
                     >
                       {database.columns.map((col, colIndex) => {
@@ -1968,7 +2017,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                             wordWrap: wrapText ? 'break-word' : 'normal',
                             verticalAlign: 'top',
                             zIndex: colIndex === 0 ? 50 : 1,
-                            backgroundColor: colIndex === 0 ? (row.highlightColor || undefined) : undefined,
+                            backgroundColor: colIndex === 0 ? (getHighlightBgColor(row.highlightColor, darkMode) || undefined) : undefined,
                             ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                           }}
                         ></td>;
@@ -1987,7 +2036,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                               wordWrap: wrapText ? 'break-word' : 'normal',
                               verticalAlign: 'top',
                               zIndex: colIndex === 0 ? 50 : 1,
-                              backgroundColor: colIndex === 0 ? (row.highlightColor || undefined) : undefined,
+                              backgroundColor: colIndex === 0 ? (getHighlightBgColor(row.highlightColor, darkMode) || undefined) : undefined,
                               ...(colIndex === 0 && { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' })
                             }}
                           >
@@ -2018,9 +2067,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                               >
                                 {/* 3 Dots Icon - Custom SVG */}
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <circle cx="8" cy="3" r="1.5" fill={row.highlightColor ? '#374151' : (darkMode ? '#9ca3af' : '#6b7280')} />
-                                  <circle cx="8" cy="8" r="1.5" fill={row.highlightColor ? '#374151' : (darkMode ? '#9ca3af' : '#6b7280')} />
-                                  <circle cx="8" cy="13" r="1.5" fill={row.highlightColor ? '#374151' : (darkMode ? '#9ca3af' : '#6b7280')} />
+                                  <circle cx="8" cy="3" r="1.5" fill={darkMode ? '#9ca3af' : '#6b7280'} />
+                                  <circle cx="8" cy="8" r="1.5" fill={darkMode ? '#9ca3af' : '#6b7280'} />
+                                  <circle cx="8" cy="13" r="1.5" fill={darkMode ? '#9ca3af' : '#6b7280'} />
                                 </svg>
                               </button>
                             )}
@@ -2042,11 +2091,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                         handleCellBlur(row.id, col.key, e.target.value);
                                         setEditingCell(null);
                                       }}
-                                      className={`w-full text-sm resize-none overflow-hidden ${row.highlightColor && darkMode
-                                        ? 'text-gray-900 bg-transparent'
-                                        : darkMode
-                                          ? 'text-gray-300 bg-transparent'
-                                          : 'text-gray-900 bg-transparent'
+                                      className={`w-full text-sm resize-none overflow-hidden ${darkMode
+                                        ? 'text-gray-300 bg-transparent'
+                                        : 'text-gray-900 bg-transparent'
                                         } border-0 focus:outline-none p-0`}
                                       style={{
                                         whiteSpace: 'pre-wrap',
@@ -2064,11 +2111,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                   ) : (
                                     <div
                                       onClick={() => canEdit && setEditingCell({ rowId: row.id, key: col.key, oldValue: prop.value })}
-                                      className={`w-full text-sm ${row.highlightColor && darkMode
-                                        ? 'text-gray-900'
-                                        : darkMode
-                                          ? 'text-gray-300'
-                                          : 'text-gray-900'
+                                      className={`w-full text-sm ${darkMode
+                                        ? 'text-gray-300'
+                                        : 'text-gray-900'
                                         } ${canEdit ? 'cursor-text' : ''}`}
                                       style={{
                                         whiteSpace: 'pre-wrap',
@@ -2090,11 +2135,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                   onBlur={(e) => handleCellBlur(row.id, col.key, e.target.value)}
                                   disabled={!canEdit}
                                   placeholder=""
-                                  className={`w-full text-sm ${row.highlightColor && darkMode
-                                    ? 'bg-transparent text-gray-900'
-                                    : darkMode
-                                      ? 'bg-transparent text-gray-300'
-                                      : 'bg-transparent text-gray-900'
+                                  className={`w-full text-sm ${darkMode
+                                    ? 'bg-transparent text-gray-300'
+                                    : 'bg-transparent text-gray-900'
                                     } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                                 />
                               )
@@ -2108,12 +2151,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                 onBlur={(e) => handleCellBlur(row.id, col.key, e.target.valueAsNumber)}
                                 disabled={!canEdit}
                                 placeholder=""
-                                className={`w-full text-sm ${row.highlightColor && darkMode
-                                  ? 'bg-transparent text-gray-900'
-                                  : darkMode
-                                    ? 'bg-transparent text-gray-300'
-                                    : 'bg-transparent text-gray-900'
-                                  } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                                className={`w-full text-sm ${darkMode
+                                   ? 'bg-transparent text-gray-300'
+                                   : 'bg-transparent text-gray-900'
+                                   } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                               />
                             )}
                             {prop.type === 'date' && (
@@ -2124,7 +2165,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                 onBlur={(value) => handleCellBlur(row.id, col.key, value)}
                                 disabled={!canEdit}
                                 darkMode={darkMode}
-                                highlightColor={row.highlightColor}
+                                highlightColor={undefined}
                               />
                             )}
                             {prop.type === 'checkbox' && (
@@ -2164,14 +2205,20 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               </tbody>
             </table>
 
-            {/* Empty State for Search */}
-            {filteredRows.length === 0 && searchQuery.trim() && (
+            {/* Empty State for Search or Date Filter */}
+            {filteredRows.length === 0 && (searchQuery.trim() || filterDate) && (
               <div className={`text-center py-12 ${darkMode ? 'bg-[#191919]' : 'bg-white'}`}>
                 <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  No data found for "{searchQuery}"
+                  {searchQuery.trim()
+                    ? `No data found for "${searchQuery}"`
+                    : `No data found for the selected date`
+                  }
                 </p>
                 <p className={`text-sm mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                  Try a different search term
+                  {searchQuery.trim()
+                    ? 'Try a different search term'
+                    : 'Try selecting a different date or clear the filter'
+                  }
                 </p>
               </div>
             )}

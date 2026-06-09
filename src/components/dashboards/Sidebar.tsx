@@ -397,7 +397,18 @@ const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                     title={collapsed ? 'History' : undefined}
                   >
-                    <Clock className="w-4 h-4" />
+                    <div className="relative flex items-center justify-center">
+                      <Clock className="w-4 h-4" />
+                      {collapsed && history.length > 0 && (
+                        <span className={`absolute -top-1.5 -right-1.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-0.5 text-[8px] font-bold ring-2 ${
+                          darkMode
+                            ? 'bg-blue-600 text-white ring-gray-800'
+                            : 'bg-blue-600 text-white ring-white'
+                        }`}>
+                          {history.length}
+                        </span>
+                      )}
+                    </div>
                     {!collapsed && (
                       <>
                         <span className="font-medium whitespace-nowrap">History</span>

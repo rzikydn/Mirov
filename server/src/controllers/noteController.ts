@@ -148,6 +148,7 @@ export const updateNote = async (req: Request, res: Response): Promise<void> => 
   try {
     const { id } = req.params;
     const { title, content, color, favorite } = req.body;
+    const user = req.user!;
 
     // Check if note exists
     const [existingNote] = await db
@@ -160,6 +161,15 @@ export const updateNote = async (req: Request, res: Response): Promise<void> => 
       res.status(404).json({
         success: false,
         message: 'Note not found'
+      });
+      return;
+    }
+
+    // Authorization check: Only creator or ADMIN/SUPERUSER can modify
+    if (existingNote.userId !== user.userId && user.role !== 'SUPERUSER' && user.role !== 'ADMIN') {
+      res.status(403).json({
+        success: false,
+        message: 'Forbidden - You do not have permission to modify this note'
       });
       return;
     }
@@ -216,6 +226,7 @@ export const updateNote = async (req: Request, res: Response): Promise<void> => 
 export const deleteNote = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const user = req.user!;
 
     // Check if note exists
     const [existingNote] = await db
@@ -228,6 +239,15 @@ export const deleteNote = async (req: Request, res: Response): Promise<void> => 
       res.status(404).json({
         success: false,
         message: 'Note not found'
+      });
+      return;
+    }
+
+    // Authorization check: Only creator or ADMIN/SUPERUSER can delete
+    if (existingNote.userId !== user.userId && user.role !== 'SUPERUSER' && user.role !== 'ADMIN') {
+      res.status(403).json({
+        success: false,
+        message: 'Forbidden - You do not have permission to delete this note'
       });
       return;
     }

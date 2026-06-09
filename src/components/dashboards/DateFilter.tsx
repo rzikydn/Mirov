@@ -1,19 +1,15 @@
-// src/components/dashboards/DateInput.tsx
-// Custom date picker with built-in calendar popup rendered via Portal
+// src/components/dashboards/DateFilter.tsx
+// Custom date filter picker with calendar popup rendered via Portal
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom';
+import { Calendar, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X } from 'lucide-react';
 import { formatDateIndonesian } from '../../utils/dateFormatUtils';
-import { Calendar, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
-interface DateInputProps {
+interface DateFilterProps {
   value: string; // YYYY-MM-DD format
   onChange: (value: string) => void;
-  onFocus?: () => void;
-  onBlur?: (value: string) => void;
-  disabled?: boolean;
   darkMode: boolean;
-  highlightColor?: string;
 }
 
 const MONTH_NAMES = [
@@ -123,7 +119,7 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({
       top = anchorRect.top - dropdownHeight - gap;
     }
 
-    // Horizontal: try to align left edge, but clamp to viewport
+    // Horizontal alignment: try to align left, clamp to window width
     left = anchorRect.left;
     if (left + dropdownWidth > window.innerWidth - 8) {
       left = window.innerWidth - dropdownWidth - 8;
@@ -146,7 +142,6 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({
         onCancel();
       }
     };
-    // Use a small delay so the opening click doesn't immediately close
     const timer = setTimeout(() => {
       document.addEventListener('mousedown', handleMouseDown);
     }, 50);
@@ -165,7 +160,7 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onCancel]);
 
-  // Close on scroll of any ancestor (the table container may scroll)
+  // Close on scroll of any ancestor
   useEffect(() => {
     const handleScroll = () => onCancel();
     window.addEventListener('scroll', handleScroll, true);
@@ -175,12 +170,20 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({
   const weeks = useMemo(() => getCalendarDays(viewYear, viewMonth), [viewYear, viewMonth]);
 
   const prevMonthFn = () => {
-    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
-    else { setViewMonth(m => m - 1); }
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear(y => y - 1);
+    } else {
+      setViewMonth(m => m - 1);
+    }
   };
   const nextMonthFn = () => {
-    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
-    else { setViewMonth(m => m + 1); }
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear(y => y + 1);
+    } else {
+      setViewMonth(m => m + 1);
+    }
   };
   const prevYearFn = () => setViewYear(y => y - 1);
   const nextYearFn = () => setViewYear(y => y + 1);
@@ -196,7 +199,6 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({
   return ReactDOM.createPortal(
     <div
       ref={dropdownRef}
-      className="custom-datepicker-dropdown"
       style={{
         position: 'fixed',
         top: pos.top,
@@ -337,7 +339,7 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({
           ))}
         </div>
 
-        {/* Footer: Cancel & Apply */}
+        {/* Footer */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -400,7 +402,6 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({
   );
 };
 
-// ── Small NavButton component ──
 const NavButton: React.FC<{
   onClick: () => void;
   darkMode: boolean;
@@ -436,15 +437,11 @@ const NavButton: React.FC<{
   </button>
 );
 
-// ── Main DateInput component ──
-const DateInput: React.FC<DateInputProps> = ({
+// ── Main DateFilter component ──
+const DateFilter: React.FC<DateFilterProps> = ({
   value,
   onChange,
-  onFocus,
-  onBlur,
-  disabled,
   darkMode,
-  highlightColor
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -459,50 +456,56 @@ const DateInput: React.FC<DateInputProps> = ({
   const displayValue = value ? formatDateIndonesian(value) : '';
 
   const handleOpen = useCallback(() => {
-    if (disabled) return;
     if (triggerRef.current) {
       setAnchorRect(triggerRef.current.getBoundingClientRect());
     }
-    onFocus?.();
     setIsOpen(true);
-  }, [disabled, onFocus]);
+  }, []);
 
   const handleCancel = useCallback(() => {
     setIsOpen(false);
-    onBlur?.(value);
-  }, [onBlur, value]);
+  }, []);
 
   const handleApply = useCallback((date: Date) => {
     const newVal = toYYYYMMDD(date);
     onChange(newVal);
-    onBlur?.(newVal);
     setIsOpen(false);
-  }, [onChange, onBlur]);
+  }, [onChange]);
+
+  const handleClear = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange('');
+  }, [onChange]);
 
   return (
     <>
-      <div ref={triggerRef} style={{ position: 'relative', width: '100%' }}>
-        {/* Display Input - Shows Indonesian format */}
-        <div
-          onClick={handleOpen}
-          className={`flex items-center gap-2 w-full text-sm ${highlightColor && darkMode
-              ? 'bg-transparent text-gray-900'
-              : darkMode
-                ? 'bg-transparent text-gray-300'
-                : 'bg-transparent text-gray-900'
-            } ${disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
-        >
-          <span className="flex-1">{displayValue || ''}</span>
-          <Calendar className={`w-4 h-4 flex-shrink-0 ${highlightColor && darkMode
-              ? 'text-gray-700'
-              : darkMode
-                ? 'text-gray-400'
-                : 'text-gray-500'
-            }`} />
-        </div>
+      <div
+        ref={triggerRef}
+        onClick={handleOpen}
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer select-none transition-colors border ${
+          darkMode
+            ? 'bg-gray-800 text-gray-300 border-transparent hover:bg-gray-700'
+            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+        }`}
+        style={{ minWidth: '150px' }}
+      >
+        <Calendar className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+        <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+          {displayValue || 'Filter by Date'}
+        </span>
+        {value && (
+          <button
+            onClick={handleClear}
+            className={`p-0.5 rounded-full ${
+              darkMode ? 'hover:bg-gray-600 text-gray-400 hover:text-white' : 'hover:bg-gray-200 text-gray-500 hover:text-gray-700'
+            }`}
+            title="Clear date filter"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
-      {/* Calendar Portal */}
       {isOpen && anchorRect && (
         <CalendarDropdown
           anchorRect={anchorRect}
@@ -517,4 +520,4 @@ const DateInput: React.FC<DateInputProps> = ({
   );
 };
 
-export default DateInput;
+export default DateFilter;

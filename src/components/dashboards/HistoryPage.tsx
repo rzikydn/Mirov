@@ -283,7 +283,7 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ darkMode }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className={`h-full overflow-auto ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}
+      className={`h-full overflow-y-auto hide-scrollbar ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}
       onScroll={handleScroll}
     >
       <div className="px-4 sm:px-6 lg:px-12 pt-8 pb-12">

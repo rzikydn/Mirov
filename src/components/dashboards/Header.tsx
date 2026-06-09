@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Menu } from 'lucide-react';
 import { useHistory } from '../../context/HistoryContext';
 import { getTimeAgo } from '../../utils/timeAgo';
+import { HyperText } from '@/components/ui/hyper-text';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -281,18 +282,18 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, user }) => {
             <Menu className="w-6 h-6 text-white" />
           </button>
           <div>
-            <motion.h1
+            <HyperText
               key={config.greeting}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="text-xl sm:text-2xl font-bold text-white mb-0 leading-tight"
+              as="h1"
+              duration={2000}
+              animateInterval={8000}
+              className="text-2xl sm:text-3xl font-bold text-white mb-0 leading-tight space-mono-bold"
               style={{
                 textShadow: '0 2px 10px rgba(0,0,0,0.3)',
               }}
             >
-              {config.greeting}, Team!
-            </motion.h1>
+              {`${config.greeting}, Team!`}
+            </HyperText>
             {/* Only show last edited for ADMIN and SUPERUSER */}
             {user && user.role !== 'UMUM' && (
               <p

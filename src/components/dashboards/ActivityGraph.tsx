@@ -198,7 +198,7 @@ export const ActivityGraph: React.FC<ActivityGraphProps> = ({ history, darkMode,
 
   return (
     <div className={`p-5 rounded-xl border mb-8 w-full
-      flex flex-col 2xl:flex-row gap-8 items-start
+      flex flex-col lg:flex-row gap-8 items-start
       ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}
     `}>
       {/* LEFT: Contribution Graph */}
@@ -267,8 +267,8 @@ export const ActivityGraph: React.FC<ActivityGraphProps> = ({ history, darkMode,
       </div>
 
       {/* RIGHT: Doughnut Chart Insight */}
-      <div className={`w-full 2xl:w-[400px] flex-shrink-0 flex flex-col sm:flex-row items-center sm:items-start 2xl:pt-1 gap-6
-        border-t 2xl:border-t-0 2xl:border-l ${darkMode ? 'border-gray-700' : 'border-gray-100'} 2xl:pl-6 2xl:pr-4 pt-6 sm:pt-4
+      <div className={`w-full lg:w-[380px] flex-shrink-0 flex flex-col sm:flex-row items-center sm:items-start lg:pt-1 gap-6
+        border-t lg:border-t-0 lg:border-l ${darkMode ? 'border-gray-700' : 'border-gray-100'} lg:pl-6 lg:pr-4 pt-6 sm:pt-4
       `}>
         {/* Doughnut SVG */}
           <div className="relative w-[150px] h-[150px] flex-shrink-0">

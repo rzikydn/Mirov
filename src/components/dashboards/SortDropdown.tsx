@@ -2,7 +2,7 @@
 // Multi-level sort dropdown component (Notion-style)
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, ArrowUpDown } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { DatabaseColumn } from '../../types/database';
 import { SortConfig } from '../../utils/sortingUtils';
 import { propertyTypeIcons } from '../../constants/propertyTypeIcons';

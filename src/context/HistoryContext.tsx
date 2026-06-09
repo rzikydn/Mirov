@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useAuth } from './AuthContext';
 
 const API_URL = `${import.meta.env.VITE_API_URL}/api/history`;
 
@@ -26,6 +27,7 @@ const HistoryContext = createContext<HistoryContextType | undefined>(undefined);
 
 export const HistoryProvider = ({ children }: { children: ReactNode }) => {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const { isAuthenticated } = useAuth();
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -38,8 +40,8 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
   // Fetch history from backend
   const refreshHistory = async () => {
     try {
-      // Fetch with reasonable limit (500 entries)
-      const response = await fetch(`${API_URL}?limit=500`, {
+      // Fetch all history entries by passing limit=-1
+      const response = await fetch(`${API_URL}?limit=-1`, {
         headers: getAuthHeaders()
       });
 
@@ -71,11 +73,14 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Load history on mount only (no auto-polling to prevent infinite loops)
+  // Load history whenever authentication state changes
   useEffect(() => {
-    // Initial fetch
-    refreshHistory();
-  }, []);
+    if (isAuthenticated) {
+      refreshHistory();
+    } else {
+      setHistory([]);
+    }
+  }, [isAuthenticated]);
 
   const addHistory = async (entry: Omit<HistoryEntry, 'id' | 'createdAt' | 'userId'>) => {
     try {

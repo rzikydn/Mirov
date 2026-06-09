@@ -6,10 +6,11 @@ import { history, users, type HistoryAction, type HistoryTarget, type Role } fro
 // Get all history (with pagination)
 export const getAllHistory = async (req: Request, res: Response): Promise<void> => {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
+    const limitParam = req.query.limit as string;
+    const limit = limitParam !== undefined ? parseInt(limitParam) : 50;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    const allHistory = await db
+    const baseQuery = db
       .select({
         id: history.id,
         userId: history.userId,
@@ -30,8 +31,9 @@ export const getAllHistory = async (req: Request, res: Response): Promise<void> 
       .from(history)
       .leftJoin(users, eq(history.userId, users.id))
       .orderBy(desc(history.createdAt))
-      .limit(limit)
       .offset(offset);
+
+    const allHistory = limit > 0 ? await baseQuery.limit(limit) : await baseQuery;
 
     res.status(200).json({
       success: true,
