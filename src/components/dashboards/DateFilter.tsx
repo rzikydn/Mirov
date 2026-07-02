@@ -477,22 +477,35 @@ const DateFilter: React.FC<DateFilterProps> = ({
     onChange('');
   }, [onChange]);
 
+  const displayValueShort = useMemo(() => {
+    if (!displayValue) return '';
+    const parts = displayValue.split(', ');
+    return parts.length > 1 ? parts[1] : displayValue;
+  }, [displayValue]);
+
   return (
     <>
       <div
         ref={triggerRef}
         onClick={handleOpen}
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer select-none transition-colors border ${
+        className={`flex items-center gap-1.5 xs:gap-2 px-2 py-1.5 xs:px-3 xs:py-2 rounded-lg text-sm cursor-pointer select-none transition-colors border w-auto xs:min-w-[150px] ${
           darkMode
             ? 'bg-gray-800 text-gray-300 border-transparent hover:bg-gray-700'
             : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
         }`}
-        style={{ minWidth: '150px' }}
       >
-        <Calendar className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-        <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+        <Calendar className={`w-3.5 h-3.5 xs:w-4 xs:h-4 flex-shrink-0 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+        
+        {/* Desktop display */}
+        <span className="hidden xs:inline flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
           {displayValue || 'Filter by Date'}
         </span>
+        
+        {/* Mobile display */}
+        <span className="xs:hidden text-xs overflow-hidden text-ellipsis whitespace-nowrap">
+          {displayValueShort || 'Date'}
+        </span>
+
         {value && (
           <button
             onClick={handleClear}
@@ -501,7 +514,7 @@ const DateFilter: React.FC<DateFilterProps> = ({
             }`}
             title="Clear date filter"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-3 h-3 xs:w-3.5 xs:h-3.5" />
           </button>
         )}
       </div>

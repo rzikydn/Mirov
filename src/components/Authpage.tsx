@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Lock, Eye, AtSign } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import BsmrLogoSvg from '../assets/bsmr-logo.svg';
+import BmsrBg from '../assets/BMSR.svg';
+import Char3 from '../assets/Char3svgh.svg';
+import bsmrLogo from '../assets/bsmr-logo.svg';
 
 interface FormData {
   email: string;
@@ -20,33 +21,23 @@ export default function AuthPage() {
   const navigate = useNavigate();
 
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: ''
   });
+  const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Load saved "Remember Me" email on mount (secure, no password is stored)
   useEffect(() => {
-    const savedCredentials = localStorage.getItem('rememberedUser');
-    if (savedCredentials) {
-      try {
-        const { email } = JSON.parse(savedCredentials);
-        if (email) {
-          setFormData(prev => ({ ...prev, email }));
-          setRememberMe(true);
-        }
-      } catch (e) {
-        console.error('Failed to parse remembered credentials:', e);
-        localStorage.removeItem('rememberedUser');
-      }
-    }
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Check if user is already logged in, redirect to dashboard
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -54,7 +45,12 @@ export default function AuthPage() {
       return;
     }
 
-    // Listen for popstate (browser back/forward) and recheck auth
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    if (savedEmail) {
+      setFormData(prev => ({ ...prev, email: savedEmail }));
+      setRememberMe(true);
+    }
+
     const handlePopState = () => {
       const currentToken = localStorage.getItem('token');
       if (currentToken) {
@@ -105,7 +101,6 @@ export default function AuthPage() {
         throw new Error(data.message || "Request failed");
       }
 
-      // Backend response format: { success: true, data: { user, token } }
       const userData = data.data?.user || data.user;
       const tokenData = data.data?.token || data.token;
 
@@ -114,24 +109,18 @@ export default function AuthPage() {
         text: 'Login successful!'
       });
 
+      if (rememberMe) {
+        localStorage.setItem('rememberedEmail', formData.email);
+      } else {
+        localStorage.removeItem('rememberedEmail');
+      }
+
       setUser(userData);
       setToken(tokenData);
 
       localStorage.setItem("token", tokenData);
       localStorage.setItem("user", JSON.stringify(userData));
       localStorage.setItem("lastActivity", Date.now().toString());
-
-      // Secure "Remember Me": save or remove ONLY email, NEVER save password
-      if (rememberMe) {
-        localStorage.setItem('rememberedUser', JSON.stringify({
-          email: formData.email
-        }));
-      } else {
-        localStorage.removeItem('rememberedUser');
-      }
-
-      // Password autofill is securely handled by the browser's credential manager
-      // No plain password storage in localStorage.
 
       setTimeout(() => {
         navigate("/dashboard");
@@ -153,410 +142,157 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800">
-      {/* ==================== MOBILE LAYOUT ==================== */}
-      <div className="flex flex-col w-full lg:hidden min-h-screen">
-        {/* Mobile Hero Header */}
-        <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 pt-12 pb-24 px-6 overflow-hidden">
+    <div 
+      className="min-h-screen w-full flex flex-col lg:flex-row items-stretch lg:items-center justify-start lg:justify-between px-0 lg:px-6 md:px-16 lg:pl-6 lg:pr-28 bg-[#0066FF] lg:bg-transparent"
+      style={isMobile ? {} : { backgroundImage: `url(${BmsrBg})` }}
+    >
+      {/* Mobile Header Banner: Top illustration area */}
+      {isMobile && (
+        <div className="w-full pt-10 pb-6 flex flex-col items-center justify-center" />
+      )}
 
-
-          {/* Logo & Welcome */}
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="bg-white rounded-xl p-2.5 shadow-lg shadow-blue-900/20">
-                <img
-                  src={BsmrLogoSvg}
-                  alt="BSMR Logo"
-                  className="h-10 w-auto object-contain"
-                />
-              </div>
-            </div>
-            <h1 className="text-3xl font-bold text-white mb-2">
-              Welcome Back
-            </h1>
-            <p className="text-blue-200 text-sm">
-              Sign in to continue to your workspace
-            </p>
-          </div>
-        </div>
-
-        {/* Mobile Form Card - Overlaps header */}
-        <div
-          className="relative z-10 -mt-16 flex-1 bg-white rounded-t-[2rem] px-6 pt-8 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]"
-        >
-          <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
-
-          <h2 className="text-2xl font-bold text-gray-900 mb-1">
-            Get Started Now
-          </h2>
-          <p className="text-gray-500 text-sm mb-6">
-            Enter your credentials to access your account
-          </p>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* User Field */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                User
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  name="username"
-                  autoComplete="username"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="Enter your username"
-                  className={`w-full pl-10 pr-4 py-3 border rounded-xl bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${errors.email ? 'border-red-500' : 'border-gray-200'
-                    }`}
-                />
-              </div>
-              {errors.email && (
-                <p className="text-red-500 text-xs mt-1">{errors.email}</p>
-              )}
-            </div>
-
-            {/* Password Field */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  autoComplete="current-password"
-                  value={formData.password}
-                  onChange={(e) => handleInputChange('password', e.target.value)}
-                  placeholder="Enter your password"
-                  className={`w-full pl-10 pr-12 py-3 border rounded-xl bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${errors.password ? 'border-red-500' : 'border-gray-200'
-                    }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {errors.password && (
-                <p className="text-red-500 text-xs mt-1">{errors.password}</p>
-              )}
-            </div>
-
-            {/* Remember Me Checkbox */}
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="rememberMeMobile"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer accent-blue-600"
-              />
-              <label
-                htmlFor="rememberMeMobile"
-                className="text-sm text-gray-600 cursor-pointer select-none hover:text-gray-800 transition-colors"
-              >
-                Remember me
-              </label>
-            </div>
-
-
-
-            {/* Error/Success Message */}
-            <AnimatePresence>
-              {message && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`p-3 rounded-xl text-sm ${message.type === 'success'
-                    ? 'bg-green-50 text-green-700 border border-green-200'
-                    : 'bg-red-50 text-red-700 border border-red-200'
-                    }`}
-                >
-                  {message.text}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3.5 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30 active:scale-[0.98]"
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Processing...
-                </span>
-              ) : (
-                'Login'
-              )}
-            </button>
-          </form>
-        </div>
+      {/* Left Side: Character Illustration */}
+      <div className="hidden lg:flex w-[62%] items-center justify-start overflow-visible">
+        <img 
+          src={Char3} 
+          alt="Illustration" 
+          className="max-h-[90vh] w-full object-contain select-none pointer-events-none transform lg:-translate-y-4 lg:-translate-x-14"
+        />
       </div>
 
-      {/* ==================== DESKTOP LAYOUT ==================== */}
-      {/* Left Side - Form (Desktop) */}
-      <div className="hidden lg:flex w-1/2 items-center justify-center py-8 px-12 bg-white overflow-y-auto">
-        <motion.div
-          initial={{ opacity: 0, x: -30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6 }}
-          className="w-full max-w-md"
-        >
+      {/* Right Side: Form wrapped in a white card container on mobile */}
+      <div className="w-full lg:max-w-[500px] flex flex-col justify-center bg-white lg:bg-transparent rounded-t-[40px] px-6 lg:px-0 pt-8 pb-12 lg:pb-0 flex-1">
+        <div className="w-full max-w-[500px] mx-auto flex flex-col justify-center">
+        {/* Header Texts */}
+        <div className="text-left lg:text-right mb-6">
           {/* Logo */}
-          <div className="mb-12">
-            <img
-              src={BsmrLogoSvg}
-              alt="BSMR Logo"
-              className="h-16 w-auto object-contain"
+          <div className="flex justify-start lg:justify-end mb-1.5">
+            <img 
+              src={bsmrLogo} 
+              alt="BSMR Logo" 
+              className="h-10 w-auto select-none pointer-events-none" 
             />
           </div>
-
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-3">
-              Get Started Now
-            </h1>
-            <p className="text-gray-600">
-              Enter your credentials to access your account
-            </p>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* User Field */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                User
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  name="username"
-                  autoComplete="username"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="Enter your username"
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${errors.email ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                />
-              </div>
-              {errors.email && (
-                <p className="text-red-500 text-xs mt-1">{errors.email}</p>
-              )}
-            </div>
-
-            {/* Password Field */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  autoComplete="current-password"
-                  value={formData.password}
-                  onChange={(e) => handleInputChange('password', e.target.value)}
-                  placeholder="Enter your password"
-                  className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${errors.password ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {errors.password && (
-                <p className="text-red-500 text-xs mt-1">{errors.password}</p>
-              )}
-            </div>
-
-            {/* Remember Me Checkbox */}
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="rememberMe"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer accent-blue-600"
-              />
-              <label
-                htmlFor="rememberMe"
-                className="text-sm text-gray-600 cursor-pointer select-none hover:text-gray-800 transition-colors"
-              >
-                Remember me
-              </label>
-            </div>
-
-
-
-            {/* Error/Success Message */}
-            <AnimatePresence>
-              {message && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`p-3 rounded-lg text-sm ${message.type === 'success'
-                    ? 'bg-green-50 text-green-700 border border-green-200'
-                    : 'bg-red-50 text-red-700 border border-red-200'
-                    }`}
-                >
-                  {message.text}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30"
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Processing...
-                </span>
-              ) : (
-                'Login'
-              )}
-            </button>
-          </form>
-        </motion.div>
-      </div>
-
-      {/* Right Side - Dashboard Preview (Desktop) */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 items-center justify-center p-12 relative overflow-hidden">
-        {/* Background decoration */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-white rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-300 rounded-full blur-3xl" />
+          <h1 className="font-montserrat text-3xl lg:text-[42px] font-extrabold text-[#0066FF] tracking-tight leading-none">Welcome</h1>
+          <p className="font-lora text-xl lg:text-2xl text-[#FF725E] mt-1 lg:mt-0.5 font-medium italic leading-none">Lets Get Started Now!</p>
+          <p className="font-jakarta text-[13px] text-gray-500 mt-4 font-normal leading-relaxed max-w-[440px] ml-0 lg:ml-auto">
+            Securely sign in to track real time operational workflows, monitor systemic database, and manage institutional risk management certification programs.
+          </p>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8 }}
-          className="relative z-10 w-full max-w-xl flex flex-col justify-start pt-0"
-        >
-          {/* Header Text - Single line */}
-          <div className="mb-3 text-right pr-4">
-            <p className="text-blue-200 text-sm">
-              The simplest way to manage your workspace
-            </p>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* User Input */}
+          <div className="relative">
+            <input
+              type="text"
+              name="mirov-username"
+              autoComplete="off"
+              value={formData.email}
+              onChange={(e) => handleInputChange('email', e.target.value)}
+              placeholder=" "
+              className={`peer w-full pl-4 pr-12 py-3.5 border rounded-xl bg-white focus:bg-white focus:ring-1 focus:ring-[#FF725E] focus:border-[#FF725E] transition-all outline-none text-gray-800 text-sm ${
+                errors.email ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-200'
+              }`}
+            />
+            <label
+              className={`absolute left-3.5 top-1/2 -translate-y-1/2 text-sm bg-white px-1.5 transition-all duration-200 pointer-events-none
+                         peer-focus:top-0 peer-focus:text-xs peer-focus:text-[#FF725E]
+                         peer-[:not(:placeholder-shown)]:top-0 peer-[:not(:placeholder-shown)]:text-xs
+                         ${errors.email ? 'peer-focus:text-red-500 text-red-500' : 'text-gray-400'}`}
+            >
+              User
+            </label>
+            <span className={`absolute right-4 top-1/2 -translate-y-1/2 transition-colors pointer-events-none peer-focus:text-[#FF725E] ${
+              errors.email ? 'text-red-400' : 'text-gray-400'
+            }`}>
+              <AtSign className="w-5 h-5" />
+            </span>
+            {errors.email && (
+              <p className="text-red-500 text-xs mt-1 pl-1">{errors.email}</p>
+            )}
           </div>
 
-          {/* Dashboard Preview Card */}
-          <div className="bg-white rounded-2xl shadow-2xl p-6 transform hover:scale-105 transition-transform duration-300">
-            {/* Dashboard Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-3xl font-bold text-gray-900">Morning Team!</h3>
-                <p className="text-sm text-gray-500">Last edited 2 hours ago</p>
-              </div>
-              <div className="flex gap-2">
-                <div className="w-8 h-8 bg-blue-600 rounded-full" />
-                <div className="w-8 h-8 bg-blue-500 rounded-full" />
-                <div className="w-8 h-8 bg-cyan-500 rounded-full" />
-              </div>
-            </div>
-
-            {/* Notes Section */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-3xl font-bold text-gray-900">Notes</h4>
-                <button className="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center text-white hover:scale-110 transition-transform">
-                  +
-                </button>
-              </div>
-
-              {/* Search Bar */}
-              <div className="relative mb-6">
-                <input
-                  type="text"
-                  placeholder="Search"
-                  className="w-full px-4 py-2 pl-10 bg-gray-50 border border-gray-200 rounded-lg text-sm"
-                  readOnly
-                />
-                <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-
-              {/* Notes Grid */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* Note 1 - Yellow */}
-                <div className="bg-yellow-100 rounded-xl p-4 relative group hover:shadow-lg transition-shadow">
-                  <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-6 h-6 bg-black rounded-full flex items-center justify-center">
-                      <span className="text-yellow-400 text-sm">★</span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-800 mb-8 line-clamp-3">
-                    beginning of screenless design: UI jobs to be taken over...
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-600">May 21, 2020</span>
-                    <button className="w-6 h-6 bg-black rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Note 2 - Coral */}
-                <div className="bg-red-200 rounded-xl p-4 relative group hover:shadow-lg transition-shadow">
-                  <div className="absolute top-3 right-3">
-                    <div className="w-6 h-6 bg-black rounded-full flex items-center justify-center">
-                      <span className="text-yellow-400 text-sm">★</span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-800 mb-8 line-clamp-3">
-                    13 Things You Should Give Up If You Want To Be a Successful...
-                  </p>
-                  <span className="text-xs text-gray-600">May 25, 2020</span>
-                </div>
-
-                {/* Note 3 - Green */}
-                <div className="bg-green-200 rounded-xl p-4 hover:shadow-lg transition-shadow">
-                  <p className="text-sm text-gray-800 mb-8 line-clamp-3">
-                    The Psychology Principles Every UI/UX Designer Needs to Know
-                  </p>
-                  <span className="text-xs text-gray-600">June 5, 2020</span>
-                </div>
-
-                {/* Note 4 - Purple */}
-                <div className="bg-purple-200 rounded-xl p-4 relative group hover:shadow-lg transition-shadow">
-                  <div className="absolute top-3 right-3">
-                    <div className="w-6 h-6 bg-black rounded-full flex items-center justify-center">
-                      <span className="text-yellow-400 text-sm">★</span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-800 mb-2">
-                    10 UI & UX Lessons
-                  </p>
-                </div>
-              </div>
-            </div>
+          {/* Password Input */}
+          <div className="relative">
+            <input
+              type="text"
+              name="mirov-password"
+              autoComplete="off"
+              value={formData.password}
+              onChange={(e) => handleInputChange('password', e.target.value)}
+              placeholder=" "
+              className={`peer w-full pl-4 pr-12 py-3.5 border rounded-xl bg-white focus:bg-white focus:ring-1 focus:ring-[#FF725E] focus:border-[#FF725E] transition-all outline-none text-gray-800 text-sm ${
+                errors.password ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-200'
+              }`}
+              style={{ WebkitTextSecurity: showPassword ? 'none' : 'disc' } as React.CSSProperties}
+            />
+            <label
+              className={`absolute left-3.5 top-1/2 -translate-y-1/2 text-sm bg-white px-1.5 transition-all duration-200 pointer-events-none
+                         peer-focus:top-0 peer-focus:text-xs peer-focus:text-[#FF725E]
+                         peer-[:not(:placeholder-shown)]:top-0 peer-[:not(:placeholder-shown)]:text-xs
+                         ${errors.password ? 'peer-focus:text-red-500 text-red-500' : 'text-gray-400'}`}
+            >
+              Password
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className={`absolute right-4 top-1/2 -translate-y-1/2 transition-colors focus:outline-none peer-focus:text-[#FF725E] ${
+                errors.password ? 'text-red-400' : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              {showPassword ? <Eye className="w-5 h-5 text-[#FF725E]" /> : <Lock className="w-5 h-5" />}
+            </button>
+            {errors.password && (
+              <p className="text-red-500 text-xs mt-1 pl-1">{errors.password}</p>
+            )}
           </div>
-        </motion.div>
+
+          {/* Remember Me */}
+          <div className="flex items-center justify-start pl-1 mt-2">
+            <label className="flex items-center gap-2 cursor-pointer select-none group">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-[#FF725E] focus:ring-[#FF725E] focus:ring-opacity-20 accent-[#FF725E] cursor-pointer"
+              />
+              <span className="text-xs text-gray-500 font-jakarta group-hover:text-gray-700 transition-colors">
+                Remember Me
+              </span>
+            </label>
+          </div>
+
+          {/* Alert Message */}
+          {message && (
+            <div
+              className={`p-3.5 rounded-xl text-sm border ${
+                message.type === 'success'
+                  ? 'bg-green-50 text-green-700 border-green-200'
+                  : 'bg-red-50 text-red-700 border-red-200'
+              }`}
+            >
+              {message.text}
+            </div>
+          )}
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-[#FF725E] hover:bg-[#e8604c] text-white py-3.5 rounded-xl font-semibold transition-all shadow-lg shadow-[#FF725E]/20 hover:shadow-[#FF725E]/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+          >
+            {isLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Processing...
+              </span>
+            ) : (
+              'Login'
+            )}
+          </button>
+        </form>
+        </div>
       </div>
     </div>
   );

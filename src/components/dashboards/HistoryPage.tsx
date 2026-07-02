@@ -359,15 +359,15 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ darkMode }) => {
                 )}
 
                 {/* Date Filter */}
-                <div className="relative group flex items-center">
-                  <div className={`relative flex items-center pl-9 pr-8 py-2 text-sm rounded-lg border transition-colors cursor-pointer w-[210px]
+                <div className="relative group flex items-center w-full xs:w-auto">
+                  <div className={`relative flex items-center pl-9 pr-8 py-2 text-sm rounded-lg border transition-colors cursor-pointer w-full xs:w-[210px]
                     ${darkMode
                       ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600 hover:border-blue-500 hover:text-white'
                       : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-blue-400'
                     }
                   `}>
                     <CalendarDays className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-gray-400 group-hover:text-gray-300' : 'text-gray-400'}`} />
-                    <span className="truncate">
+                    <span className="truncate hidden xs:inline">
                       {dateFilter ? (
                         (() => {
                           const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -376,6 +376,15 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ darkMode }) => {
                           return `${HARI[d.getDay()]}, ${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()}`;
                         })()
                       ) : 'Keterangan tanggal'}
+                    </span>
+                    <span className="truncate xs:hidden">
+                      {dateFilter ? (
+                        (() => {
+                          const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                          const d = new Date(dateFilter + 'T00:00:00');
+                          return `${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()}`;
+                        })()
+                      ) : 'Tanggal'}
                     </span>
                     
                     {/* Transparent native date input overlay */}
@@ -402,8 +411,8 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ darkMode }) => {
             </div>
 
             {/* Row 2: Action Type Filter Tabs + Bulk Delete */}
-            <div className="flex items-center justify-between mt-3">
-              <div className="flex items-center gap-1">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mt-3">
+              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-1 max-w-full">
                 {[
                   { key: 'all' as const, label: 'All Activity', icon: <ListFilter className="w-3.5 h-3.5" /> },
                   { key: 'create' as const, label: 'Created', icon: <span className="w-2 h-2 rounded-full bg-emerald-500" /> },
@@ -413,7 +422,7 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ darkMode }) => {
                   <button
                     key={tab.key}
                     onClick={() => { setActionFilter(tab.key); setVisibleCount(ITEMS_PER_PAGE); }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 flex-shrink-0
                       ${actionFilter === tab.key
                         ? (darkMode ? 'bg-gray-700 text-white shadow-sm' : 'bg-gray-900 text-white shadow-sm')
                         : (darkMode ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100')

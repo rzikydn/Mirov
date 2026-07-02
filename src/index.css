@@ -298,3 +298,12 @@ table,
     clip-path: circle(var(--reveal-radius, 100vmax) at var(--reveal-x, 50%) var(--reveal-y, 50%));
   }
 }
+
+/* Chrome/Safari autofill background override */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px white inset !important;
+  -webkit-text-fill-color: #1f2937 !important;
+}

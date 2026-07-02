@@ -1639,10 +1639,10 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         )}
 
         {/* Table Header */}
-        <div className="flex items-center justify-between mb-3 mt-2">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-1 xs:gap-2 mb-3 mt-2">
+          <div className="flex items-center gap-1 xs:gap-2">
             {/* Table Label */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded ${darkMode ? 'bg-gray-800' : 'bg-gray-100'
+            <div className={`flex items-center gap-1 px-1.5 py-1.5 xs:gap-2 xs:px-3 xs:py-1.5 rounded ${darkMode ? 'bg-gray-800' : 'bg-gray-100'
               }`}>
               <div className="w-4 h-4 grid grid-cols-2 gap-0.5">
                 <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-400'} rounded-sm`}></div>
@@ -1650,7 +1650,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-400'} rounded-sm`}></div>
                 <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-400'} rounded-sm`}></div>
               </div>
-              <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              <span className={`hidden xs:inline text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Table
               </span>
             </div>
@@ -1660,11 +1660,11 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               {/* Mobile: Search Icon Button */}
               <button
                 onClick={() => setShowSearchInput(!showSearchInput)}
-                className={`lg:hidden p-2 rounded-lg ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+                className={`lg:hidden p-1.5 xs:p-2 rounded-lg ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
                   } ${showSearchInput ? (darkMode ? 'bg-gray-800' : 'bg-gray-100') : ''}`}
                 title="Search"
               >
-                <Search className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+                <Search className={`w-4 h-4 xs:w-5 xs:h-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
               </button>
 
               {/* Desktop: Always visible search bar */}
@@ -1712,7 +1712,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 size="sm"
                 onClick={handleRefresh}
                 title="Refresh data from server"
-                className={cn("flex items-center gap-1.5", buttonThemeClass)}
+                className={cn("flex items-center justify-center h-8 w-8 p-0 md:h-9 md:w-auto md:px-3 gap-1.5", buttonThemeClass)}
               >
                 <RefreshCw className="w-3.5 h-3.5 flex-shrink-0" />
                 <span className="hidden md:inline">Refresh</span>
@@ -1725,7 +1725,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   size="sm"
                   onClick={handleSaveDatabase}
                   title="Save changes"
-                  className={cn("flex items-center gap-1.5", buttonThemeClass)}
+                  className={cn("flex items-center justify-center h-8 w-8 p-0 md:h-9 md:w-auto md:px-3 gap-1.5", buttonThemeClass)}
                 >
                   <Save className="w-3.5 h-3.5 flex-shrink-0" />
                   <span className="hidden md:inline">Save</span>
@@ -1739,7 +1739,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 onClick={() => setWrapText(!wrapText)}
                 title={wrapText ? "Disable text wrapping" : "Enable text wrapping (Excel-like)"}
                 className={cn(
-                  "flex items-center gap-1.5",
+                  "flex items-center justify-center h-8 w-8 p-0 md:h-9 md:w-auto md:px-3 gap-1.5",
                   wrapText
                     ? (darkMode
                         ? "bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border-blue-500/30"
@@ -1759,7 +1759,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => setShowSortDropdown(!showSortDropdown)}
-                  className={cn("relative flex items-center gap-1.5 rounded-none border-l-0", buttonThemeClass)}
+                  className={cn("relative flex items-center justify-center h-8 w-8 p-0 md:h-9 md:w-auto md:px-3 gap-1.5 rounded-none border-l-0", buttonThemeClass)}
                 >
                   <ArrowUpDown className="w-3.5 h-3.5" />
                   <span className="hidden md:inline">Sort</span>
@@ -1790,7 +1790,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   size="sm"
                   onClick={handleAddRow}
                   title="Add a new row"
-                  className={cn("flex items-center gap-1.5", buttonThemeClass)}
+                  className={cn("flex items-center justify-center h-8 w-8 p-0 md:h-9 md:w-auto md:px-3 gap-1.5", buttonThemeClass)}
                 >
                   <Plus className="w-3.5 h-3.5 flex-shrink-0" />
                   <span className="hidden md:inline">Rows</span>
@@ -1812,7 +1812,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                 }}
                 disabled={!canEdit}
                 title={!canEdit ? 'Only ADMIN and SUPERUSER can add properties' : 'Add a new column'}
-                className={cn("flex items-center gap-1.5", buttonThemeClass)}
+                className={cn("flex items-center justify-center h-8 w-8 p-0 md:h-9 md:w-auto md:px-3 gap-1.5", buttonThemeClass)}
               >
                 <Columns3 className="w-3.5 h-3.5 flex-shrink-0" />
                 <span className="hidden md:inline">Property</span>
