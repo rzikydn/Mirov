@@ -159,7 +159,7 @@ export default function AuthPage() {
         <img 
           src={Char3} 
           alt="Illustration" 
-          className="max-h-[90vh] w-full object-contain select-none pointer-events-none transform lg:-translate-y-4 lg:-translate-x-14"
+          className="max-h-[90vh] w-full object-contain select-none pointer-events-none transform lg:translate-y-2 lg:-translate-x-14"
         />
       </div>
 
