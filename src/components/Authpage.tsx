@@ -143,7 +143,7 @@ export default function AuthPage() {
 
   return (
     <div 
-      className="min-h-screen w-full flex flex-col lg:flex-row items-stretch lg:items-center justify-start lg:justify-between px-0 lg:px-6 md:px-16 lg:pl-6 lg:pr-28 bg-[#0066FF] lg:bg-transparent"
+      className="min-h-screen w-full flex flex-col lg:flex-row items-stretch lg:items-center justify-start lg:justify-between px-0 lg:px-6 md:px-16 lg:pl-6 lg:pr-28 bg-[#0066FF] lg:bg-transparent lg:bg-cover lg:bg-center lg:bg-no-repeat"
       style={isMobile ? {} : { backgroundImage: `url(${BmsrBg})` }}
     >
       {/* Mobile Header Banner: Top illustration area */}
@@ -173,7 +173,7 @@ export default function AuthPage() {
               className="h-10 w-auto select-none pointer-events-none" 
             />
           </div>
-          <h1 className="font-montserrat text-3xl lg:text-[42px] font-extrabold text-[#0066FF] tracking-tight leading-none">Welcome</h1>
+          <h1 className="font-montserrat text-2xl lg:text-[36px] font-extrabold text-[#0066FF] tracking-tight leading-none">Welcome</h1>
           <p className="font-lora text-xl lg:text-2xl text-[#FF725E] mt-1 lg:mt-0.5 font-medium italic leading-none">Lets Get Started Now!</p>
           <p className="font-jakarta text-[13px] text-gray-500 mt-4 font-normal leading-relaxed max-w-[440px] ml-0 lg:ml-auto">
             Securely sign in to track real time operational workflows, monitor systemic database, and manage institutional risk management certification programs.
