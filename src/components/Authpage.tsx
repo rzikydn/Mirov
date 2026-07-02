@@ -122,7 +122,6 @@ const SmoothInput = React.forwardRef((
     const absoluteWidth = measurePrefixWidth(textBeforeCaret);
     if (absoluteWidth === null) return;
 
-    const styles = window.getComputedStyle(target);
     const paddingLeft = parseFloat(styles.paddingLeft) || 0;
     const paddingRight = parseFloat(styles.paddingRight) || 0;
     const caretPosition = absoluteWidth - target.scrollLeft;
