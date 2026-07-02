@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useReducedMotion, useSpring } from 'framer-motion';
 import { Lock, Eye, AtSign } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import BmsrBg from '../assets/BMSR.svg';
@@ -17,6 +17,211 @@ interface FormErrors {
   password?: string;
 }
 
+const PASSWORD_CHAR = navigator.userAgent.match(/firefox|fxios/i)
+  ? "\u25CF"
+  : "\u2022";
+
+interface SmoothInputProps extends React.ComponentPropsWithoutRef<"input"> {
+  hasError?: boolean;
+}
+
+const SmoothInput = React.forwardRef<HTMLInputElement, SmoothInputProps>(({
+  className,
+  value,
+  defaultValue,
+  onChange,
+  onBlur,
+  type = "text",
+  placeholder,
+  style,
+  ...props
+}, ref) => {
+  const [internalValue, setInternalValue] = useState(defaultValue ?? "");
+  const caretX = useMotionValue(0);
+  const caretOpacity = useMotionValue(0);
+  const localInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = (ref as React.RefObject<HTMLInputElement>) || localInputRef;
+  const measureRef = useRef<HTMLSpanElement>(null);
+  const prefersReducedMotion = useReducedMotion();
+
+  const isControlled = value !== undefined;
+
+  const springConfig = {
+    stiffness: 500,
+    damping: 30,
+    mass: 0.5,
+  };
+
+  const springCaretX = useSpring(
+    caretX,
+    prefersReducedMotion
+      ? { stiffness: 10000, damping: 100, mass: 0.1 }
+      : springConfig,
+  );
+
+  const inputValue = isControlled ? String(value) : internalValue;
+
+  const syncMeasureSpan = () => {
+    const input = inputRef.current;
+    const measureSpan = measureRef.current;
+    if (!input || !measureSpan) return;
+
+    const styles = window.getComputedStyle(input);
+    const isPassword = type === "password";
+
+    let fontSize = styles.fontSize;
+    if (
+      PASSWORD_CHAR === "\u2022" &&
+      isPassword
+    ) {
+      fontSize = `${parseFloat(fontSize) + 4}px`;
+    }
+
+    measureSpan.style.font = `${styles.fontStyle} ${styles.fontWeight} ${fontSize} ${styles.fontFamily}`;
+    measureSpan.style.letterSpacing = styles.letterSpacing;
+    measureSpan.style.fontFeatureSettings = styles.fontFeatureSettings;
+    measureSpan.style.fontVariationSettings = styles.fontVariationSettings;
+  };
+
+  const measurePrefixWidth = (text: string) => {
+    const input = inputRef.current;
+    const measureSpan = measureRef.current;
+    if (!input || !measureSpan) return null;
+
+    syncMeasureSpan();
+    measureSpan.textContent = text;
+
+    const paddingLeft =
+      parseFloat(window.getComputedStyle(input).paddingLeft) || 0;
+
+    return text.length > 0
+      ? measureSpan.offsetWidth + paddingLeft
+      : paddingLeft - 1;
+  };
+
+  const updateCaretFromInput = (target: HTMLInputElement) => {
+    const selectionStart = target.selectionStart ?? 0;
+    const selectionEnd = target.selectionEnd ?? 0;
+    const hasSelection = selectionStart !== selectionEnd;
+    const caretIndex = selectionStart;
+    const isPassword = type === "password";
+    
+    const textBeforeCaret = isPassword
+      ? PASSWORD_CHAR.repeat(caretIndex)
+      : target.value.slice(0, caretIndex);
+
+    const absoluteWidth = measurePrefixWidth(textBeforeCaret);
+    if (absoluteWidth === null) return;
+
+    const styles = window.getComputedStyle(target);
+    const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+    const paddingRight = parseFloat(styles.paddingRight) || 0;
+    const caretPosition = absoluteWidth - target.scrollLeft;
+    const minX = paddingLeft - 1;
+    const maxX = target.clientWidth - paddingRight;
+    const isCaretVisible =
+      caretPosition >= minX && caretPosition <= maxX + 1;
+
+    caretX.set(Math.min(caretPosition, maxX));
+
+    if (!isCaretVisible || hasSelection) {
+      caretOpacity.set(0);
+      return;
+    }
+
+    caretOpacity.set(1);
+  };
+
+  const updateCaretRef = useRef(updateCaretFromInput);
+  updateCaretRef.current = updateCaretFromInput;
+  const caretOpacityRef = useRef(caretOpacity);
+  caretOpacityRef.current = caretOpacity;
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (input && document.activeElement === input) {
+      updateCaretRef.current(input);
+    }
+  }, [inputValue]);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (input && document.activeElement === input) {
+      updateCaretRef.current(input);
+    }
+  }, [type]);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const updateCaretIfFocused = () => {
+      if (document.activeElement === input) {
+        updateCaretRef.current(input);
+      }
+    };
+
+    const handleSelectionChange = () => {
+      if (document.activeElement !== input) return;
+      requestAnimationFrame(updateCaretIfFocused);
+    };
+
+    document.addEventListener("selectionchange", handleSelectionChange);
+    document.fonts.addEventListener("loadingdone", updateCaretIfFocused);
+    void document.fonts.ready.then(updateCaretIfFocused);
+    input.addEventListener("scroll", updateCaretIfFocused);
+
+    updateCaretIfFocused();
+
+    return () => {
+      document.removeEventListener("selectionchange", handleSelectionChange);
+      document.fonts.removeEventListener("loadingdone", updateCaretIfFocused);
+      input.removeEventListener("scroll", updateCaretIfFocused);
+    };
+  }, []);
+
+  return (
+    <>
+      <input
+        {...props}
+        ref={inputRef}
+        type={type}
+        placeholder={placeholder}
+        className={className}
+        style={{ ...style, caretColor: "transparent" }}
+        value={inputValue}
+        onChange={(e) => {
+          if (!isControlled) setInternalValue(e.target.value);
+          onChange?.(e);
+          requestAnimationFrame(() => {
+            updateCaretRef.current(e.target);
+          });
+        }}
+        onFocus={(e) => {
+          requestAnimationFrame(() => {
+            updateCaretRef.current(e.target);
+          });
+        }}
+        onBlur={(e) => {
+          caretOpacityRef.current.set(0);
+          onBlur?.(e);
+        }}
+      />
+      <span
+        ref={measureRef}
+        aria-hidden
+        className="pointer-events-none invisible absolute top-0 left-0 whitespace-pre font-jakarta"
+      />
+      <motion.div
+        className="bg-[#FF725E] pointer-events-none absolute left-0 h-[1.3em] w-0.5 top-[17px] z-10"
+        style={{ x: springCaretX, opacity: caretOpacity }}
+      />
+    </>
+  );
+});
+
+SmoothInput.displayName = "SmoothInput";
+
 export default function AuthPage() {
   const { setUser, setToken } = useAuth();
   const navigate = useNavigate();
@@ -31,7 +236,14 @@ export default function AuthPage() {
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  useEffect(() => {
+    if (message && message.type === 'error') {
+      const timer = setTimeout(() => {
+        setMessage(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -127,7 +339,7 @@ export default function AuthPage() {
       localStorage.setItem("user", JSON.stringify(userData));
       localStorage.setItem("lastActivity", Date.now().toString());
 
-      setShowSuccessToast(true);
+      setMessage({ type: 'success', text: 'Login successful!' });
 
       setTimeout(() => {
         navigate("/dashboard", { replace: true });
@@ -153,27 +365,45 @@ export default function AuthPage() {
       style={isMobile ? {} : { backgroundImage: `url(${BmsrBg})` }}
     >
       <AnimatePresence>
-        {showSuccessToast && (
+        {message && (
           <motion.div
             initial={{ opacity: 0, y: -50, x: "-50%" }}
             animate={{ opacity: 1, y: 20, x: "-50%" }}
             exit={{ opacity: 0, y: -50, x: "-50%" }}
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-between w-fit max-w-[340px] gap-6 bg-[#E8F8F0] border border-[#A2E0C1] rounded-xl px-4 py-2.5 shadow-lg shadow-black/5"
+            className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-between w-fit max-w-[340px] gap-6 border rounded-xl px-4 py-2.5 shadow-lg shadow-black/5 ${
+              message.type === 'success' 
+                ? 'bg-[#E8F8F0] border-[#A2E0C1]' 
+                : 'bg-[#FDF2F2] border-[#FDE8E8]'
+            }`}
           >
             <div className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#10B981] flex items-center justify-center shadow-sm">
-                <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-              </div>
-              <span className="text-[#065F46] font-jakarta font-medium text-[14px]">
-                Login successful!
+              {message.type === 'success' ? (
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#10B981] flex items-center justify-center shadow-sm">
+                  <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                </div>
+              ) : (
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#EF4444] flex items-center justify-center shadow-sm">
+                  <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="3.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+              )}
+              <span className={`font-jakarta font-medium text-[14px] ${
+                message.type === 'success' ? 'text-[#065F46]' : 'text-[#9B1C1C]'
+              }`}>
+                {message.text}
               </span>
             </div>
             <button 
-              onClick={() => setShowSuccessToast(false)}
-              className="text-[#047857] hover:text-[#065F46] transition-colors p-1 rounded-full hover:bg-[#D1FAE5]/60"
+              onClick={() => setMessage(null)}
+              className={`transition-colors p-1 rounded-full ${
+                message.type === 'success' 
+                  ? 'text-[#047857] hover:text-[#065F46] hover:bg-[#D1FAE5]/60' 
+                  : 'text-[#DF1B1B] hover:text-[#9B1C1C] hover:bg-[#FDE8E8]/60'
+              }`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -219,7 +449,7 @@ export default function AuthPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* User Input */}
           <div className="relative">
-            <input
+            <SmoothInput
               type="text"
               name="mirov-username"
               autoComplete="off"
@@ -250,7 +480,7 @@ export default function AuthPage() {
 
           {/* Password Input */}
           <div className="relative">
-            <input
+            <SmoothInput
               type="text"
               name="mirov-password"
               autoComplete="off"
@@ -299,14 +529,7 @@ export default function AuthPage() {
             </label>
           </div>
 
-          {/* Alert Message */}
-          {message && message.type === 'error' && (
-            <div
-              className="p-3.5 rounded-xl text-sm border bg-red-50 text-red-700 border-red-200"
-            >
-              {message.text}
-            </div>
-          )}
+
 
           {/* Submit Button */}
           <button
