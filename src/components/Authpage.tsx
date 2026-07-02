@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, Eye, AtSign } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import BmsrBg from '../assets/BMSR.svg';
@@ -30,6 +31,7 @@ export default function AuthPage() {
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -125,14 +127,15 @@ export default function AuthPage() {
       localStorage.setItem("user", JSON.stringify(userData));
       localStorage.setItem("lastActivity", Date.now().toString());
 
+      setShowSuccessToast(true);
+
       setTimeout(() => {
-        navigate("/dashboard");
-      }, 800);
+        navigate("/dashboard", { replace: true });
+      }, 1500);
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "An error occurred";
       setMessage({ type: "error", text: errorMessage });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -149,6 +152,36 @@ export default function AuthPage() {
       className="min-h-screen w-full flex flex-col lg:flex-row items-stretch lg:items-center justify-start lg:justify-between px-0 lg:px-6 md:px-16 lg:pl-6 lg:pr-28 bg-[#0066FF] lg:bg-transparent lg:bg-cover lg:bg-center lg:bg-no-repeat"
       style={isMobile ? {} : { backgroundImage: `url(${BmsrBg})` }}
     >
+      <AnimatePresence>
+        {showSuccessToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: "-50%" }}
+            animate={{ opacity: 1, y: 20, x: "-50%" }}
+            exit={{ opacity: 0, y: -50, x: "-50%" }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-between w-fit max-w-[340px] gap-6 bg-[#E8F8F0] border border-[#A2E0C1] rounded-xl px-4 py-2.5 shadow-lg shadow-black/5"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#10B981] flex items-center justify-center shadow-sm">
+                <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              </div>
+              <span className="text-[#065F46] font-jakarta font-medium text-[14px]">
+                Login successful!
+              </span>
+            </div>
+            <button 
+              onClick={() => setShowSuccessToast(false)}
+              className="text-[#047857] hover:text-[#065F46] transition-colors p-1 rounded-full hover:bg-[#D1FAE5]/60"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Mobile Header Banner: Top illustration area */}
       {isMobile && (
         <div className="w-full pt-10 pb-6 flex flex-col items-center justify-center" />

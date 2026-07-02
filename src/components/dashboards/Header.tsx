@@ -285,7 +285,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, user }) => {
             <HyperText
               key={config.greeting}
               as="h1"
-              duration={2000}
+              duration={800}
               animateInterval={8000}
               className="text-2xl sm:text-3xl font-bold text-white mb-0 leading-tight space-mono-bold"
               style={{

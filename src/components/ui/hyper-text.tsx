@@ -6,7 +6,6 @@ import {
   type RefAttributes,
 } from "react"
 import {
-  AnimatePresence,
   motion,
   type DOMMotionComponents,
   type HTMLMotionProps,
@@ -185,19 +184,7 @@ export function HyperText({
       onMouseEnter={handleAnimationTrigger}
       {...props}
     >
-      <AnimatePresence>
-        {displayText.map((letter, index) => (
-          <motion.span
-            key={index}
-            className={cn(
-              "font-mono inline-block",
-              letter === " " ? "w-[0.3ch] overflow-hidden" : ""
-            )}
-          >
-            {letter.toUpperCase()}
-          </motion.span>
-        ))}
-      </AnimatePresence>
+      {displayText.join("").toUpperCase()}
     </MotionComponent>
   )
 }

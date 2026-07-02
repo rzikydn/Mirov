@@ -33,8 +33,19 @@ export default function DashboardPage() {
   }, []);
 
 
-  // 🧩 Ambil data user dari localStorage
-  const [user, setUser] = useState<{ name: string; email: string; role: 'SUPERUSER' | 'ADMIN' | 'UMUM' } | null>(null);
+  // 🧩 Ambil data user dari localStorage secara sinkron saat inisialisasi state
+  const [user] = useState<{ name: string; email: string; role: 'SUPERUSER' | 'ADMIN' | 'UMUM' } | null>(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        return JSON.parse(storedUser);
+      } catch (error) {
+        console.error('❌ Error parsing initial user state:', error);
+        return null;
+      }
+    }
+    return null;
+  });
 
   // ✅ Cek login state
   useEffect(() => {
@@ -44,16 +55,6 @@ export default function DashboardPage() {
     if (!token || !storedUser) {
       // Belum login → kembali ke halaman auth
       navigate('/auth', { replace: true });
-    } else {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-
-
-      } catch (error) {
-        console.error('❌ Error parsing user:', error);
-        navigate('/auth', { replace: true });
-      }
     }
 
     // Listen for popstate (browser back/forward) and recheck auth
