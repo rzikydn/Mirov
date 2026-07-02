@@ -25,17 +25,20 @@ interface SmoothInputProps extends React.ComponentPropsWithoutRef<"input"> {
   hasError?: boolean;
 }
 
-const SmoothInput = React.forwardRef<HTMLInputElement, SmoothInputProps>(({
-  className,
-  value,
-  defaultValue,
-  onChange,
-  onBlur,
-  type = "text",
-  placeholder,
-  style,
-  ...props
-}, ref) => {
+const SmoothInput = React.forwardRef((
+  {
+    className,
+    value,
+    defaultValue,
+    onChange,
+    onBlur,
+    type = "text",
+    placeholder,
+    style,
+    ...props
+  }: SmoothInputProps,
+  ref: React.ForwardedRef<HTMLInputElement>
+) => {
   const [internalValue, setInternalValue] = useState(defaultValue ?? "");
   const caretX = useMotionValue(0);
   const caretOpacity = useMotionValue(0);
@@ -67,20 +70,24 @@ const SmoothInput = React.forwardRef<HTMLInputElement, SmoothInputProps>(({
     if (!input || !measureSpan) return;
 
     const styles = window.getComputedStyle(input);
-    const isPassword = type === "password";
+    const isPassword = type === "password" || styles.webkitTextSecurity === "disc";
 
     let fontSize = styles.fontSize;
     if (
       PASSWORD_CHAR === "\u2022" &&
-      isPassword
+      isPassword &&
+      !navigator.userAgent.match(/chrome|chromium|crios/i)
     ) {
-      fontSize = `${parseFloat(fontSize) + 4}px`;
+      fontSize = `${parseFloat(fontSize) + 6.25}px`;
     }
 
     measureSpan.style.font = `${styles.fontStyle} ${styles.fontWeight} ${fontSize} ${styles.fontFamily}`;
     measureSpan.style.letterSpacing = styles.letterSpacing;
     measureSpan.style.fontFeatureSettings = styles.fontFeatureSettings;
     measureSpan.style.fontVariationSettings = styles.fontVariationSettings;
+    if (isPassword && styles.webkitTextSecurity) {
+      measureSpan.style.webkitTextSecurity = styles.webkitTextSecurity;
+    }
   };
 
   const measurePrefixWidth = (text: string) => {
@@ -104,7 +111,9 @@ const SmoothInput = React.forwardRef<HTMLInputElement, SmoothInputProps>(({
     const selectionEnd = target.selectionEnd ?? 0;
     const hasSelection = selectionStart !== selectionEnd;
     const caretIndex = selectionStart;
-    const isPassword = type === "password";
+    
+    const styles = window.getComputedStyle(target);
+    const isPassword = type === "password" || styles.webkitTextSecurity === "disc";
     
     const textBeforeCaret = isPassword
       ? PASSWORD_CHAR.repeat(caretIndex)
@@ -213,8 +222,8 @@ const SmoothInput = React.forwardRef<HTMLInputElement, SmoothInputProps>(({
         className="pointer-events-none invisible absolute top-0 left-0 whitespace-pre font-jakarta"
       />
       <motion.div
-        className="bg-[#FF725E] pointer-events-none absolute left-0 h-[1.3em] w-0.5 top-1/2 -translate-y-1/2 z-10"
-        style={{ x: springCaretX, opacity: caretOpacity }}
+        className="bg-[#FF725E] pointer-events-none absolute left-0 h-[1.3em] w-0.5 top-1/2 z-10"
+        style={{ x: springCaretX, y: "-50%", opacity: caretOpacity }}
       />
     </>
   );
