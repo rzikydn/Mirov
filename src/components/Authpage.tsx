@@ -46,8 +46,13 @@ export default function AuthPage() {
     }
 
     const savedEmail = localStorage.getItem('rememberedEmail');
+    const savedPassword = localStorage.getItem('rememberedPassword');
     if (savedEmail) {
-      setFormData(prev => ({ ...prev, email: savedEmail }));
+      setFormData(prev => ({ 
+        ...prev, 
+        email: savedEmail,
+        password: savedPassword || ''
+      }));
       setRememberMe(true);
     }
 
@@ -79,6 +84,7 @@ export default function AuthPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setMessage(null);
 
     if (!validateForm()) return;
@@ -104,15 +110,12 @@ export default function AuthPage() {
       const userData = data.data?.user || data.user;
       const tokenData = data.data?.token || data.token;
 
-      setMessage({
-        type: "success",
-        text: 'Login successful!'
-      });
-
       if (rememberMe) {
         localStorage.setItem('rememberedEmail', formData.email);
+        localStorage.setItem('rememberedPassword', formData.password);
       } else {
         localStorage.removeItem('rememberedEmail');
+        localStorage.removeItem('rememberedPassword');
       }
 
       setUser(userData);
@@ -161,7 +164,7 @@ export default function AuthPage() {
       </div>
 
       {/* Right Side: Form wrapped in a white card container on mobile */}
-      <div className="w-full lg:max-w-[500px] flex flex-col justify-center bg-white lg:bg-transparent rounded-t-[40px] px-6 lg:px-0 pt-8 pb-12 lg:pb-0 flex-1">
+      <div className="w-full lg:max-w-[500px] flex flex-col justify-center bg-white lg:bg-transparent rounded-t-[40px] px-6 lg:px-0 pt-8 pb-12 lg:pb-0 flex-1 transform lg:-translate-y-8">
         <div className="w-full max-w-[500px] mx-auto flex flex-col justify-center">
         {/* Header Texts */}
         <div className="text-left lg:text-right mb-6">
@@ -255,7 +258,7 @@ export default function AuthPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-[#FF725E] focus:ring-[#FF725E] focus:ring-opacity-20 accent-[#FF725E] cursor-pointer"
+                className="w-4 h-4 rounded border-gray-300 text-[#0066FF] focus:ring-[#0066FF] focus:ring-opacity-20 accent-[#0066FF] cursor-pointer"
               />
               <span className="text-xs text-gray-500 font-jakarta group-hover:text-gray-700 transition-colors">
                 Remember Me
@@ -264,13 +267,9 @@ export default function AuthPage() {
           </div>
 
           {/* Alert Message */}
-          {message && (
+          {message && message.type === 'error' && (
             <div
-              className={`p-3.5 rounded-xl text-sm border ${
-                message.type === 'success'
-                  ? 'bg-green-50 text-green-700 border-green-200'
-                  : 'bg-red-50 text-red-700 border-red-200'
-              }`}
+              className="p-3.5 rounded-xl text-sm border bg-red-50 text-red-700 border-red-200"
             >
               {message.text}
             </div>
