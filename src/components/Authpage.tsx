@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, useSpring } from 'framer-motion';
 import { Lock, Eye, AtSign } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import BmsrBg from '../assets/BMSR.svg';
+
 import Char3 from '../assets/Char3svgh.svg';
 import bsmrLogo from '../assets/bsmr-logo.svg';
 
@@ -70,7 +70,7 @@ const SmoothInput = React.forwardRef((
     if (!input || !measureSpan) return;
 
     const styles = window.getComputedStyle(input);
-    const isPassword = type === "password" || styles.webkitTextSecurity === "disc";
+    const isPassword = type === "password" || (styles as any).webkitTextSecurity === "disc";
 
     let fontSize = styles.fontSize;
     if (
@@ -85,8 +85,8 @@ const SmoothInput = React.forwardRef((
     measureSpan.style.letterSpacing = styles.letterSpacing;
     measureSpan.style.fontFeatureSettings = styles.fontFeatureSettings;
     measureSpan.style.fontVariationSettings = styles.fontVariationSettings;
-    if (isPassword && styles.webkitTextSecurity) {
-      measureSpan.style.webkitTextSecurity = styles.webkitTextSecurity;
+    if (isPassword && (styles as any).webkitTextSecurity) {
+      (measureSpan.style as any).webkitTextSecurity = (styles as any).webkitTextSecurity;
     }
   };
 
@@ -113,7 +113,7 @@ const SmoothInput = React.forwardRef((
     const caretIndex = selectionStart;
     
     const styles = window.getComputedStyle(target);
-    const isPassword = type === "password" || styles.webkitTextSecurity === "disc";
+    const isPassword = type === "password" || (styles as any).webkitTextSecurity === "disc";
     
     const textBeforeCaret = isPassword
       ? PASSWORD_CHAR.repeat(caretIndex)
@@ -370,7 +370,7 @@ export default function AuthPage() {
   return (
     <div 
       className="min-h-screen w-full flex flex-col lg:flex-row items-stretch lg:items-center justify-start lg:justify-between px-0 lg:px-6 md:px-16 lg:pl-6 lg:pr-28 bg-[#0066FF] lg:bg-transparent lg:bg-cover lg:bg-center lg:bg-no-repeat"
-      style={isMobile ? {} : { backgroundImage: `url(${BmsrBg})` }}
+      style={isMobile ? {} : { backgroundImage: 'url(/BMSR.svg)' }}
     >
       <AnimatePresence>
         {message && (
