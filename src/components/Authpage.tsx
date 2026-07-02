@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, useSpring } from 'framer-motion';
 import { Lock, Eye, AtSign } from 'lucide-react';
@@ -213,7 +213,7 @@ const SmoothInput = React.forwardRef<HTMLInputElement, SmoothInputProps>(({
         className="pointer-events-none invisible absolute top-0 left-0 whitespace-pre font-jakarta"
       />
       <motion.div
-        className="bg-[#FF725E] pointer-events-none absolute left-0 h-[1.3em] w-0.5 top-[17px] z-10"
+        className="bg-[#FF725E] pointer-events-none absolute left-0 h-[1.3em] w-0.5 top-1/2 -translate-y-1/2 z-10"
         style={{ x: springCaretX, opacity: caretOpacity }}
       />
     </>
