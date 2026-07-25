@@ -94,6 +94,28 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
   const [showImportModal, setShowImportModal] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [warningMessage, setWarningMessage] = useState({ title: '', message: '' });
+  const [isHeaderVisible, setIsHeaderVisible] = useState<boolean>(() => {
+    const saved = localStorage.getItem('mirov_header_visible');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  useEffect(() => {
+    const handleHeaderChange = (e: any) => {
+      if (e?.detail !== undefined) {
+        setIsHeaderVisible(e.detail);
+      } else {
+        const saved = localStorage.getItem('mirov_header_visible');
+        setIsHeaderVisible(saved !== null ? JSON.parse(saved) : true);
+      }
+    };
+
+    window.addEventListener('headerVisibilityChange', handleHeaderChange);
+    window.addEventListener('storage', handleHeaderChange);
+    return () => {
+      window.removeEventListener('headerVisibilityChange', handleHeaderChange);
+      window.removeEventListener('storage', handleHeaderChange);
+    };
+  }, []);
   const [sortConfig, setSortConfig] = useState<SortConfig[]>(() => {
     // Set default sort to first column - DESCENDING
     if (database.columns.length > 0) {
@@ -329,6 +351,28 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     });
   };
 
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerAutoSave = (updatedDb: Database) => {
+    if (!canEdit || typeof updatedDb.id !== 'number') return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await updateDatabase(updatedDb, token);
+        console.log('⚡ Realtime auto-saved database to server:', updatedDb.name);
+      } catch (err) {
+        console.error('Auto-save error:', err);
+      }
+    }, 350);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, []);
+
   const updateThisDb = (mutator: (db: Database) => Database) => {
     // Use functional update to ensure we always work with the latest state
     setDatabases((prev) => {
@@ -341,7 +385,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       const newDatabases = [...prev];
       newDatabases[dbIndex] = updatedDb;
 
-      console.log('📝 Local state updated for database:', updatedDb.name, 'Click "Save" to persist.');
+      // Realtime background auto-save to server
+      triggerAutoSave(updatedDb);
+
       return newDatabases;
     });
   };
@@ -748,14 +794,20 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     }
 
     if (typeof database.id === 'number') {
-      const loadingToast = toast.loading('Saving changes to server...');
-      try {
-        console.log('📤 Manually saving database:', database.name, 'with', database.rows.length, 'rows');
+      const loadingToast = toast.loading('Saving to server...', {
+        position: 'top-right',
+        style: {
+          background: darkMode ? '#18181b' : '#3b82f6',
+          color: '#fff',
+          fontWeight: '500',
+        },
+      });
 
+      try {
         const result = await updateDatabase(
           database,
           token,
-          undefined, // History handled individually in actions
+          undefined,
           user?.name,
           user?.role as 'SUPERUSER' | 'ADMIN' | 'UMUM'
         );
@@ -764,7 +816,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
 
         if (result.success) {
           toast.success(
-            'Successfully saved database!',
+            'Database saved!',
             {
               duration: 3000,
               position: 'top-right',
@@ -780,27 +832,32 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
               },
             }
           );
-          console.log('✅ Database manually saved to backend');
         } else {
-          // Check if it's a size issue (413 is Payload Too Large)
-          const errorMsg = result.status === 413
-            ? 'Data too large for server. Try uploading a smaller CSV or contact admin to increase limit.'
-            : `Failed: ${result.error || 'Server error'}`;
-
-          toast.error(errorMsg, { duration: 5000 });
+          toast.error(`Failed to save: ${result.error || 'Server error'}`, {
+            duration: 4000,
+            position: 'top-right',
+          });
         }
       } catch (error) {
         toast.dismiss(loadingToast);
-        console.error('❌ Failed to save to backend:', error);
-        toast.error('Failed to save changes: Network error or server timeout.');
+        toast.error('Failed to save changes due to network error.', {
+          duration: 4000,
+          position: 'top-right',
+        });
       }
-    } else {
-      toast.error('Cannot save: Database ID is invalid.');
     }
   };
 
   const handleRefresh = async () => {
-    const loadingToast = toast.loading('Refreshing data...');
+    const loadingToast = toast.loading('Refreshing data...', {
+      position: 'top-right',
+      style: {
+        background: darkMode ? '#18181b' : '#3b82f6',
+        color: '#fff',
+        fontWeight: '500',
+      },
+    });
+
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/databases/${database.id}`, {
@@ -810,23 +867,50 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
         }
       });
 
+      toast.dismiss(loadingToast);
+
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data) {
           // Update the database in the parent state
           setDatabases((prev) => prev.map((d) => (d.id === database.id ? result.data : d)));
-          toast.dismiss(loadingToast);
-          toast.success('Data refreshed from server');
+
+          toast.success(
+            'Data refreshed!',
+            {
+              duration: 3000,
+              position: 'top-right',
+              style: {
+                background: '#10b981',
+                color: '#fff',
+                fontWeight: '500',
+                border: 'none',
+              },
+              iconTheme: {
+                primary: '#fff',
+                secondary: '#10b981',
+              },
+            }
+          );
         } else {
-          throw new Error('Failed to parse response');
+          toast.error('Failed to refresh data: Invalid server response', {
+            duration: 4000,
+            position: 'top-right',
+          });
         }
       } else {
-        throw new Error('Server returned an error');
+        toast.error('Failed to refresh data: Server error', {
+          duration: 4000,
+          position: 'top-right',
+        });
       }
     } catch (error) {
       toast.dismiss(loadingToast);
       console.error('Error refreshing database:', error);
-      toast.error('Failed to refresh data. Check your connection.');
+      toast.error('Failed to refresh data. Check your connection.', {
+        duration: 4000,
+        position: 'top-right',
+      });
     }
   };
 
@@ -1829,7 +1913,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           {/* Scrollable container - both horizontal and vertical scroll */}
           <div
             ref={tableContainerRef}
-            className="overflow-auto hide-scrollbar max-h-[calc(100vh-300px)]"
+            className={`overflow-auto hide-scrollbar transition-[max-height] duration-300 ease-in-out ${
+              isHeaderVisible ? 'max-h-[calc(100vh-300px)]' : 'max-h-[calc(100vh-170px)]'
+            }`}
             style={{
               willChange: 'transform',
               transform: 'translateZ(0)',

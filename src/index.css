@@ -273,31 +273,6 @@ table,
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23e5e7eb'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
 }
 
-/* ✨ Circular Reveal - Dark Mode Toggle Animation (View Transition API) */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
-}
-
-::view-transition-old(root) {
-  z-index: 1;
-}
-
-::view-transition-new(root) {
-  z-index: 9999;
-  animation: circular-reveal 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-@keyframes circular-reveal {
-  from {
-    clip-path: circle(0% at var(--reveal-x, 50%) var(--reveal-y, 50%));
-  }
-
-  to {
-    clip-path: circle(var(--reveal-radius, 100vmax) at var(--reveal-x, 50%) var(--reveal-y, 50%));
-  }
-}
 
 /* Chrome/Safari autofill background override */
 input:-webkit-autofill,

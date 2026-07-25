@@ -20,8 +20,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ show, darkMode, database, onC
     onClose();
   };
 
-  const handleExportXLSX = () => {
-    exportToXLSX(database);
+  const handleExportXLSX = async () => {
+    await exportToXLSX(database);
     onClose();
   };
 

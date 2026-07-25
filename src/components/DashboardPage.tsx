@@ -221,11 +221,12 @@ export default function DashboardPage() {
         style={{
           marginLeft: isDesktop ? (isCollapsed ? 72 : 192) : 0,
           transition: 'margin-left 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+          willChange: 'margin-left',
         }}
       >
         <Header onMenuClick={() => setSidebarOpen(true)} darkMode={darkMode} user={user} />
 
-        <main className={`flex-1 relative overflow-hidden ${darkMode ? 'bg-gray-900' : 'bg-slate-100'}`}>
+        <main className={`flex-1 relative overflow-y-auto hide-scrollbar ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           <AnimatePresence mode="wait">
             {!selectedDatabase ? (
               selectedMenu === '1' ? (

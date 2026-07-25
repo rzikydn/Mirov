@@ -369,7 +369,7 @@ export default function AuthPage() {
 
   return (
     <div 
-      className="min-h-screen w-full flex flex-col lg:flex-row items-stretch lg:items-center justify-start lg:justify-between px-0 lg:px-6 md:px-16 lg:pl-6 lg:pr-28 bg-[#0066FF] lg:bg-transparent lg:bg-cover lg:bg-center lg:bg-no-repeat"
+      className="min-h-screen w-full flex flex-col lg:flex-row items-stretch lg:items-center justify-start px-0 lg:px-0 md:px-16 bg-[#0066FF] lg:bg-transparent lg:bg-cover lg:bg-center lg:bg-no-repeat"
       style={isMobile ? {} : { backgroundImage: 'url(/BMSR.svg)' }}
     >
       <AnimatePresence>
@@ -426,17 +426,17 @@ export default function AuthPage() {
       )}
 
       {/* Left Side: Character Illustration */}
-      <div className="hidden lg:flex w-[62%] items-center justify-start overflow-visible">
+      <div className="hidden lg:flex w-[50vw] items-center justify-end overflow-visible pr-8 xl:pr-16">
         <img 
           src={Char3} 
           alt="Illustration" 
-          className="max-h-[90vh] w-full object-contain select-none pointer-events-none transform lg:translate-y-2 lg:-translate-x-14"
+          className="max-h-[85vh] w-auto max-w-[95%] object-contain select-none pointer-events-none transform lg:translate-y-2 lg:translate-x-10 xl:translate-x-14"
         />
       </div>
 
       {/* Right Side: Form wrapped in a white card container on mobile */}
-      <div className="w-full lg:max-w-[500px] flex flex-col justify-center bg-white lg:bg-transparent rounded-t-[40px] px-6 lg:px-0 pt-8 pb-12 lg:pb-0 flex-1 transform lg:-translate-y-8">
-        <div className="w-full max-w-[500px] mx-auto flex flex-col justify-center">
+      <div className="w-full lg:w-[50vw] flex flex-col justify-center bg-white lg:bg-transparent rounded-t-[40px] px-6 lg:px-12 xl:px-24 pt-8 pb-12 lg:pb-0 flex-1 transform lg:-translate-y-8">
+        <div className="w-full max-w-[450px] mx-auto flex flex-col justify-center">
         {/* Header Texts */}
         <div className="text-left lg:text-right mb-6">
           {/* Logo */}

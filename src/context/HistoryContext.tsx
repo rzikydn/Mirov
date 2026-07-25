@@ -19,6 +19,7 @@ interface HistoryContextType {
   history: HistoryEntry[];
   addHistory: (entry: Omit<HistoryEntry, 'id' | 'createdAt' | 'userId'>) => Promise<void>;
   deleteHistory: (id: number) => Promise<boolean>;
+  deleteBulkHistory: (ids: number[]) => Promise<boolean>;
   getLastChange: () => HistoryEntry | null;
   refreshHistory: () => Promise<void>;
 }
@@ -134,6 +135,29 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const deleteBulkHistory = async (ids: number[]): Promise<boolean> => {
+    try {
+      // Optimistic UI update (Instant 0ms)
+      setHistory((prev) => prev.filter((item) => !ids.includes(item.id)));
+
+      // Send parallel delete requests to server
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`${API_URL}/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+          })
+        )
+      );
+
+      return true;
+    } catch (error) {
+      console.error('❌ Error during bulk delete history:', error);
+      await refreshHistory();
+      return false;
+    }
+  };
+
   const getLastChange = (): HistoryEntry | null => {
     return history.length > 0 ? history[0] : null;
   };
@@ -144,6 +168,7 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
         history,
         addHistory,
         deleteHistory,
+        deleteBulkHistory,
         getLastChange,
         refreshHistory
       }}

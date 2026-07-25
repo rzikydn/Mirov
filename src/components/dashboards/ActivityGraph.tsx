@@ -1,18 +1,19 @@
 "use client";
 
-import {
-  ContributionGraph,
-  ContributionGraphBlock,
-  ContributionGraphCalendar,
-} from "@/components/kibo-ui/contribution-graph/index";
-import { formatISO } from "date-fns";
-import { cn } from "@/lib/utils";
-import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-
-// Assuming we want to show 1 year back from today exactly like typical contribution graphs, 
-// or from start of year to end of year like in the example code data.
-import { eachDayOfInterval, endOfYear, startOfYear } from "date-fns";
+import { Activity, BarChart2, AlertCircle, RotateCcw } from "lucide-react";
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Area,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ReferenceLine,
+} from "recharts";
 import { HistoryEntry } from "../../context/HistoryContext";
 
 interface ActivityGraphProps {
@@ -22,357 +23,471 @@ interface ActivityGraphProps {
   selectedDate?: string;
 }
 
-export const ActivityGraph: React.FC<ActivityGraphProps> = ({ history, darkMode, onDateSelect, selectedDate }) => {
-  const now = new Date();
-  const maxLevel = 4;
+// ── Indonesian Date Helpers ──
+const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const BULAN_FULL = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
-  // Indonesian date formatter
-  const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-  const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+// Custom Tooltip Component
+const CustomTooltip = ({ active, payload, label, darkMode }: any) => {
+  if (active && payload && payload.length) {
+    const items = payload.filter((entry: any) => !entry.dataKey.endsWith('Area'));
 
-  const formatIndonesianDate = useCallback((dateStr: string) => {
-    const d = new Date(dateStr + 'T00:00:00');
-    return `${HARI[d.getDay()]}, ${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()}`;
-  }, []);
+    return (
+      <div
+        className={`rounded-xl border p-2.5 shadow-xl text-xs space-y-1.5 min-w-[170px] backdrop-blur-md ${
+          darkMode
+            ? 'bg-[#18181b]/95 border-gray-700 text-white'
+            : 'bg-gray-900/95 border-gray-800 text-white'
+        }`}
+      >
+        <div className="font-semibold text-gray-300 border-b border-gray-700/60 pb-1 text-[11px] flex items-center justify-between">
+          <span>{label}</span>
+        </div>
+        <div className="space-y-1 pt-0.5">
+          {items.map((entry: any, index: number) => (
+            <div key={index} className="flex justify-between items-center text-[11px]">
+              <span className="flex items-center gap-1.5 font-medium" style={{ color: entry.color }}>
+                <span className="w-2 h-2 rounded-full border bg-transparent" style={{ borderColor: entry.color }} />
+                {entry.name}:
+              </span>
+              <span className="font-bold text-white tabular-nums">{entry.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
-  // Tooltip state
-  const [tooltip, setTooltip] = useState<{ date: string; count: number; x: number; y: number } | null>(null);
-  const tooltipTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+export const ActivityGraph: React.FC<ActivityGraphProps> = ({
+  history,
+  darkMode,
+  onDateSelect,
+  selectedDate,
+}) => {
+  const [timeRange, setTimeRange] = useState<'14d' | '30d' | '90d'>('14d');
 
-  const data = useMemo(() => {
-    // 1. Calculate activity counts per date string (yyyy-MM-dd)
-    const counts = new Map<string, number>();
-    history.forEach(entry => {
+  // 1. Process daily history counts based on selected timeRange
+  const daysCount = timeRange === '14d' ? 14 : timeRange === '30d' ? 30 : 90;
+
+  const chartData = useMemo(() => {
+    const today = new Date();
+    const result: Array<{
+      dateStr: string; // YYYY-MM-DD
+      month: string; // 22 Jul
+      fullDate: string; // Senin, 22 Juli 2026
+      created: number;
+      edited: number;
+      deleted: number;
+      other: number;
+      total: number;
+      editedArea: number;
+      createdArea: number;
+    }> = [];
+
+    const mapByDate = new Map<string, { created: number; edited: number; deleted: number; other: number }>();
+
+    history.forEach((entry) => {
       const d = new Date(entry.createdAt);
-      // Create local YYYY-MM-DD
-      const dateString = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      counts.set(dateString, (counts.get(dateString) || 0) + 1);
-    });
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (!mapByDate.has(key)) {
+        mapByDate.set(key, { created: 0, edited: 0, deleted: 0, other: 0 });
+      }
+      const item = mapByDate.get(key)!;
+      const action = (entry.action || '').toLowerCase();
+      const desc = (entry.description || '').toLowerCase();
 
-    let maxCount = 0;
-    counts.forEach(count => {
-      if (count > maxCount) maxCount = count;
-    });
-    
-    // To avoid dividing by zero or having too small scale
-    if (maxCount < 4) maxCount = 4;
-
-    // 2. Generate days of the entire year
-    const days = eachDayOfInterval({
-      start: startOfYear(now),
-      end: endOfYear(now),
-    });
-
-    return days.map((date) => {
-      const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-      const count = counts.get(dateString) || 0;
-      
-      // Calculate level (0-4) based on actual activity vs maxCount
-      const level = count === 0 ? 0 : Math.ceil((count / maxCount) * maxLevel);
-
-      return {
-        date: formatISO(date, { representation: "date" }),
-        count,
-        level,
-      };
-    });
-  }, [history]);
-
-  // Doughnut Chart Data Calculation
-  const filteredForChart = useMemo(() => {
-    if (!selectedDate) return history;
-    return history.filter(entry => {
-      const entryDate = new Date(entry.createdAt);
-      const entryDateStr = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}-${String(entryDate.getDate()).padStart(2, '0')}`;
-      return entryDateStr === selectedDate;
-    });
-  }, [history, selectedDate]);
-
-  const activityStats = useMemo(() => {
-    let creates = 0;
-    let edits = 0;
-    let deletes = 0;
-    let others = 0;
-
-    filteredForChart.forEach((entry) => {
-      const action = entry.action?.toLowerCase() || '';
-      const desc = entry.description?.toLowerCase() || '';
-      
       if (action === 'create' || action === 'added' || desc.includes('created') || desc.includes('added')) {
-        creates++;
+        item.created++;
       } else if (action === 'edit' || action === 'update' || desc.includes('updated') || desc.includes('changed')) {
-        edits++;
+        item.edited++;
       } else if (action === 'delete' || action === 'remove' || desc.includes('deleted') || desc.includes('removed')) {
-        deletes++;
+        item.deleted++;
       } else {
-        others++;
+        item.other++;
       }
     });
 
-    return [
-      { id: 'creates', label: 'Created / Added', count: creates, color: '#10B981', ringColor: darkMode ? 'ring-[#10B981]/30' : 'ring-[#10B981]/20' },
-      { id: 'edits', label: 'Edited / Updated', count: edits, color: '#3B82F6', ringColor: darkMode ? 'ring-[#3B82F6]/30' : 'ring-[#3B82F6]/20' },
-      { id: 'deletes', label: 'Deleted / Removed', count: deletes, color: '#EF4444', ringColor: darkMode ? 'ring-[#EF4444]/30' : 'ring-[#EF4444]/20' },
-      { id: 'others', label: 'Other Activity', count: others, color: '#F59E0B', ringColor: darkMode ? 'ring-[#F59E0B]/30' : 'ring-[#F59E0B]/20' },
-    ];
-  }, [filteredForChart, darkMode]);
+    for (let i = daysCount - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const counts = mapByDate.get(key) || { created: 0, edited: 0, deleted: 0, other: 0 };
+      const total = counts.created + counts.edited + counts.deleted + counts.other;
 
-  const totalActivities = filteredForChart.length;
-  const radius = 60;
-  const strokeWidth = 12;
-  const circumference = 2 * Math.PI * radius;
-  
-  // Calculate SVG stroke offsets
-  let currentOffset = 0;
-  let chartSegments: any[] = [];
-  
-  const activeStats = activityStats.filter(stat => stat.count > 0);
-  
-  if (activeStats.length === 0) {
-    chartSegments = [];
-  } else if (activeStats.length === 1) {
-    chartSegments = activeStats.map((stat: any) => ({
-      ...stat,
-      dashArray: `${circumference} ${circumference}`,
-      dashOffset: 0
-    }));
-  } else {
-    const visualGap = 8;
-    const capCompensation = strokeWidth; // strokeLinecap="round" adds strokeWidth/2 to BOTH ends
-    const totalGaps = activeStats.length * (visualGap + capCompensation);
-    const availableCircumference = Math.max(0, circumference - totalGaps);
+      result.push({
+        dateStr: key,
+        month: `${d.getDate()} ${BULAN[d.getMonth()]}`,
+        fullDate: `${HARI[d.getDay()]}, ${d.getDate()} ${BULAN_FULL[d.getMonth()]} ${d.getFullYear()}`,
+        created: counts.created,
+        edited: counts.edited,
+        deleted: counts.deleted,
+        other: counts.other,
+        total,
+        editedArea: counts.edited,
+        createdArea: counts.created,
+      });
+    }
 
-    chartSegments = activeStats.map((stat: any) => {
-      const percentage = totalActivities > 0 ? stat.count / totalActivities : 0;
-      const dashLength = percentage * availableCircumference;
-      
-      const segment = {
-        ...stat,
-        dashArray: `${dashLength} ${circumference}`,
-        dashOffset: -currentOffset - (capCompensation / 2),
-      };
-      
-      const advance = dashLength + capCompensation + visualGap;
-      currentOffset += advance;
-      
-      return segment;
+    return result;
+  }, [history, daysCount]);
+
+  // 2. Summary stats for distribution progress bars
+  const distributionStats = useMemo(() => {
+    let created = 0;
+    let edited = 0;
+    let deleted = 0;
+    let other = 0;
+
+    chartData.forEach((d) => {
+      created += d.created;
+      edited += d.edited;
+      deleted += d.deleted;
+      other += d.other;
     });
-  }
 
-  // Dynamic block sizing based on container width
-  const graphContainerRef = useRef<HTMLDivElement>(null);
-  const [blockSize, setBlockSize] = useState(11);
-  const [blockMargin, setBlockMargin] = useState(3);
+    const grandTotal = created + edited + deleted + other || 1;
 
-  useEffect(() => {
-    const container = graphContainerRef.current;
-    if (!container) return;
+    return [
+      { id: 'created', label: 'Created / Added', count: created, pct: Math.round((created / grandTotal) * 100), color: 'bg-emerald-500' },
+      { id: 'edited', label: 'Edits & Updates', count: edited, pct: Math.round((edited / grandTotal) * 100), color: 'bg-blue-500' },
+      { id: 'deleted', label: 'Deleted Items', count: deleted, pct: Math.round((deleted / grandTotal) * 100), color: 'bg-rose-500' },
+      { id: 'other', label: 'Other Activity', count: other, pct: Math.round((other / grandTotal) * 100), color: 'bg-amber-500' },
+    ];
+  }, [chartData]);
 
-    const calculateBlockSize = () => {
-      const width = container.clientWidth;
-      const dayLabelWidth = 36; // space reserved for day-of-week labels
-      const availableWidth = width - dayLabelWidth;
-      
-      // Calculate how many weeks we are actually rendering.
-      // E.g., startOfYear to endOfYear is usually 53 weeks across.
-      const weeks = 53; 
+  // Find peak activity day
+  const peakDay = useMemo(() => {
+    if (chartData.length === 0) return null;
+    return [...chartData].sort((a, b) => b.total - a.total)[0];
+  }, [chartData]);
 
-      // Use exact floating point math to perfectly stretch without right-side blank space
-      const cellTotal = availableWidth / weeks;
-      
-      // At least 2px margin, scale margin proportionally
-      const margin = Math.max(2, cellTotal * 0.22);
-      
-      // At least 6px size
-      const size = Math.max(6, cellTotal - margin);
-      
-      setBlockSize(size);
-      setBlockMargin(margin);
-    };
-
-    calculateBlockSize();
-    const observer = new ResizeObserver(() => calculateBlockSize());
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, []);
+  // Color config for Recharts matching the design
+  const colors = {
+    edited: '#3B82F6', // Blue / Teal
+    created: '#10B981', // Green / Emerald
+    deleted: '#F43F5E', // Red / Rose
+    other: '#F59E0B', // Amber
+  };
 
   return (
-    <div className={`p-5 rounded-xl border mb-8 w-full
-      flex flex-col lg:flex-row gap-8 items-start
-      ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}
-    `}>
-      {/* LEFT: Contribution Graph */}
-      <div ref={graphContainerRef} className="flex-1 min-w-0 w-full overflow-x-auto hide-scrollbar">
-        <div className="pb-2">
-          <ContributionGraph 
-            data={data} 
-            blockSize={blockSize} 
-            blockMargin={blockMargin}
-          >
-            <ContributionGraphCalendar className={darkMode ? 'text-gray-400' : 'text-gray-500'}>
-              {({ activity, dayIndex, weekIndex }) => (
-                <ContributionGraphBlock
-                  activity={activity}
-                  className={cn(
-                    'transition-all duration-300 cursor-pointer stroke-1',
-                    darkMode ? 'data-[level="0"]:fill-[#374151]' : 'data-[level="0"]:fill-[#ebedf0]',
-                    darkMode ? 'data-[level="1"]:fill-[#0e4429]' : 'data-[level="1"]:fill-[#9be9a8]',
-                    darkMode ? 'data-[level="2"]:fill-[#006d32]' : 'data-[level="2"]:fill-[#40c463]',
-                    darkMode ? 'data-[level="3"]:fill-[#26a641]' : 'data-[level="3"]:fill-[#30a14e]',
-                    darkMode ? 'data-[level="4"]:fill-[#39d353]' : 'data-[level="4"]:fill-[#216e39]',
-                    selectedDate && selectedDate !== activity.date ? 'opacity-20' : 'opacity-100',
-                    selectedDate === activity.date ? (darkMode ? 'stroke-white' : 'stroke-gray-900') : 'stroke-transparent'
-                  )}
-                  dayIndex={dayIndex}
-                  weekIndex={weekIndex}
-                  onMouseEnter={(e: React.MouseEvent) => {
-                    if (tooltipTimeout.current) clearTimeout(tooltipTimeout.current);
-                    const rect = (e.target as SVGRectElement).getBoundingClientRect();
-                    setTooltip({
-                      date: activity.date,
-                      count: activity.count,
-                      x: rect.left + rect.width / 2,
-                      y: rect.top - 8,
-                    });
-                  }}
-                  onMouseLeave={() => {
-                    tooltipTimeout.current = setTimeout(() => setTooltip(null), 150);
-                  }}
-                  onClick={() => {
-                    if (onDateSelect) {
-                      onDateSelect(activity.date);
-                    }
-                  }}
-                />
-              )}
-            </ContributionGraphCalendar>
-            <div className="flex justify-between items-center mt-4 text-xs">
-              <span className={`${darkMode ? 'text-gray-400' : 'text-[#64748B]'}`}>
-                {history.length} activities in {new Date().getFullYear()}
-              </span>
-              <div className="flex items-center gap-1.5">
-                <span className={`${darkMode ? 'text-gray-400' : 'text-[#64748B]'}`}>Less</span>
-                <div className="flex gap-1">
-                  <div className={`w-[10px] h-[10px] rounded-[2px] ${darkMode ? 'bg-[#374151]' : 'bg-[#ebedf0]'}`} />
-                  <div className={`w-[10px] h-[10px] rounded-[2px] ${darkMode ? 'bg-[#0e4429]' : 'bg-[#9be9a8]'}`} />
-                  <div className={`w-[10px] h-[10px] rounded-[2px] ${darkMode ? 'bg-[#006d32]' : 'bg-[#40c463]'}`} />
-                  <div className={`w-[10px] h-[10px] rounded-[2px] ${darkMode ? 'bg-[#26a641]' : 'bg-[#30a14e]'}`} />
-                  <div className={`w-[10px] h-[10px] rounded-[2px] ${darkMode ? 'bg-[#39d353]' : 'bg-[#216e39]'}`} />
-                </div>
-                <span className={`${darkMode ? 'text-gray-400' : 'text-[#64748B]'}`}>More</span>
-              </div>
-            </div>
-          </ContributionGraph>
-        </div>
-      </div>
-
-      {/* RIGHT: Doughnut Chart Insight */}
-      <div className={`w-full lg:w-[380px] flex-shrink-0 flex flex-col sm:flex-row items-center sm:items-start lg:pt-1 gap-6
-        border-t lg:border-t-0 lg:border-l ${darkMode ? 'border-gray-700' : 'border-gray-100'} lg:pl-6 lg:pr-4 pt-6 sm:pt-4
-      `}>
-        {/* Doughnut SVG */}
-          <div className="relative w-[150px] h-[150px] flex-shrink-0">
-            <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 150 150">
-              {/* Background Ring */}
-              <circle
-                cx="75" cy="75" r={radius}
-                fill="none"
-                stroke={darkMode ? '#374151' : '#F3F4F6'}
-                strokeWidth={strokeWidth}
-              />
-              {/* Segments */}
-              {chartSegments.map((seg) => (
-                <motion.circle
-                  key={`${selectedDate || 'all'}-${seg.id}`}
-                  cx="75" cy="75" r={radius}
-                  fill="none"
-                  stroke={seg.color}
-                  strokeWidth={strokeWidth}
-                  strokeLinecap="round"
-                  initial={{ strokeDasharray: `${circumference} ${circumference}`, strokeDashoffset: circumference }}
-                  animate={{ strokeDasharray: seg.dashArray as string, strokeDashoffset: seg.dashOffset as number }}
-                  transition={{ duration: 1.2, ease: "easeInOut" }}
-                />
-              ))}
-            </svg>
-            
-            {/* Center Text */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <motion.span 
-                key={(selectedDate || 'all') + '-total'}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}
-              >
-                {totalActivities}
-              </motion.span>
-              <span className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                Total
-              </span>
-            </div>
-          </div>
-
-          {/* Legend */}
-          <div className="flex-1 w-full space-y-3">
-            <h3 className={`text-sm font-semibold mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-              Activity Insight
-            </h3>
-            {activityStats.map((stat) => (
-              <div key={stat.id} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2.5">
-                  <span 
-                    className={`w-3 h-3 rounded-full flex-shrink-0 ring-4 ${stat.ringColor}`} 
-                    style={{ backgroundColor: stat.color }}
-                  />
-                  <span className={`whitespace-nowrap ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {stat.label}
-                  </span>
-                </div>
-                <span className={`font-semibold pl-4 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-                  {stat.count}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-      <style dangerouslySetInnerHTML={{__html: `
-        .hide-scrollbar::-webkit-scrollbar {
-          height: 6px;
-        }
-        .hide-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .hide-scrollbar::-webkit-scrollbar-thumb {
-          background-color: ${darkMode ? '#374151' : '#E5E7EB'};
-          border-radius: 10px;
-        }
-      `}} />
-
-      {/* Custom Tooltip */}
-      {tooltip && (
+    <div className="w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+        
+        {/* ── LEFT PANEL: Recharts Sales-Overview Style Line Chart (col-span-8) ── */}
         <div
-          className="fixed z-[9999] pointer-events-none"
-          style={{
-            left: tooltip.x,
-            top: tooltip.y,
-            transform: 'translate(-50%, -100%)',
-          }}
+          className={`lg:col-span-8 rounded-xl p-3.5 border transition-colors shadow-sm flex flex-col justify-between ${
+            darkMode
+              ? 'bg-[#121214] border-[#27272a] text-gray-100'
+              : 'bg-white border-gray-200 text-gray-900'
+          }`}
         >
-          <div className={`px-3 py-2 rounded-lg shadow-lg text-xs font-medium whitespace-nowrap
-            ${darkMode ? 'bg-gray-900 text-gray-100 border border-gray-700' : 'bg-gray-800 text-white'}
-          `}>
-            <div className="font-semibold">{formatIndonesianDate(tooltip.date)}</div>
-            <div className={`mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-300'}`}>
-              {tooltip.count} {tooltip.count === 1 ? 'kontribusi' : 'kontribusi'}
+          {/* Header Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-800/20">
+            <div className="flex items-center gap-2">
+              <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
+                <Activity className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  Activity Timeline
+                  {selectedDate && (
+                    <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                      Filtered: {selectedDate}
+                    </span>
+                  )}
+                </h3>
+              </div>
+            </div>
+
+            {/* Top Right Controls & Legend */}
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* Legend dots */}
+              <div className="hidden sm:flex items-center gap-2.5 text-[11px] font-medium mr-1">
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 border border-blue-400" />
+                  <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}>Edits</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 border border-emerald-400" />
+                  <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}>Created</span>
+                </div>
+              </div>
+
+              {/* Time Range Selector */}
+              <div className={`flex items-center p-0.5 rounded-lg border text-[11px] ${darkMode ? 'bg-[#18181b] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
+                {(['14d', '30d', '90d'] as const).map((range) => (
+                  <button
+                    key={range}
+                    onClick={() => setTimeRange(range)}
+                    className={`px-2 py-0.5 rounded-md font-medium transition-all ${
+                      timeRange === range
+                        ? darkMode
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'bg-white text-blue-600 shadow-sm'
+                        : darkMode
+                        ? 'text-gray-400 hover:text-white'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {range.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+
+              {selectedDate && (
+                <button
+                  onClick={() => onDateSelect && onDateSelect('')}
+                  className={`text-[11px] px-2 py-0.5 rounded-lg border font-medium transition-colors flex items-center gap-1 ${
+                    darkMode
+                      ? 'border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800'
+                      : 'border-gray-300 text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Reset
+                </button>
+              )}
             </div>
           </div>
-          {/* Arrow */}
-          <div className="flex justify-center -mt-[1px]">
-            <div className={`w-2 h-2 rotate-45 ${darkMode ? 'bg-gray-900 border-r border-b border-gray-700' : 'bg-gray-800'}`} />
+
+          {/* Recharts Linear Area + Line Chart View */}
+          <div className="w-full pt-2 min-h-[135px]">
+            <ResponsiveContainer width="100%" height={135}>
+              <ComposedChart
+                data={chartData}
+                margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
+                onClick={(e: any) => {
+                  if (e && e.activePayload && e.activePayload.length && onDateSelect) {
+                    onDateSelect(e.activePayload[0].payload.dateStr);
+                  }
+                }}
+              >
+                <defs>
+                  {/* Linear Gradient Backgrounds */}
+                  <linearGradient id="editedGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={colors.edited} stopOpacity={0.25} />
+                    <stop offset="100%" stopColor={colors.edited} stopOpacity={0.02} />
+                  </linearGradient>
+                  <linearGradient id="createdGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={colors.created} stopOpacity={0.2} />
+                    <stop offset="100%" stopColor={colors.created} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+
+                {/* Horizontal Dashed Grid */}
+                <CartesianGrid
+                  strokeDasharray="4 4"
+                  stroke={darkMode ? "#27272a" : "#e2e8f0"}
+                  horizontal={true}
+                  vertical={false}
+                />
+
+                {/* X Axis */}
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: darkMode ? '#9ca3af' : '#6b7280' }}
+                  dy={4}
+                />
+
+                {/* Y Axis */}
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: darkMode ? '#9ca3af' : '#6b7280' }}
+                  dx={-2}
+                  allowDecimals={false}
+                />
+
+                {/* Selected Date Reference Line */}
+                {selectedDate && (
+                  <ReferenceLine
+                    x={
+                      chartData.find((d) => d.dateStr === selectedDate)?.month || ''
+                    }
+                    stroke={colors.edited}
+                    strokeWidth={1.5}
+                    strokeDasharray="3 3"
+                  />
+                )}
+
+                {/* Custom Tooltip */}
+                <Tooltip
+                  content={<CustomTooltip darkMode={darkMode} />}
+                  cursor={{
+                    stroke: darkMode ? '#3f3f46' : '#cbd5e1',
+                    strokeWidth: 1,
+                    strokeDasharray: '4 4',
+                  }}
+                />
+
+                {/* Gradient Area under Edits */}
+                <Area
+                  type="linear"
+                  dataKey="editedArea"
+                  name="Edits"
+                  stroke="transparent"
+                  fill="url(#editedGradient)"
+                  strokeWidth={0}
+                  dot={false}
+                  activeDot={false}
+                />
+
+                {/* Linear Line: Edits */}
+                <Line
+                  type="linear"
+                  dataKey="edited"
+                  name="Edits & Updates"
+                  stroke={colors.edited}
+                  strokeWidth={1.75}
+                  dot={{
+                    fill: darkMode ? '#121214' : '#ffffff',
+                    strokeWidth: 1.5,
+                    r: 3.5,
+                    stroke: colors.edited,
+                  }}
+                  activeDot={{
+                    r: 5.5,
+                    strokeWidth: 2.5,
+                    fill: colors.edited,
+                  }}
+                />
+
+                {/* Linear Line: Created */}
+                <Line
+                  type="linear"
+                  dataKey="created"
+                  name="Created Items"
+                  stroke={colors.created}
+                  strokeWidth={1.75}
+                  dot={{
+                    fill: darkMode ? '#121214' : '#ffffff',
+                    strokeWidth: 1.5,
+                    r: 3.5,
+                    stroke: colors.created,
+                  }}
+                  activeDot={{
+                    r: 5.5,
+                    strokeWidth: 2.5,
+                    fill: colors.created,
+                  }}
+                />
+
+                {/* Linear Line: Deleted */}
+                <Line
+                  type="linear"
+                  dataKey="deleted"
+                  name="Deleted"
+                  stroke={colors.deleted}
+                  strokeWidth={1.5}
+                  strokeDasharray="3 3"
+                  dot={{
+                    fill: darkMode ? '#121214' : '#ffffff',
+                    strokeWidth: 1.5,
+                    r: 3,
+                    stroke: colors.deleted,
+                  }}
+                />
+
+                {/* Linear Line: Other */}
+                <Line
+                  type="linear"
+                  dataKey="other"
+                  name="Other"
+                  stroke={colors.other}
+                  strokeWidth={1.25}
+                  strokeDasharray="2 2"
+                  dot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
         </div>
-      )}
+
+        {/* ── RIGHT PANEL: Activity Distribution (col-span-4) ── */}
+        <div
+          className={`lg:col-span-4 rounded-xl p-3.5 border transition-colors shadow-sm flex flex-col justify-between ${
+            darkMode
+              ? 'bg-[#121214] border-[#27272a] text-gray-100'
+              : 'bg-white border-gray-200 text-gray-900'
+          }`}
+        >
+          <div>
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-gray-800/20">
+              <div className="flex items-center gap-2">
+                <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
+                  <BarChart2 className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-xs">Activity Distribution</h3>
+                </div>
+              </div>
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                {timeRange}
+              </span>
+            </div>
+
+            {/* Horizontal Bar Chart Items */}
+            <div className="space-y-2 pt-2.5">
+              {distributionStats.map((item) => (
+                <div key={item.id} className="space-y-0.5">
+                  <div className="flex justify-between items-center text-[11px] font-medium">
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>
+                      {item.label}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[10px] ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {item.count}
+                      </span>
+                      <span className="font-bold min-w-[26px] text-right text-[11px]">
+                        {item.pct}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Horizontal Bar Track */}
+                  <div className={`w-full h-1.5 rounded-full overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                    <motion.div
+                      className={`h-full rounded-full ${item.color}`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${item.pct}%` }}
+                      transition={{ duration: 0.6, ease: "easeOut" }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Anomaly / Insight Summary Box at Bottom */}
+          <div className={`mt-2 p-2 rounded-lg border text-[11px] space-y-1 ${
+            darkMode ? 'bg-amber-950/20 border-amber-900/40 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'
+          }`}>
+            <div className="flex items-center gap-1.5 font-semibold text-amber-400 text-[11px]">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>Activity Insights</span>
+            </div>
+            <ul className="space-y-0.5 text-[10px] opacity-90 pl-4 list-disc">
+              {peakDay ? (
+                <li>
+                  Peak: <strong className="font-semibold">{peakDay.month}</strong> ({peakDay.total} actions)
+                </li>
+              ) : (
+                <li>No activity recorded</li>
+              )}
+              <li>Top: <strong className="font-semibold">{[...distributionStats].sort((a,b)=>b.count-a.count)[0]?.label}</strong></li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 };
+
+export default ActivityGraph;

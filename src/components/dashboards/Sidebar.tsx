@@ -16,6 +16,7 @@ import {
   Database as DatabaseIcon,
   Calendar as CalendarIcon,
   Settings,
+  Bell,
 } from 'lucide-react';
 import { Database } from '../../types/database';
 import { menuItems } from '../../constants/dashboard';
@@ -24,6 +25,7 @@ import LogoutModal from './modals/LogoutModal';
 import AvatarPickerModal from './modals/AvatarPickerModal';
 import BsmrLogo from '../BsmrLogo';
 import { useHistory } from '../../context/HistoryContext';
+import { NotificationList } from '../animate-ui/components/community/notification-list';
 
 interface SidebarProps {
   databases: Database[];
@@ -64,6 +66,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [deleteDbId, setDeleteDbId] = useState<string | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [showFeatureUpdates, setShowFeatureUpdates] = useState(false);
   
   // Persist avatar selection in localStorage simulating a backend
   // React state initialization only runs once. So we must use useEffect below to catch user changes mapping.
@@ -152,6 +155,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               width: collapsed ? 72 : 192,
               transition: 'width 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
               overflow: 'hidden',
+              willChange: 'width',
             }}
           >
             <div className="p-3 flex flex-col flex-1 overflow-y-auto custom-scrollbar">
@@ -386,7 +390,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       onSelectDatabase(null);
                       setIsOpen(false);
                     }}
-                    className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-2'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
+                    className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-between gap-1.5'} px-2.5 py-1.5 rounded-lg transition-colors text-sm ${
                       selectedMenu === 'history' && !selectedDatabase
                         ? darkMode
                           ? 'bg-blue-900 text-blue-300'
@@ -397,32 +401,81 @@ const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                     title={collapsed ? 'History' : undefined}
                   >
-                    <div className="relative flex items-center justify-center">
-                      <Clock className="w-4 h-4" />
-                      {collapsed && history.length > 0 && (
-                        <span className={`absolute -top-1.5 -right-1.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-0.5 text-[8px] font-bold ring-2 ${
-                          darkMode
-                            ? 'bg-blue-600 text-white ring-gray-800'
-                            : 'bg-blue-600 text-white ring-white'
-                        }`}>
-                          {history.length}
-                        </span>
-                      )}
-                    </div>
-                    {!collapsed && (
-                      <>
-                        <span className="font-medium whitespace-nowrap">History</span>
-                        {history.length > 0 && (
-                          <span className={`ml-auto text-xs px-1.5 py-0.5 rounded-full ${
-                            darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-600'
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="relative flex items-center justify-center shrink-0">
+                        <Clock className="w-4 h-4" />
+                        {collapsed && history.length > 0 && (
+                          <span className={`absolute -top-1.5 -right-1.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-0.5 text-[8px] font-bold ring-2 ${
+                            darkMode
+                              ? 'bg-blue-600 text-white ring-gray-800'
+                              : 'bg-blue-600 text-white ring-white'
                           }`}>
                             {history.length}
                           </span>
                         )}
-                      </>
+                      </div>
+                      {!collapsed && (
+                        <span className="font-medium truncate">History</span>
+                      )}
+                    </div>
+                    {!collapsed && history.length > 0 && (
+                      <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded-full ${
+                        darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-600'
+                      }`}>
+                        {history.length}
+                      </span>
                     )}
                   </button>
                 )}
+
+                {/* Feature Updates Button with Floating NotificationList Popover */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowFeatureUpdates(!showFeatureUpdates)}
+                    className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-between gap-1.5'} px-2.5 py-1.5 rounded-lg transition-colors text-sm ${
+                      showFeatureUpdates
+                        ? darkMode
+                          ? 'bg-blue-900/50 text-blue-300'
+                          : 'bg-blue-50 text-[#2563eb]'
+                        : darkMode
+                          ? 'text-gray-300 hover:bg-gray-700'
+                          : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title={collapsed ? 'Feature updates' : undefined}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="relative flex items-center justify-center shrink-0">
+                        <Bell className="w-4 h-4" />
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-blue-500" />
+                      </div>
+                      {!collapsed && (
+                        <span className="font-medium truncate text-xs sm:text-sm">Feature updates</span>
+                      )}
+                    </div>
+                    {!collapsed && (
+                      <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded-full ${
+                        darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-600'
+                      }`}>
+                        3
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Floating Popover Overlay (Ultra-lightweight dim backdrop with 0 GPU blur pass overhead) */}
+                  {showFeatureUpdates && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40 bg-black/30 dark:bg-black/50 transition-opacity duration-150 animate-in fade-in"
+                        onClick={() => setShowFeatureUpdates(false)}
+                      />
+                      <div className={`fixed ${collapsed ? 'left-[72px]' : 'left-[265px]'} bottom-16 z-50 w-80 transform-gpu will-change-transform animate-in fade-in zoom-in-95 duration-150 shadow-2xl rounded-3xl overflow-hidden border ${
+                        darkMode ? 'bg-[#18181b] border-gray-800' : 'bg-white border-gray-200'
+                      }`}>
+                        <NotificationList darkMode={darkMode} className="w-full border-none shadow-none" />
+                      </div>
+                    </>
+                  )}
+                </div>
 
                 {/* Dark Mode Toggle */}
                 <button

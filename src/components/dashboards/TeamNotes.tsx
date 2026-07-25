@@ -33,6 +33,7 @@ interface ColoredNote extends FlexibleNote {
   date: string;
   createdAt?: string; // Field dari backend API
   updatedAt?: string; // Field dari backend API
+  user?: { name: string; role?: string };
 }
 
 // Post-it colors: Red, Yellow, Green
@@ -134,6 +135,27 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
     };
   };
 
+  // Instant 0ms load from localStorage cache
+  const [notes, setNotes] = useState<ColoredNote[]>(() => {
+    try {
+      const cached = localStorage.getItem('mirov_cached_notes');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Helper to update state and sync localStorage cache immediately
+  const updateNotesAndCache = (updater: ColoredNote[] | ((prev: ColoredNote[]) => ColoredNote[])) => {
+    setNotes((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      try {
+        localStorage.setItem('mirov_cached_notes', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
   // Fetch notes dari backend
   const fetchNotes = async () => {
     try {
@@ -141,28 +163,34 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
         headers: getAuthHeaders()
       });
       if (!res.ok) {
-        console.warn("Notes API not available, using empty array");
-        setNotes([]);
         return;
       }
       const data = await res.json();
-      // Pastikan data adalah array
-      if (Array.isArray(data)) {
-        setNotes(data);
-      } else if (data.data && Array.isArray(data.data)) {
-        setNotes(data.data);
-      } else {
-        console.warn("Notes response is not an array, using empty array");
-        setNotes([]);
+      const list = Array.isArray(data) ? data : (data.data && Array.isArray(data.data) ? data.data : null);
+      if (list) {
+        updateNotesAndCache(list);
       }
     } catch (err) {
       console.error("Failed to fetch notes:", err);
-      setNotes([]); // Set empty array on error
     }
   };
 
-  // Tambah note
+  // Realtime Optimistic Tambah note (0ms UI response)
   const createNote = async (note: { text: string; color: string; userId: number }) => {
+    const tempId = `temp-${Date.now()}`;
+    const newNote: ColoredNote = {
+      id: tempId,
+      content: note.text,
+      text: note.text,
+      color: note.color,
+      date: formatDateIndonesian(new Date().toISOString()),
+      createdAt: new Date().toISOString(),
+      user: user ? { name: user.name, role: user.role } : undefined
+    };
+
+    // Optimistic UI insert (INSTANT 0ms)
+    updateNotesAndCache((prev) => [newNote, ...prev]);
+
     try {
       const res = await fetch(API_URL, {
         method: "POST",
@@ -171,9 +199,13 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       });
       const data = await res.json();
       if (data.success && data.data) {
-        // Add to history
+        // Swap temp note with saved note from server
+        updateNotesAndCache((prev) =>
+          prev.map((n) => (n.id === tempId ? { ...data.data, content: data.data.content || note.text, text: data.data.content || note.text } : n))
+        );
+        // Non-blocking history log
         if (user) {
-          await addHistory({
+          addHistory({
             userName: user.name,
             userRole: user.role,
             action: 'create',
@@ -182,16 +214,20 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
             description: `${user.name} added a note`
           });
         }
-        // Refresh notes list
-        fetchNotes();
       }
     } catch (err) {
       console.error("Failed to create note:", err);
+      fetchNotes(); // Revert on failure
     }
   };
 
-  // Update note
+  // Realtime Optimistic Update note (0ms UI response)
   const editNote = async (id: string | number, note: { text: string; color: string; favorite: boolean }) => {
+    // Optimistic UI update (INSTANT 0ms)
+    updateNotesAndCache((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, content: note.text, text: note.text, color: note.color, favorite: note.favorite } : n))
+    );
+
     try {
       const res = await fetch(`${API_URL}/${id}`, {
         method: "PUT",
@@ -204,9 +240,8 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       });
       const data = await res.json();
       if (data.success) {
-        // Add to history
         if (user) {
-          await addHistory({
+          addHistory({
             userName: user.name,
             userRole: user.role,
             action: 'edit',
@@ -215,27 +250,28 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
             description: `${user.name} changed a note`
           });
         }
-        // Refresh notes list
-        fetchNotes();
       } else {
-        console.error('❌ Update failed:', data);
+        fetchNotes(); // Revert on failure
       }
     } catch (err) {
       console.error("Failed to update note:", err);
+      fetchNotes();
     }
   };
 
-  // Hapus note
+  // Realtime Optimistic Hapus note (0ms UI response)
   const removeNote = async (id: string | number) => {
+    // Optimistic UI delete (INSTANT 0ms)
+    updateNotesAndCache((prev) => prev.filter((n) => n.id !== id));
+
     try {
       const res = await fetch(`${API_URL}/${id}`, {
         method: "DELETE",
         headers: getAuthHeaders()
       });
       if (res.ok) {
-        // Add to history
         if (user) {
-          await addHistory({
+          addHistory({
             userName: user.name,
             userRole: user.role,
             action: 'delete',
@@ -243,20 +279,26 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
             description: `${user.name} deleted a note`
           });
         }
-        // Refresh notes list
-        fetchNotes();
+      } else {
+        fetchNotes(); // Revert on failure
       }
     } catch (err) {
       console.error("Failed to delete note:", err);
+      fetchNotes();
     }
   };
 
-  // Ambil data saat component mount
+  // Realtime Polling & Window Focus Listener for 100% sync
   useEffect(() => {
     fetchNotes();
+    const interval = setInterval(fetchNotes, 3000);
+    const handleFocus = () => fetchNotes();
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
-
-  const [notes, setNotes] = useState<ColoredNote[]>([]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
