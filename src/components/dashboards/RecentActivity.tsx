@@ -18,35 +18,31 @@ function categorize(entry: HistoryEntry): 'created' | 'edited' | 'deleted' | 'ot
   return 'other'
 }
 
-function formatDateTime(date: Date) {
+function formatDateTime(date: Date | string | number) {
   const d = new Date(date)
-  const hari = HARI[d.getDay()]
+  if (isNaN(d.getTime())) {
+    return { line1: 'Hari ini', line2: '--.-- WIB' }
+  }
+  const hari = HARI[d.getDay()] || 'Hari'
   const tgl = d.getDate()
-  const bulan = BULAN[d.getMonth()]
+  const bulan = BULAN[d.getMonth()] || 'Bulan'
   const tahun = d.getFullYear()
   const jam = String(d.getHours()).padStart(2, '0')
   const menit = String(d.getMinutes()).padStart(2, '0')
   return { line1: `${hari}, ${tgl} ${bulan} ${tahun}`, line2: `${jam}.${menit} WIB` }
 }
 
-function getUserAvatarUrl(userName?: string): string {
-  if (!userName) return 'https://api.dicebear.com/7.x/avataaars/svg?seed=User&backgroundColor=b6e3f4&mouth=default,smile,twinkle&eyes=default,happy,wink'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  try {
-    const personalSaved = localStorage.getItem(`user_avatar_${userName}`)
-    if (personalSaved) return personalSaved
+function getUserAvatarUrl(userName?: string, userAvatarsMap: Record<string, string> = {}): string {
+  if (!userName) return 'https://api.dicebear.com/7.x/avataaars/svg?seed=User&backgroundColor=b6e3f4&mouth=default,smile,twinkle&eyes=default,happy,wink';
 
-    const globalMapStr = localStorage.getItem('global_used_avatars')
-    if (globalMapStr) {
-      const globalMap = JSON.parse(globalMapStr)
-      if (globalMap[userName]) return globalMap[userName]
-    }
-  } catch (e) {
-    // Ignore error
+  if (userAvatarsMap[userName]) {
+    return userAvatarsMap[userName];
   }
 
-  const safeParams = '&mouth=default,smile,twinkle&eyes=default,happy,wink'
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userName)}&backgroundColor=b6e3f4${safeParams}`
+  const safeParams = '&mouth=default,smile,twinkle&eyes=default,happy,wink';
+  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userName)}&backgroundColor=b6e3f4${safeParams}`;
 }
 
 function ActionBadge({ category, darkMode }: { category: string; darkMode?: boolean }) {
@@ -152,35 +148,28 @@ function RecentActivity({
 
   const toggleSelectRow = (id: number) => {
     const next = new Set(selectedIds)
-    if (next.has(id)) {
-      next.delete(id)
-    } else {
-      next.add(id)
-    }
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
     setSelectedIds(next)
   }
 
   const handleBulkDelete = async () => {
     if (!isSuperUser || selectedIds.size === 0) return
     setIsDeleting(true)
-    const idsToDelete = Array.from(selectedIds)
-    const toastId = toast.loading(`Deleting ${idsToDelete.length} activity log(s)...`)
+    const toastId = toast.loading(`Deleting ${selectedIds.size} log items...`)
 
     try {
-      const success = await deleteBulkHistory(idsToDelete)
-      if (success) {
-        toast.success(`Successfully deleted ${idsToDelete.length} activity log(s)`, { id: toastId })
-      } else {
-        toast.error('Failed to delete activity logs', { id: toastId })
-      }
+      const idsArray = Array.from(selectedIds)
+      await deleteBulkHistory(idsArray)
       setSelectedIds(new Set())
       setIsSelectMode(false)
-      setShowDeleteConfirm(false)
+      toast.success(`Successfully deleted ${idsArray.length} log items`, { id: toastId })
     } catch (error) {
       console.error('Error during bulk delete:', error)
       toast.error('Failed to delete activity logs', { id: toastId })
     } finally {
       setIsDeleting(false)
+      setShowDeleteConfirm(false)
     }
   }
 
@@ -195,18 +184,16 @@ function RecentActivity({
     <div className={`rounded-xl border overflow-hidden ${
       darkMode ? 'bg-[#121214] border-[#27272a]' : 'bg-white border-gray-200'
     }`}>
-      {/* Header */}
-      <div className={`px-5 py-4 border-b ${darkMode ? 'border-gray-800' : 'border-gray-100'}`}>
+      <div className={`px-4 sm:px-5 py-4 border-b ${darkMode ? 'border-gray-800' : 'border-gray-100'}`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <h2 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Recent Activity</h2>
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+            <h2 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Recent Activity</h2>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
               darkMode ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-100 text-blue-700'
-            }`}>{total.toLocaleString()}</span>
+            }`}>{filtered.length.toLocaleString()}</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Select Mode & Bulk Delete (Strictly for SUPERUSER) */}
+          <div className="flex flex-wrap items-center gap-2">
             {isSuperUser && (
               <>
                 <button
@@ -219,17 +206,14 @@ function RecentActivity({
                       setIsSelectMode(true)
                     }
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                     isSelectMode
-                      ? darkMode
-                        ? 'bg-blue-900/50 border-blue-700 text-blue-300'
-                        : 'bg-blue-50 border-blue-300 text-blue-700'
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
                       : darkMode
                         ? 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
-                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                        : 'bg-gray-100 border-gray-200 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  <CheckSquare className="w-3.5 h-3.5" />
                   {isSelectMode ? 'Cancel Select' : 'Select'}
                 </button>
 
@@ -237,26 +221,27 @@ function RecentActivity({
                   <button
                     type="button"
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-colors animate-in fade-in"
+                    disabled={isDeleting}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-700 active:scale-95 text-white flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    Delete ({selectedIds.size})
+                    <span>Delete Selected ({selectedIds.size})</span>
                   </button>
                 )}
               </>
             )}
 
             {/* Search Input Bar */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm flex-1 sm:flex-initial ${
               darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-50 text-gray-500 border border-gray-200'
             }`}>
-              <Search className="w-3.5 h-3.5" />
+              <Search className="w-3.5 h-3.5 shrink-0" />
               <input
                 type="text"
                 placeholder="Search activities..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className={`bg-transparent outline-none text-xs w-32 placeholder:text-gray-400 ${
+                className={`bg-transparent outline-none text-xs w-full sm:w-32 placeholder:text-gray-400 ${
                   darkMode ? 'text-gray-200' : 'text-gray-700'
                 }`}
               />
@@ -265,7 +250,7 @@ function RecentActivity({
         </div>
 
         {/* Filter tabs */}
-        <div className="flex items-center gap-1 mt-3">
+        <div className="flex items-center flex-wrap gap-1.5 mt-3">
           {filters.map((f) => (
             <button
               key={f.key}
@@ -287,8 +272,97 @@ function RecentActivity({
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* Mobile View: Continuous Connecting Timeline View (Visible on mobile, hidden on desktop) */}
+      <div className="md:hidden p-4 relative">
+        {visibleEntries.length === 0 ? (
+          <div className={`text-center py-10 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+            No activity found
+          </div>
+        ) : (
+          <div className="relative">
+            {/* Continuous Vertical Connecting Line */}
+            <div className={`absolute left-[13px] top-3 bottom-3 w-0.5 ${
+              darkMode ? 'bg-gray-800' : 'bg-gray-200'
+            }`} />
+
+            <div className="space-y-4">
+              {visibleEntries.map((entry) => {
+                const cat = categorize(entry)
+                const dt = formatDateTime(entry.createdAt)
+                const avatarUrl = getUserAvatarUrl(entry.userName)
+                const isSelected = selectedIds.has(entry.id)
+
+                return (
+                  <div
+                    key={entry.id}
+                    className={`relative flex items-start gap-3 rounded-xl p-2 transition-colors ${
+                      isSelected
+                        ? darkMode ? 'bg-blue-900/20' : 'bg-blue-50/60'
+                        : darkMode ? 'hover:bg-gray-800/30' : 'hover:bg-gray-50/60'
+                    }`}
+                  >
+                    {/* Selection Checkbox */}
+                    {isSuperUser && isSelectMode && (
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectRow(entry.id)}
+                        className="mt-1.5 w-4 h-4 rounded border-gray-300 accent-blue-600 cursor-pointer shrink-0 z-10"
+                      />
+                    )}
+
+                    {/* Timeline Avatar Node (Sits directly on the connecting vertical line) */}
+                    <div className={`relative shrink-0 z-10 rounded-full p-0.5 ${
+                      darkMode ? 'bg-[#121214] ring-2 ring-[#121214]' : 'bg-white ring-2 ring-white'
+                    }`}>
+                      <img
+                        src={avatarUrl}
+                        alt={entry.userName}
+                        className="w-6 h-6 rounded-full bg-sky-100 object-cover border border-sky-200"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+
+                    {/* Timeline Content Block */}
+                    <div className="flex-1 min-w-0 pt-0.5">
+                      {/* Header Row: User, Action Badges & Time */}
+                      <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-xs font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {entry.userName}
+                          </span>
+                          <ActionBadge category={cat} darkMode={darkMode} />
+                          <TargetBadge target={entry.target || entry.targetName} darkMode={darkMode} />
+                        </div>
+                        <span className={`text-[10px] font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          {dt.line2}
+                        </span>
+                      </div>
+
+                      {/* Description Text - Fully Wrapped, No Truncation */}
+                      <p className={`text-xs leading-relaxed break-words font-medium ${
+                        darkMode ? 'text-gray-200' : 'text-gray-800'
+                      }`}>
+                        {entry.description}
+                      </p>
+
+                      {/* Date Subtext */}
+                      <div className={`text-[10px] font-medium mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                        {dt.line1}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop View: Full Table (Hidden on mobile, visible on tablet/desktop) */}
+      <div className="hidden md:block overflow-x-auto custom-scrollbar">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className={`text-[10px] uppercase tracking-wider ${

@@ -32,6 +32,7 @@ import { dateInputStyles } from '../../styles/dateInputStyles';
 // Import utilities
 import { SortConfig, getSortedRows, addSort, updateSortDirection, deleteSort, clearAllSorts } from '../../utils/sortingUtils';
 import { updateDatabase } from '../../utils/databaseUtils';
+import { apiFetch } from '@/services/offlineSync';
 
 // Highlight colors for rows (same as TeamNotes)
 const highlightColors = [
@@ -360,7 +361,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         await updateDatabase(updatedDb, token);
-        console.log('⚡ Realtime auto-saved database to server:', updatedDb.name);
+        console.log('Realtime auto-saved database to server:', updatedDb.name);
       } catch (err) {
         console.error('Auto-save error:', err);
       }
@@ -618,6 +619,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
       const firstColumnKey = database.columns[0]?.key;
       const firstColumnLabel = database.columns[0]?.label || 'Column';
       const firstColumnValue = rowToDelete?.properties[firstColumnKey]?.value || '(empty)';
+
+
 
       await updateThisDb((db) => ({
         ...db,
@@ -1826,8 +1829,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                   "flex items-center justify-center h-8 w-8 p-0 md:h-9 md:w-auto md:px-3 gap-1.5",
                   wrapText
                     ? (darkMode
-                        ? "bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border-blue-500/30"
-                        : "bg-blue-600/10 hover:bg-blue-600/20 text-blue-600 border-blue-600/20")
+                      ? "bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border-blue-500/30"
+                      : "bg-blue-600/10 hover:bg-blue-600/20 text-blue-600 border-blue-600/20")
                     : buttonThemeClass
                 )}
               >
@@ -1913,9 +1916,8 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
           {/* Scrollable container - both horizontal and vertical scroll */}
           <div
             ref={tableContainerRef}
-            className={`overflow-auto hide-scrollbar transition-[max-height] duration-300 ease-in-out ${
-              isHeaderVisible ? 'max-h-[calc(100vh-300px)]' : 'max-h-[calc(100vh-170px)]'
-            }`}
+            className={`overflow-auto hide-scrollbar transition-[max-height] duration-300 ease-in-out ${isHeaderVisible ? 'max-h-[calc(100vh-300px)]' : 'max-h-[calc(100vh-170px)]'
+              }`}
             style={{
               willChange: 'transform',
               transform: 'translateZ(0)',
@@ -2238,9 +2240,9 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
                                 disabled={!canEdit}
                                 placeholder=""
                                 className={`w-full text-sm ${darkMode
-                                   ? 'bg-transparent text-gray-300'
-                                   : 'bg-transparent text-gray-900'
-                                   } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
+                                  ? 'bg-transparent text-gray-300'
+                                  : 'bg-transparent text-gray-900'
+                                  } border-0 focus:outline-none px-0 py-0 ${!canEdit ? 'cursor-not-allowed opacity-70' : ''}`}
                               />
                             )}
                             {prop.type === 'date' && (

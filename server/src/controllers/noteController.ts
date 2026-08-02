@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, isNull } from 'drizzle-orm';
 import { db } from '../db';
 import { notes, users } from '../db/schema';
 
@@ -24,6 +24,7 @@ export const getAllNotes = async (_req: Request, res: Response): Promise<void> =
       })
       .from(notes)
       .leftJoin(users, eq(notes.userId, users.id))
+      .where(isNull(notes.deletedAt))
       .orderBy(desc(notes.createdAt));
 
     res.status(200).json({
@@ -253,7 +254,8 @@ export const deleteNote = async (req: Request, res: Response): Promise<void> => 
     }
 
     await db
-      .delete(notes)
+      .update(notes)
+      .set({ deletedAt: new Date() })
       .where(eq(notes.id, parseInt(id)));
 
     res.status(200).json({

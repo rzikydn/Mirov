@@ -5,10 +5,12 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import AuthPage from './components/Authpage.tsx';
 import DashboardPage from './components/DashboardPage.tsx';
 import DebugDashboard from './components/DebugDashboard.tsx';
+import { OfflineBanner } from './components/OfflineBanner.tsx';
 
 function App() {
   return (
     <Router>
+      <OfflineBanner />
       <Analytics />
       <SpeedInsights />
       <Toaster

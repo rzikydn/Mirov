@@ -43,3 +43,14 @@ export const authenticate = (req: Request, res: Response, next: NextFunction): v
     });
   }
 };
+
+export const requireSuperuser = (req: Request, res: Response, next: NextFunction): void => {
+  if (!req.user || req.user.role !== 'SUPERUSER') {
+    res.status(403).json({
+      success: false,
+      message: 'Access denied. Superuser role required.'
+    });
+    return;
+  }
+  next();
+};

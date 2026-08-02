@@ -2,6 +2,7 @@
 // Database operation utilities
 
 import { Database } from '../types/database';
+import { apiFetch } from '../services/offlineSync';
 
 const API_URL = `${import.meta.env.VITE_API_URL}/api/databases`;
 
@@ -14,10 +15,10 @@ export const getAuthHeaders = (token?: string | null): HeadersInit => {
   };
 };
 
-// Update database with backend sync
+// Update database with backend sync & offline queueing support
 export const updateDatabase = async (
   database: Database,
-  token?: string | null,
+  _token?: string | null,
   addHistory?: (historyData: {
     userName: string;
     userRole: string;
@@ -30,12 +31,10 @@ export const updateDatabase = async (
   userRole?: string
 ): Promise<{ success: boolean; status?: number; error?: string }> => {
   // Sync with backend if database has a numeric ID (already saved)
-  if (typeof database.id === 'number') {
+  if (typeof database.id === 'number' || typeof database.id === 'string') {
     try {
-      console.log('🔄 Sending to backend - Rows count:', database.rows.length);
-      const response = await fetch(`${API_URL}/${database.id}`, {
+      const { ok } = await apiFetch(`${API_URL}/${database.id}`, {
         method: 'PUT',
-        headers: getAuthHeaders(token),
         body: JSON.stringify({
           name: database.name,
           description: database.description,
@@ -46,10 +45,9 @@ export const updateDatabase = async (
         })
       });
 
-      if (response.ok) {
-        // Add to history if provided
+      if (ok) {
         if (addHistory && userName && userRole) {
-          await addHistory({
+          addHistory({
             userName,
             userRole,
             action: 'edit',
@@ -59,18 +57,9 @@ export const updateDatabase = async (
           });
         }
         return { success: true };
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to sync database:', response.status, response.statusText);
-        return {
-          success: false,
-          status: response.status,
-          error: errorData.message || response.statusText || `Server error (${response.status})`
-        };
       }
     } catch (error) {
       console.error('Error syncing database:', error);
-      return { success: false, error: 'Network connection error or timeout' };
     }
   }
   return { success: true };

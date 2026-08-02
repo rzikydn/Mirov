@@ -23,6 +23,7 @@ export const users = mysqlTable('users', {
   password: varchar('password', { length: 255 }).notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   role: roleEnum.notNull().default('UMUM'),
+  avatar: text('avatar'),
   createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
 });
@@ -39,6 +40,7 @@ export const schedules = mysqlTable('schedules', {
   createdBy: int('createdBy').notNull().references(() => users.id, { onDelete: 'cascade' }),
   createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+  deletedAt: datetime('deletedAt', { mode: 'date', fsp: 3 }),
 });
 
 // Notes table
@@ -51,6 +53,7 @@ export const notes = mysqlTable('notes', {
   createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
   favorite: boolean('favorite').notNull().default(false),
+  deletedAt: datetime('deletedAt', { mode: 'date', fsp: 3 }),
 });
 
 // Databases table
@@ -65,6 +68,7 @@ export const databases = mysqlTable('databases', {
   createdBy: int('createdBy').notNull().references(() => users.id, { onDelete: 'cascade' }),
   createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+  deletedAt: datetime('deletedAt', { mode: 'date', fsp: 3 }),
 });
 
 // History table
@@ -97,6 +101,21 @@ export type NewDatabase = typeof databases.$inferInsert;
 
 export type History = typeof history.$inferSelect;
 export type NewHistory = typeof history.$inferInsert;
+
+// Database Row Trash table (for soft-deleting individual rows inside a database grid)
+export const databaseRowTrash = mysqlTable('database_row_trash', {
+  id: int('id').primaryKey().autoincrement(),
+  databaseId: int('databaseId').notNull(),
+  databaseName: varchar('databaseName', { length: 255 }).notNull(),
+  rowId: varchar('rowId', { length: 255 }).notNull(),
+  rowData: json('rowData').notNull(),
+  previewText: varchar('previewText', { length: 255 }).notNull(),
+  deletedBy: int('deletedBy'),
+  deletedAt: datetime('deletedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+});
+
+export type DatabaseRowTrash = typeof databaseRowTrash.$inferSelect;
+export type NewDatabaseRowTrash = typeof databaseRowTrash.$inferInsert;
 
 // Enum type exports
 export type Role = 'SUPERUSER' | 'ADMIN' | 'UMUM';

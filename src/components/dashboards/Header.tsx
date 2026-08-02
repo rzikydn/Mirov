@@ -134,9 +134,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, user }) => {
           opacity: isHeaderVisible ? 1 : 0,
         }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className={`relative overflow-hidden flex-shrink-0 ${
-          darkMode ? 'border-b border-gray-700' : 'border-b border-gray-200'
-        } ${!isHeaderVisible ? 'pointer-events-none' : ''}`}
+        className={`relative overflow-hidden flex-shrink-0 ${darkMode ? 'border-b border-gray-700' : 'border-b border-gray-200'
+          } ${!isHeaderVisible ? 'pointer-events-none' : ''}`}
       >
         {/* Animated Background Illustration */}
         <div className="absolute inset-0 overflow-hidden">
@@ -330,11 +329,10 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, user }) => {
       <div className="absolute right-6 -bottom-3.5 z-40">
         <button
           onClick={toggleHeaderVisibility}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-md border transition-all cursor-pointer ${
-            darkMode
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-md border transition-all cursor-pointer ${darkMode
               ? 'bg-[#18181b] border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white'
               : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-          }`}
+            }`}
           title={isHeaderVisible ? 'Hide Header' : 'Show Header'}
         >
           {isHeaderVisible ? (

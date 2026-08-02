@@ -13,42 +13,65 @@ import newUserActivityLogImg from '@/assets/NewUserActivityLogUi.webp';
 import collapsibleHeaderImg from '@/assets/CollapsibleHeaderTogle.webp';
 import saveAndRefreshImg from '@/assets/SaveAndRefreshButton.webp';
 
-interface NotificationItem {
+export interface NotificationItem {
   id: number;
   title: string;
   subtitle: string;
-  time: string;
+  releasedAt: string; // ISO date string
   count?: number;
   imageSrc?: string;
   imageObjectFit?: 'cover' | 'contain' | 'fill';
   imageObjectPosition?: string;
 }
 
-const notifications: NotificationItem[] = [
+export const rawNotifications: NotificationItem[] = [
   {
     id: 1,
-    title: 'New User Activity Log UI',
-    subtitle: 'Sleek layout & 60 FPS performance',
-    time: 'tonight',
-    imageSrc: newUserActivityLogImg,
+    title: 'Offline-First Architecture',
+    subtitle: 'Work offline & background auto-sync',
+    releasedAt: new Date().toISOString(), // Released today
   },
   {
     id: 2,
-    title: 'Collapsible Header Toggle',
-    subtitle: 'Hide header for expanded worksheet view',
-    time: 'tonight',
-    imageSrc: collapsibleHeaderImg,
-    imageObjectPosition: 'right center',
-  },
-  {
-    id: 3,
-    title: 'Save & Refresh Buttons',
-    subtitle: 'Realtime auto-save & instant status toasts',
-    time: '2 weeks ago',
-    imageSrc: saveAndRefreshImg,
-    imageObjectFit: 'contain',
+    title: 'New User Activity Log UI',
+    subtitle: 'Sleek layout & 60 FPS performance',
+    releasedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
+    imageSrc: newUserActivityLogImg,
   },
 ];
+
+export function formatRelativeTime(releasedAtIso: string): string {
+  const now = Date.now();
+  const releaseTime = new Date(releasedAtIso).getTime();
+  const diffMs = now - releaseTime;
+  if (diffMs < 0) return 'Just now';
+
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMinutes < 60) return 'Just now';
+  if (diffHours < 24) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffWeeks === 1) return '1 week ago';
+  if (diffWeeks === 2) return '2 weeks ago';
+  return `${diffDays} days ago`;
+}
+
+export function getActiveNotifications(): NotificationItem[] {
+  const now = Date.now();
+  const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000; // 2 weeks
+  return rawNotifications.filter(item => {
+    const releaseTime = new Date(item.releasedAt).getTime();
+    return (now - releaseTime) <= FOURTEEN_DAYS_MS;
+  });
+}
+
+export function getActiveNotificationCount(): number {
+  return getActiveNotifications().length;
+}
 
 const cardTransition: Transition = {
   type: 'spring',
@@ -59,14 +82,25 @@ const cardTransition: Transition = {
 
 const getCardVariants = (i: number) => ({
   collapsed: {
-    marginTop: i === 0 ? 0 : -46,
-    scaleX: 1 - i * 0.05,
+    marginTop: i === 0 ? 0 : -48,
+    scaleX: 1 - i * 0.04,
     transformOrigin: 'top center',
   },
   expanded: {
-    marginTop: i === 0 ? 0 : 6,
+    marginTop: i === 0 ? 0 : 8,
     scaleX: 1,
     transformOrigin: 'top center',
+  },
+});
+
+const getCardContentVariants = (i: number) => ({
+  collapsed: {
+    opacity: i === 0 ? 1 : 0,
+    transition: { duration: 0.15 }
+  },
+  expanded: {
+    opacity: 1,
+    transition: { duration: 0.2, delay: 0.05 }
   },
 });
 
@@ -86,6 +120,8 @@ const viewAllTextVariants = {
 };
 
 function NotificationList({ className, darkMode }: { className?: string; darkMode?: boolean }) {
+  const activeNotifications = getActiveNotifications();
+
   return (
     <motion.div
       className={`p-3 rounded-3xl w-full space-y-3 shadow-xl transition-colors select-none ${
@@ -96,10 +132,10 @@ function NotificationList({ className, darkMode }: { className?: string; darkMod
       animate="collapsed"
     >
       <div>
-        {notifications.map((notification, i) => (
+        {activeNotifications.map((notification, i) => (
           <motion.div
             key={notification.id}
-            className={`rounded-xl px-4 py-2.5 shadow-sm transition-shadow duration-200 relative border transform-gpu ${
+            className={`rounded-xl px-4 py-2.5 shadow-sm transition-shadow duration-200 relative border transform-gpu overflow-hidden ${
               darkMode
                 ? 'bg-[#27272a] border-neutral-700/70 text-white'
                 : 'bg-white border-neutral-200 text-neutral-900'
@@ -107,39 +143,45 @@ function NotificationList({ className, darkMode }: { className?: string; darkMod
             variants={getCardVariants(i)}
             transition={cardTransition}
             style={{
-              zIndex: notifications.length - i,
+              zIndex: activeNotifications.length - i,
             }}
           >
-            <div className="flex justify-between items-center">
-              <h1 className={`text-xs font-semibold ${darkMode ? 'text-white' : 'text-neutral-900'}`}>
-                <PreviewLinkCard followCursor={true}>
-                  <PreviewLinkCardTrigger className={`underline underline-offset-4 decoration-1 hover:decoration-2 ${darkMode ? 'text-white' : 'text-neutral-900'}`}>
-                    {notification.title}
-                  </PreviewLinkCardTrigger>
-                  <PreviewLinkCardPanel side="top" sideOffset={8}>
-                    <PreviewLinkCardImage
-                      src={notification.imageSrc}
-                      alt={notification.title}
-                      objectFit={notification.imageObjectFit}
-                      objectPosition={notification.imageObjectPosition}
-                    />
-                  </PreviewLinkCardPanel>
-                </PreviewLinkCard>
-              </h1>
-              {notification.count && (
-                <div className={`flex items-center text-[11px] gap-0.5 font-medium ${
-                  darkMode ? 'text-neutral-300' : 'text-neutral-500'
-                }`}>
-                  <RotateCcw className="size-3" />
-                  <span>{notification.count}</span>
-                </div>
-              )}
-            </div>
-            <div className={`text-[11px] font-medium ${darkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>
-              <span>{notification.time}</span>
-              &nbsp;•&nbsp;
-              <span>{notification.subtitle}</span>
-            </div>
+            <motion.div variants={getCardContentVariants(i)}>
+              <div className="flex justify-between items-center">
+                <h1 className={`text-xs font-semibold ${darkMode ? 'text-white' : 'text-neutral-900'}`}>
+                  {notification.imageSrc ? (
+                    <PreviewLinkCard followCursor={true}>
+                      <PreviewLinkCardTrigger className={`underline underline-offset-4 decoration-1 hover:decoration-2 ${darkMode ? 'text-white' : 'text-neutral-900'}`}>
+                        {notification.title}
+                      </PreviewLinkCardTrigger>
+                      <PreviewLinkCardPanel side="top" sideOffset={8}>
+                        <PreviewLinkCardImage
+                          src={notification.imageSrc}
+                          alt={notification.title}
+                          objectFit={notification.imageObjectFit}
+                          objectPosition={notification.imageObjectPosition}
+                        />
+                      </PreviewLinkCardPanel>
+                    </PreviewLinkCard>
+                  ) : (
+                    <span>{notification.title}</span>
+                  )}
+                </h1>
+                {notification.count && (
+                  <div className={`flex items-center text-[11px] gap-0.5 font-medium ${
+                    darkMode ? 'text-neutral-300' : 'text-neutral-500'
+                  }`}>
+                    <RotateCcw className="size-3" />
+                    <span>{notification.count}</span>
+                  </div>
+                )}
+              </div>
+              <div className={`text-[11px] font-medium ${darkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                <span>{formatRelativeTime(notification.releasedAt)}</span>
+                &nbsp;•&nbsp;
+                <span>{notification.subtitle}</span>
+              </div>
+            </motion.div>
           </motion.div>
         ))}
       </div>
@@ -148,7 +190,7 @@ function NotificationList({ className, darkMode }: { className?: string; darkMod
         <div className={`size-5 rounded-full text-xs flex items-center justify-center font-bold ${
           darkMode ? 'bg-neutral-700 text-white' : 'bg-neutral-300 text-neutral-700'
         }`}>
-          {notifications.length}
+          {activeNotifications.length}
         </div>
         <span className="grid">
           <motion.span

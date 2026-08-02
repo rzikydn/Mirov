@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
-import { eq } from 'drizzle-orm';
+import { eq, isNotNull, and, ne } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { db } from '../db';
 import { users } from '../db/schema';
 import { generateToken } from '../utils/token';
+
+const safeParams = '&mouth=default,smile,twinkle&eyes=default,happy,wink';
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -40,6 +42,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Auto assign avatar if missing
+    let userAvatarUrl = user.avatar;
+    if (!userAvatarUrl) {
+      userAvatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=b6e3f4${safeParams}`;
+      await db.update(users).set({ avatar: userAvatarUrl }).where(eq(users.id, user.id));
+    }
+
     // Generate token
     const token = generateToken({
       userId: user.id,
@@ -56,7 +65,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role
+          role: user.role,
+          avatar: userAvatarUrl
         },
         token
       }
@@ -96,13 +106,15 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
+    const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}&backgroundColor=b6e3f4${safeParams}`;
 
     // Create user (default role: UMUM)
     const [user] = await db.insert(users).values({
       email,
       password: hashedPassword,
       name,
-      role: 'UMUM'
+      role: 'UMUM',
+      avatar: defaultAvatar
     }).$returningId();
 
     // Get the created user
@@ -123,7 +135,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           id: createdUser.id,
           name: createdUser.name,
           email: createdUser.email,
-          role: createdUser.role
+          role: createdUser.role,
+          avatar: createdUser.avatar || defaultAvatar
         },
         token
       }
@@ -146,6 +159,7 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
       name: users.name,
       email: users.email,
       role: users.role,
+      avatar: users.avatar,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt
     }).from(users).where(eq(users.id, userId)).limit(1);
@@ -167,6 +181,82 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
     res.status(500).json({
       success: false,
       message: 'Internal server error'
+    });
+  }
+};
+
+export const getAllUserAvatars = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const allUsers = await db.select({
+      userId: users.id,
+      name: users.name,
+      avatar: users.avatar
+    }).from(users).where(isNotNull(users.avatar));
+
+    res.status(200).json({
+      success: true,
+      data: allUsers.filter(u => u.avatar && u.avatar.trim() !== '')
+    });
+  } catch (error) {
+    console.error('Get all avatars error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch taken avatars'
+    });
+  }
+};
+
+export const updateUserAvatar = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const { avatarUrl } = req.body;
+
+    if (!userId || !avatarUrl) {
+      res.status(400).json({ success: false, message: 'Avatar URL is required' });
+      return;
+    }
+
+    // Check if another user is already using this avatar
+    const [existing] = await db
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .where(and(eq(users.avatar, avatarUrl), ne(users.id, userId)))
+      .limit(1);
+
+    if (existing) {
+      res.status(400).json({
+        success: false,
+        message: `Avatar ini sudah digunakan oleh ${existing.name}`
+      });
+      return;
+    }
+
+    // Update avatar in MySQL
+    await db.update(users).set({ avatar: avatarUrl }).where(eq(users.id, userId));
+
+    // Get updated user profile
+    const [updatedUser] = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        avatar: users.avatar
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    res.status(200).json({
+      success: true,
+      message: 'Avatar updated successfully',
+      data: { user: updatedUser }
+    });
+  } catch (error) {
+    console.error('Update user avatar error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update user avatar'
     });
   }
 };

@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { apiFetch, getCache, setCache } from '@/services/offlineSync';
 
 const API_URL = `${import.meta.env.VITE_API_URL}/api/history`;
 
@@ -27,87 +28,92 @@ interface HistoryContextType {
 const HistoryContext = createContext<HistoryContextType | undefined>(undefined);
 
 export const HistoryProvider = ({ children }: { children: ReactNode }) => {
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>(() => {
+    const cached = getCache<any[]>('history_logs', []);
+    return cached.map((entry) => ({
+      ...entry,
+      createdAt: entry.createdAt ? new Date(entry.createdAt) : new Date(),
+    }));
+  });
   const { isAuthenticated } = useAuth();
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return {
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` })
-    };
-  };
-
-  // Fetch history from backend
-  const refreshHistory = async () => {
+  // Fetch history from backend with offline fallback
+  const refreshHistory = useCallback(async () => {
     try {
-      // Fetch all history entries by passing limit=-1
-      const response = await fetch(`${API_URL}?limit=-1`, {
-        headers: getAuthHeaders()
-      });
+      const { ok, data } = await apiFetch(`${API_URL}?limit=-1`, {}, 'history_logs');
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && Array.isArray(data.data)) {
-          const historyWithDates = data.data.map((entry: any) => ({
-            ...entry,
-            action: entry.action.toLowerCase(), // Convert to lowercase
-            target: entry.target.toLowerCase(), // Convert to lowercase
-            // Fix timezone: MySQL CURRENT_TIMESTAMP stores local time,
-            // but Drizzle serializes with 'Z' (UTC) suffix.
-            // Strip the Z to parse as local time instead of UTC.
-            createdAt: (() => {
-              const raw = String(entry.createdAt);
-              // If it ends with Z, remove it so it's parsed as local time
-              const cleaned = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
-              return new Date(cleaned);
-            })()
-          }));
-          setHistory(historyWithDates);
-        }
-      } else {
-        const errorData = await response.json();
-        console.error('❌ Failed to fetch history:', errorData);
+      if (ok && data && data.data && Array.isArray(data.data)) {
+        const historyWithDates = data.data.map((entry: any) => ({
+          ...entry,
+          action: (entry.action || 'edit').toLowerCase(),
+          target: (entry.target || 'database').toLowerCase(),
+          createdAt: (() => {
+            const raw = String(entry.createdAt || '');
+            const cleaned = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
+            const d = new Date(cleaned);
+            return isNaN(d.getTime()) ? new Date() : d;
+          })()
+        }));
+        setHistory(historyWithDates);
+        setCache('history_logs', historyWithDates);
       }
     } catch (error) {
       console.error('❌ Error fetching history:', error);
     }
-  };
+  }, []);
 
-  // Load history whenever authentication state changes
+  // Load history whenever authentication state changes or data synced
   useEffect(() => {
     if (isAuthenticated) {
       refreshHistory();
     } else {
       setHistory([]);
     }
-  }, [isAuthenticated]);
+
+    const handleDataSynced = () => {
+      refreshHistory();
+    };
+    window.addEventListener('app:data-synced', handleDataSynced);
+
+    return () => window.removeEventListener('app:data-synced', handleDataSynced);
+  }, [isAuthenticated, refreshHistory]);
 
   const addHistory = async (entry: Omit<HistoryEntry, 'id' | 'createdAt' | 'userId'>) => {
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-      const response = await fetch(API_URL, {
+      // Optimistic UI Update (Instant 0ms update even when offline)
+      const newEntry: HistoryEntry = {
+        id: Date.now(),
+        userId: user.id || 1,
+        userName: entry.userName || 'User',
+        userRole: entry.userRole || 'UMUM',
+        action: (entry.action || 'edit').toLowerCase() as any,
+        target: (entry.target || 'database').toLowerCase() as any,
+        targetName: entry.targetName || '',
+        description: entry.description || '',
+        createdAt: new Date(),
+      };
+
+      setHistory((prev) => {
+        const updated = [newEntry, ...prev];
+        setCache('history_logs', updated);
+        return updated;
+      });
+
+      // Send to server or queue for background sync if offline
+      await apiFetch(API_URL, {
         method: 'POST',
-        headers: getAuthHeaders(),
         body: JSON.stringify({
           userId: user.id,
           userName: entry.userName,
           userRole: entry.userRole,
-          action: entry.action.toUpperCase(), // Convert to enum format (CREATE, EDIT, DELETE)
-          target: entry.target.toUpperCase(), // Convert to enum format (NOTE, DATABASE, SCHEDULE)
+          action: (entry.action || 'EDIT').toUpperCase(),
+          target: (entry.target || 'DATABASE').toUpperCase(),
           targetName: entry.targetName,
           description: entry.description
         })
       });
-
-      if (response.ok) {
-        // Refresh history to get latest
-        await refreshHistory();
-      } else {
-        const errorData = await response.json();
-        console.error('❌ Failed to add history:', errorData);
-      }
     } catch (error) {
       console.error('❌ Error adding history:', error);
     }
@@ -115,20 +121,18 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteHistory = async (id: number): Promise<boolean> => {
     try {
-      const response = await fetch(`${API_URL}/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
+      // Optimistic UI Delete
+      setHistory((prev) => {
+        const updated = prev.filter((item) => item.id !== id);
+        setCache('history_logs', updated);
+        return updated;
       });
 
-      if (response.ok) {
-        // Refresh history to get latest
-        await refreshHistory();
-        return true;
-      } else {
-        const errorData = await response.json();
-        console.error('❌ Failed to delete history:', errorData.message || errorData);
-        return false;
-      }
+      await apiFetch(`${API_URL}/${id}`, {
+        method: 'DELETE'
+      });
+
+      return true;
     } catch (error) {
       console.error('❌ Error deleting history:', error);
       return false;
@@ -137,15 +141,18 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteBulkHistory = async (ids: number[]): Promise<boolean> => {
     try {
-      // Optimistic UI update (Instant 0ms)
-      setHistory((prev) => prev.filter((item) => !ids.includes(item.id)));
+      // Optimistic UI Delete (Instant 0ms)
+      setHistory((prev) => {
+        const updated = prev.filter((item) => !ids.includes(item.id));
+        setCache('history_logs', updated);
+        return updated;
+      });
 
-      // Send parallel delete requests to server
+      // Send delete requests via apiFetch (queueing if offline)
       await Promise.all(
         ids.map((id) =>
-          fetch(`${API_URL}/${id}`, {
-            method: 'DELETE',
-            headers: getAuthHeaders(),
+          apiFetch(`${API_URL}/${id}`, {
+            method: 'DELETE'
           })
         )
       );
@@ -153,7 +160,6 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
       return true;
     } catch (error) {
       console.error('❌ Error during bulk delete history:', error);
-      await refreshHistory();
       return false;
     }
   };

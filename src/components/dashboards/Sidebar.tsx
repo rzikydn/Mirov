@@ -25,7 +25,7 @@ import LogoutModal from './modals/LogoutModal';
 import AvatarPickerModal from './modals/AvatarPickerModal';
 import BsmrLogo from '../BsmrLogo';
 import { useHistory } from '../../context/HistoryContext';
-import { NotificationList } from '../animate-ui/components/community/notification-list';
+import { NotificationList, getActiveNotificationCount } from '../animate-ui/components/community/notification-list';
 
 interface SidebarProps {
   databases: Database[];
@@ -43,6 +43,7 @@ interface SidebarProps {
   user?: { name: string; email: string; role: 'SUPERUSER' | 'ADMIN' | 'UMUM' } | null;
   isCollapsed: boolean;
   setIsCollapsed: (v: boolean) => void;
+  onRefreshParentData?: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -61,6 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   user,
   isCollapsed,
   setIsCollapsed,
+  onRefreshParentData,
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteDbId, setDeleteDbId] = useState<string | null>(null);
@@ -68,49 +70,28 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [showFeatureUpdates, setShowFeatureUpdates] = useState(false);
   
-  // Persist avatar selection in localStorage simulating a backend
-  // React state initialization only runs once. So we must use useEffect below to catch user changes mapping.
+  // User Avatar state synchronized with user record and event listener
   const [userAvatar, setUserAvatar] = useState<string>('');
 
-  // Re-fetch avatar when user logs in/changes
-  React.useEffect(() => {
+  const syncUserAvatar = React.useCallback(() => {
     const safeParams = '&mouth=default,smile,twinkle&eyes=default,happy,wink';
-    if (!user) {
+    const storedUserStr = localStorage.getItem('user');
+    const storedUser = storedUserStr ? JSON.parse(storedUserStr) : user;
+    if (!storedUser) {
       setUserAvatar(`https://api.dicebear.com/7.x/avataaars/svg?seed=User&backgroundColor=b6e3f4${safeParams}`);
       return;
     }
-    
-    const userKey = user.name || user.email || 'User';
-    // Get personal choice
-    const personalSaved = localStorage.getItem(`user_avatar_${userKey}`);
-    
-    // Manage Global Map
-    const globalMapStr = localStorage.getItem('global_used_avatars');
-    const globalMap = globalMapStr ? JSON.parse(globalMapStr) : {};
-    
-    const activeAvatar = personalSaved || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userKey}&backgroundColor=b6e3f4${safeParams}`;
-    
-    // Ensure it's in the global map for this user
-    if (globalMap[userKey] !== activeAvatar) {
-      globalMap[userKey] = activeAvatar;
-      localStorage.setItem('global_used_avatars', JSON.stringify(globalMap));
-    }
-    
-    setUserAvatar(activeAvatar);
+    const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${storedUser.name || 'User'}&backgroundColor=b6e3f4${safeParams}`;
+    setUserAvatar(storedUser.avatar || defaultAvatar);
   }, [user]);
 
-  // Calculate disabled avatars just in time for the modal
-  const getDisabledAvatars = () => {
-    if (!user) return [];
-    const userKey = user.name || user.email || 'User';
-    const globalMapStr = localStorage.getItem('global_used_avatars');
-    const globalMap = globalMapStr ? JSON.parse(globalMapStr) : {};
-    
-    // Return all values from global map EXCEPT this user's avatar
-    return Object.entries(globalMap)
-      .filter(([key, _]) => key !== userKey)
-      .map(([_, url]) => url as string);
-  };
+  React.useEffect(() => {
+    syncUserAvatar();
+    window.addEventListener('userAvatarUpdated', syncUserAvatar);
+    return () => {
+      window.removeEventListener('userAvatarUpdated', syncUserAvatar);
+    };
+  }, [syncUserAvatar]);
 
   const { history } = useHistory();
 
@@ -199,7 +180,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       onSelectDatabase(null);
                       setIsOpen(false);
                     }}
-                    className={`w-full ${collapsed ? 'flex justify-center' : 'text-left'} px-2 py-1.5 rounded-lg transition-colors duration-150 text-sm ${
+                    className={`w-full ${collapsed ? 'flex justify-center' : 'text-left'} px-1.5 py-1.5 rounded-lg transition-colors duration-150 text-sm ${
                       selectedMenu === item.id && !selectedDatabase
                         ? darkMode
                           ? 'bg-blue-900 text-blue-300'
@@ -225,7 +206,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className="mb-3 flex-1">
                 {!collapsed ? (
                   <>
-                    <div className="flex items-center justify-between mb-3 mt-2">
+                    <div className="flex items-center justify-between mb-3 mt-2 px-0.5">
                       <span className={`text-sm font-semibold whitespace-nowrap ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                         Databases
                       </span>
@@ -245,7 +226,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       {databases.map((db) => (
                         <div
                           key={db.id}
-                          className={`w-full text-left px-2 py-1.5 rounded-lg transition-all duration-150 flex items-center gap-1.5 group text-sm ${
+                          className={`w-full text-left px-1.5 py-1.5 rounded-lg transition-all duration-150 flex items-center gap-1.5 group text-sm ${
                             selectedDatabase === db.id.toString()
                               ? darkMode
                                 ? 'bg-blue-900 text-blue-300'
@@ -325,7 +306,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className={`border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} pt-2 space-y-1`}>
                 {/* User Profile Display */}
                 {user && (
-                  <div className={`${collapsed ? 'flex justify-center' : 'px-2'} py-2 mb-1 rounded-lg transition-colors relative group ${
+                  <div className={`${collapsed ? 'flex justify-center' : 'px-1.5'} py-2 mb-1 rounded-lg transition-colors relative group ${
                     darkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'
                   }`}>
                     {collapsed ? (
@@ -390,7 +371,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       onSelectDatabase(null);
                       setIsOpen(false);
                     }}
-                    className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-between gap-1.5'} px-2.5 py-1.5 rounded-lg transition-colors text-sm ${
+                    className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-between gap-1.5'} px-1.5 py-1.5 rounded-lg transition-colors text-sm ${
                       selectedMenu === 'history' && !selectedDatabase
                         ? darkMode
                           ? 'bg-blue-900 text-blue-300'
@@ -432,7 +413,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <div className="relative">
                   <button
                     onClick={() => setShowFeatureUpdates(!showFeatureUpdates)}
-                    className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-between gap-1.5'} px-2.5 py-1.5 rounded-lg transition-colors text-sm ${
+                    className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-between gap-1.5'} px-1.5 py-1.5 rounded-lg transition-colors text-sm ${
                       showFeatureUpdates
                         ? darkMode
                           ? 'bg-blue-900/50 text-blue-300'
@@ -456,7 +437,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded-full ${
                         darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-600'
                       }`}>
-                        3
+                        {getActiveNotificationCount()}
                       </span>
                     )}
                   </button>
@@ -468,7 +449,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         className="fixed inset-0 z-40 bg-black/30 dark:bg-black/50 transition-opacity duration-150 animate-in fade-in"
                         onClick={() => setShowFeatureUpdates(false)}
                       />
-                      <div className={`fixed ${collapsed ? 'left-[72px]' : 'left-[265px]'} bottom-16 z-50 w-80 transform-gpu will-change-transform animate-in fade-in zoom-in-95 duration-150 shadow-2xl rounded-3xl overflow-hidden border ${
+                      <div className={`fixed left-4 right-4 sm:right-auto ${collapsed ? 'sm:left-[76px]' : 'sm:left-[200px]'} bottom-16 z-50 sm:w-80 transform-gpu will-change-transform animate-in fade-in zoom-in-95 duration-150 shadow-2xl rounded-3xl overflow-hidden border ${
                         darkMode ? 'bg-[#18181b] border-gray-800' : 'bg-white border-gray-200'
                       }`}>
                         <NotificationList darkMode={darkMode} className="w-full border-none shadow-none" />
@@ -480,7 +461,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {/* Dark Mode Toggle */}
                 <button
                   onClick={(e) => toggleDarkMode(e)}
-                  className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-between'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
+                  className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-between gap-1.5'} px-1.5 py-1.5 rounded-lg transition-colors text-sm ${
                     darkMode
                       ? 'text-gray-300 hover:bg-gray-700'
                       : 'text-gray-700 hover:bg-gray-100'
@@ -491,20 +472,18 @@ const Sidebar: React.FC<SidebarProps> = ({
                     darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />
                   ) : (
                     <>
-                      <div className="flex items-center gap-2">
-                        {darkMode ? (
-                          <Sun className="w-4 h-4" />
-                        ) : (
-                          <Moon className="w-4 h-4" />
-                        )}
-                        <span className="font-medium whitespace-nowrap">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="relative flex items-center justify-center shrink-0">
+                          {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                        </div>
+                        <span className="font-medium truncate text-xs sm:text-sm">
                           {darkMode ? 'Light' : 'Dark'}
                         </span>
                       </div>
                       <div
                         className={`w-8 h-5 rounded-full transition-colors ${
                           darkMode ? 'bg-blue-600' : 'bg-gray-300'
-                        } relative`}
+                        } relative shrink-0`}
                       >
                         <div
                           className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
@@ -519,15 +498,21 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {/* Logout Button */}
                 <button
                   onClick={() => setShowLogoutConfirm(true)}
-                  className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-2'} px-2 py-1.5 rounded-lg transition-colors text-sm ${
+                  className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-between gap-1.5'} px-1.5 py-1.5 rounded-lg transition-colors text-sm ${
                     darkMode
                       ? 'text-gray-300 hover:bg-red-900 hover:text-red-300'
                       : 'text-gray-700 hover:bg-red-50 hover:text-red-600'
                   }`}
                   title={collapsed ? 'Logout' : undefined}
                 >
-                  <Home className="w-4 h-4" />
-                  {!collapsed && <span className="font-medium whitespace-nowrap">Logout</span>}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="relative flex items-center justify-center shrink-0">
+                      <Home className="w-4 h-4" />
+                    </div>
+                    {!collapsed && (
+                      <span className="font-medium truncate text-xs sm:text-sm">Logout</span>
+                    )}
+                  </div>
                 </button>
               </div>
             </div>
@@ -572,19 +557,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         show={showAvatarPicker}
         darkMode={darkMode}
         currentAvatar={userAvatar}
-        disabledAvatars={getDisabledAvatars()}
         onSelect={(newAvatar) => {
-          if (!user) return;
-          const userKey = user.name || user.email || 'User';
-          
           setUserAvatar(newAvatar);
-          // Save personal
-          localStorage.setItem(`user_avatar_${userKey}`, newAvatar);
-          // Update global
-          const globalMapStr = localStorage.getItem('global_used_avatars');
-          const globalMap = globalMapStr ? JSON.parse(globalMapStr) : {};
-          globalMap[userKey] = newAvatar;
-          localStorage.setItem('global_used_avatars', JSON.stringify(globalMap));
         }}
         onClose={() => setShowAvatarPicker(false)}
       />

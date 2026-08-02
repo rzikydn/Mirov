@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import { sql } from 'drizzle-orm';
+import { db } from './db';
 import authRoutes from './routes/authRoutes';
 import scheduleRoutes from './routes/scheduleRoutes';
 import noteRoutes from './routes/noteRoutes';
@@ -98,13 +100,22 @@ app.use('/api/databases', databaseRoutes);
 app.use('/api/setup', generalLimiter, setupRoutes); // Setup gets general limit for safety
 app.use('/api/history', historyRoutes);
 
-// Health check
-app.get('/health', (_req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'OK',
-    message: 'Server is running',
-    timestamp: new Date().toISOString()
-  });
+// Health check (checks both Express server and MySQL database connection)
+app.get(['/health', '/api/health'], async (_req: Request, res: Response) => {
+  try {
+    await db.execute(sql`SELECT 1`);
+    res.status(200).json({
+      status: 'OK',
+      message: 'Server and database are running',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'ERROR',
+      message: 'Database connection failed',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // 404 handler

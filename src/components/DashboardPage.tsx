@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './dashboards/Sidebar';
@@ -11,13 +11,14 @@ import { Database } from '../types/database';
 import { menuItems } from '../constants/dashboard';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useHistory } from '../context/HistoryContext';
+import { apiFetch, getCache, setCache } from '../services/offlineSync';
 
 const API_URL = `${import.meta.env.VITE_API_URL}/api/databases`;
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { addHistory } = useHistory();
-  const [databases, setDatabases] = useState<Database[]>([]);
+  const [databases, setDatabases] = useState<Database[]>(() => getCache<Database[]>('databases', []));
   const [selectedDatabase, setSelectedDatabase] = useState<string | null>(null);
   const [selectedMenu, setSelectedMenu] = useState<string | null>(menuItems[0].id);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -32,6 +33,12 @@ export default function DashboardPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Sync databases state with localStorage cache whenever databases change
+  useEffect(() => {
+    if (databases.length > 0) {
+      setCache('databases', databases);
+    }
+  }, [databases]);
 
   // 🧩 Ambil data user dari localStorage secara sinkron saat inisialisasi state
   const [user] = useState<{ name: string; email: string; role: 'SUPERUSER' | 'ADMIN' | 'UMUM' } | null>(() => {
@@ -53,11 +60,9 @@ export default function DashboardPage() {
     const storedUser = localStorage.getItem('user');
 
     if (!token || !storedUser) {
-      // Belum login → kembali ke halaman auth
       navigate('/auth', { replace: true });
     }
 
-    // Listen for popstate (browser back/forward) and recheck auth
     const handlePopState = () => {
       const currentToken = localStorage.getItem('token');
       if (!currentToken) {
@@ -69,119 +74,113 @@ export default function DashboardPage() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [navigate]);
 
-  // 🧱 Fetch databases from backend
-  useEffect(() => {
-    const fetchDatabases = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
-      try {
-        const response = await fetch(API_URL, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.data) {
-            setDatabases(result.data);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching databases:', error);
-      }
-    };
-
-    fetchDatabases();
-  }, []);
-
-  const handleCreateDatabase = async () => {
+  // 🧱 Fetch databases from backend with offline fallback & sync event listener
+  const fetchDatabases = useCallback(async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
+    const { ok, data } = await apiFetch<{ success?: boolean; data?: Database[] }>(API_URL, {}, 'databases');
+    if (ok && data && data.data) {
+      setDatabases(data.data);
+      setCache('databases', data.data);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDatabases();
+
+    // Re-fetch databases when offline queue is synced
+    const handleDataSynced = () => {
+      fetchDatabases();
+    };
+
+    window.addEventListener('app:data-synced', handleDataSynced);
+    return () => window.removeEventListener('app:data-synced', handleDataSynced);
+  }, [fetchDatabases]);
+
+  const handleCreateDatabase = async () => {
     const colKey = `title-${Date.now()}`;
     const nextNumber = databases.length + 1;
+    const tempId = Date.now();
 
-    try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: `New database ${nextNumber}`,
-          columns: [{ key: colKey, label: 'Name', type: 'text' }],
-          rows: [
-            { id: `row-1-${Date.now()}`, properties: { [colKey]: { value: '', type: 'text' } } },
-            { id: `row-2-${Date.now() + 1}`, properties: { [colKey]: { value: '', type: 'text' } } },
-            { id: `row-3-${Date.now() + 2}`, properties: { [colKey]: { value: '', type: 'text' } } },
-            { id: `row-4-${Date.now() + 3}`, properties: { [colKey]: { value: '', type: 'text' } } },
-          ]
-        })
+    const payload = {
+      name: `New database ${nextNumber}`,
+      columns: [{ key: colKey, label: 'Name', type: 'text' }],
+      rows: [
+        { id: `row-1-${Date.now()}`, properties: { [colKey]: { value: '', type: 'text' } } },
+        { id: `row-2-${Date.now() + 1}`, properties: { [colKey]: { value: '', type: 'text' } } },
+        { id: `row-3-${Date.now() + 2}`, properties: { [colKey]: { value: '', type: 'text' } } },
+        { id: `row-4-${Date.now() + 3}`, properties: { [colKey]: { value: '', type: 'text' } } },
+      ]
+    };
+
+    // Optimistic UI Update
+    const newDbLocal: Database = {
+      id: tempId,
+      name: payload.name,
+      columns: payload.columns,
+      rows: payload.rows as any,
+    };
+
+    setDatabases((prev) => {
+      const updated = [...prev, newDbLocal];
+      setCache('databases', updated);
+      return updated;
+    });
+    setSelectedDatabase(tempId.toString());
+
+    if (user) {
+      addHistory({
+        userName: user.name,
+        userRole: user.role,
+        action: 'create',
+        target: 'database',
+        targetName: payload.name,
+        description: `${user.name} added a database`
       });
+    }
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data) {
-          // Add to history
-          if (user) {
-            await addHistory({
-              userName: user.name,
-              userRole: user.role,
-              action: 'create',
-              target: 'database',
-              targetName: result.data.name,
-              description: `${user.name} added a database`
-            });
-          }
-          setDatabases((prev) => [...prev, result.data]);
-          setSelectedDatabase(result.data.id.toString());
-        }
-      }
-    } catch (error) {
-      console.error('Error creating database:', error);
+    const { ok, data } = await apiFetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    if (ok && data && data.data && data.data.id) {
+      // Server returned real ID -> update local database ID
+      const realDb = data.data;
+      setDatabases((prev) => prev.map((db) => (db.id === tempId ? realDb : db)));
+      setSelectedDatabase(realDb.id.toString());
     }
   };
 
   const handleDeleteDatabase = async (id: string) => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    // Find database name before deleting
     const dbToDelete = databases.find((db) => db.id.toString() === id);
 
-    try {
-      const response = await fetch(`${API_URL}/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+    // Optimistic UI Update
+    setDatabases((prev) => {
+      const updated = prev.filter((db) => db.id.toString() !== id);
+      setCache('databases', updated);
+      return updated;
+    });
 
-      if (response.ok) {
-        // Add to history
-        if (user && dbToDelete) {
-          await addHistory({
-            userName: user.name,
-            userRole: user.role,
-            action: 'delete',
-            target: 'database',
-            targetName: dbToDelete.name,
-            description: `${user.name} deleted a database`
-          });
-        }
-        setDatabases((prev) => prev.filter((db) => db.id.toString() !== id));
-        if (selectedDatabase === id) {
-          setSelectedDatabase(null);
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting database:', error);
+    if (selectedDatabase === id) {
+      setSelectedDatabase(null);
     }
+
+    if (user && dbToDelete) {
+      addHistory({
+        userName: user.name,
+        userRole: user.role,
+        action: 'delete',
+        target: 'database',
+        targetName: dbToDelete.name,
+        description: `${user.name} deleted a database`
+      });
+    }
+
+    await apiFetch(`${API_URL}/${id}`, {
+      method: 'DELETE'
+    });
   };
 
   // 🚪 Logout
@@ -192,8 +191,6 @@ export default function DashboardPage() {
   };
 
   const currentDb = databases.find((d) => d.id.toString() === selectedDatabase) || null;
-
-
 
   return (
     <div className={`flex h-screen relative overflow-hidden ${darkMode ? 'bg-gray-900' : ''}`}>
@@ -214,6 +211,7 @@ export default function DashboardPage() {
         user={user}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
+        onRefreshParentData={fetchDatabases}
       />
 
       <div

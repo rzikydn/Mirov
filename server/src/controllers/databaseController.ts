@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, isNull } from 'drizzle-orm';
 import { db } from '../db';
 import { databases, users } from '../db/schema';
 
@@ -27,6 +27,7 @@ export const getAllDatabases = async (_req: Request, res: Response): Promise<voi
       })
       .from(databases)
       .leftJoin(users, eq(databases.createdBy, users.id))
+      .where(isNull(databases.deletedAt))
       .orderBy(desc(databases.createdAt));
 
     // Parse JSON fields (MySQL returns them as strings)
@@ -235,7 +236,8 @@ export const deleteDatabase = async (req: Request, res: Response): Promise<void>
     }
 
     await db
-      .delete(databases)
+      .update(databases)
+      .set({ deletedAt: new Date() })
       .where(eq(databases.id, parseInt(id)));
 
     res.json({ success: true, message: 'Database deleted successfully' });

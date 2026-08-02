@@ -15,6 +15,7 @@ import {
   ExpandableContent,
   ExpandableTrigger,
 } from '@/components/ui/expandable';
+import { apiFetch } from '@/services/offlineSync';
 
 interface TeamNotesProps {
   darkMode: boolean;
@@ -156,22 +157,14 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
     });
   };
 
-  // Fetch notes dari backend
+  // Fetch notes dari backend dengan offline fallback
   const fetchNotes = async () => {
-    try {
-      const res = await fetch(API_URL, {
-        headers: getAuthHeaders()
-      });
-      if (!res.ok) {
-        return;
-      }
-      const data = await res.json();
+    const { ok, data } = await apiFetch(API_URL, {}, 'notes');
+    if (ok && data) {
       const list = Array.isArray(data) ? data : (data.data && Array.isArray(data.data) ? data.data : null);
       if (list) {
         updateNotesAndCache(list);
       }
-    } catch (err) {
-      console.error("Failed to fetch notes:", err);
     }
   };
 
@@ -191,33 +184,26 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
     // Optimistic UI insert (INSTANT 0ms)
     updateNotesAndCache((prev) => [newNote, ...prev]);
 
-    try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ content: note.text, color: note.color }),
+    if (user) {
+      addHistory({
+        userName: user.name,
+        userRole: user.role,
+        action: 'create',
+        target: 'note',
+        targetName: note.text.substring(0, 30) + (note.text.length > 30 ? '...' : ''),
+        description: `${user.name} added a note`
       });
-      const data = await res.json();
-      if (data.success && data.data) {
-        // Swap temp note with saved note from server
-        updateNotesAndCache((prev) =>
-          prev.map((n) => (n.id === tempId ? { ...data.data, content: data.data.content || note.text, text: data.data.content || note.text } : n))
-        );
-        // Non-blocking history log
-        if (user) {
-          addHistory({
-            userName: user.name,
-            userRole: user.role,
-            action: 'create',
-            target: 'note',
-            targetName: note.text.substring(0, 30) + (note.text.length > 30 ? '...' : ''),
-            description: `${user.name} added a note`
-          });
-        }
-      }
-    } catch (err) {
-      console.error("Failed to create note:", err);
-      fetchNotes(); // Revert on failure
+    }
+
+    const { ok, data } = await apiFetch(API_URL, {
+      method: "POST",
+      body: JSON.stringify({ content: note.text, color: note.color }),
+    });
+
+    if (ok && data && data.data && data.data.id) {
+      updateNotesAndCache((prev) =>
+        prev.map((n) => (n.id === tempId ? { ...data.data, content: data.data.content || note.text, text: data.data.content || note.text } : n))
+      );
     }
   };
 
@@ -228,35 +214,25 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       prev.map((n) => (n.id === id ? { ...n, content: note.text, text: note.text, color: note.color, favorite: note.favorite } : n))
     );
 
-    try {
-      const res = await fetch(`${API_URL}/${id}`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          content: note.text,
-          color: note.color,
-          favorite: note.favorite
-        }),
+    if (user) {
+      addHistory({
+        userName: user.name,
+        userRole: user.role,
+        action: 'edit',
+        target: 'note',
+        targetName: note.text.substring(0, 30) + (note.text.length > 30 ? '...' : ''),
+        description: `${user.name} changed a note`
       });
-      const data = await res.json();
-      if (data.success) {
-        if (user) {
-          addHistory({
-            userName: user.name,
-            userRole: user.role,
-            action: 'edit',
-            target: 'note',
-            targetName: note.text.substring(0, 30) + (note.text.length > 30 ? '...' : ''),
-            description: `${user.name} changed a note`
-          });
-        }
-      } else {
-        fetchNotes(); // Revert on failure
-      }
-    } catch (err) {
-      console.error("Failed to update note:", err);
-      fetchNotes();
     }
+
+    await apiFetch(`${API_URL}/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        content: note.text,
+        color: note.color,
+        favorite: note.favorite
+      }),
+    });
   };
 
   // Realtime Optimistic Hapus note (0ms UI response)
@@ -264,39 +240,35 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
     // Optimistic UI delete (INSTANT 0ms)
     updateNotesAndCache((prev) => prev.filter((n) => n.id !== id));
 
-    try {
-      const res = await fetch(`${API_URL}/${id}`, {
-        method: "DELETE",
-        headers: getAuthHeaders()
+    if (user) {
+      addHistory({
+        userName: user.name,
+        userRole: user.role,
+        action: 'delete',
+        target: 'note',
+        description: `${user.name} deleted a note`
       });
-      if (res.ok) {
-        if (user) {
-          addHistory({
-            userName: user.name,
-            userRole: user.role,
-            action: 'delete',
-            target: 'note',
-            description: `${user.name} deleted a note`
-          });
-        }
-      } else {
-        fetchNotes(); // Revert on failure
-      }
-    } catch (err) {
-      console.error("Failed to delete note:", err);
-      fetchNotes();
     }
+
+    await apiFetch(`${API_URL}/${id}`, {
+      method: "DELETE"
+    });
   };
 
-  // Realtime Polling & Window Focus Listener for 100% sync
+  // Realtime Polling & Window Focus Listener & Data Synced Listener
   useEffect(() => {
     fetchNotes();
     const interval = setInterval(fetchNotes, 3000);
     const handleFocus = () => fetchNotes();
+    const handleDataSynced = () => fetchNotes();
+
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('app:data-synced', handleDataSynced);
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('app:data-synced', handleDataSynced);
     };
   }, []);
 

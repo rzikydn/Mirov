@@ -70,18 +70,9 @@ const SmoothInput = React.forwardRef((
     if (!input || !measureSpan) return;
 
     const styles = window.getComputedStyle(input);
-    const isPassword = type === "password" || (styles as any).webkitTextSecurity === "disc";
+    const isPassword = type === "password" || (styles as any).webkitTextSecurity === "disc" || (style as any)?.WebkitTextSecurity === "disc";
 
-    let fontSize = styles.fontSize;
-    if (
-      PASSWORD_CHAR === "\u2022" &&
-      isPassword &&
-      !navigator.userAgent.match(/chrome|chromium|crios/i)
-    ) {
-      fontSize = `${parseFloat(fontSize) + 6.25}px`;
-    }
-
-    measureSpan.style.font = `${styles.fontStyle} ${styles.fontWeight} ${fontSize} ${styles.fontFamily}`;
+    measureSpan.style.font = `${styles.fontStyle} ${styles.fontWeight} ${styles.fontSize} ${styles.fontFamily}`;
     measureSpan.style.letterSpacing = styles.letterSpacing;
     measureSpan.style.fontFeatureSettings = styles.fontFeatureSettings;
     measureSpan.style.fontVariationSettings = styles.fontVariationSettings;
@@ -113,7 +104,7 @@ const SmoothInput = React.forwardRef((
     const caretIndex = selectionStart;
     
     const styles = window.getComputedStyle(target);
-    const isPassword = type === "password" || (styles as any).webkitTextSecurity === "disc";
+    const isPassword = type === "password" || (styles as any).webkitTextSecurity === "disc" || (style as any)?.WebkitTextSecurity === "disc";
     
     const textBeforeCaret = isPassword
       ? PASSWORD_CHAR.repeat(caretIndex)
@@ -321,7 +312,43 @@ export default function AuthPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
         }
-      );
+      ).catch(() => null);
+
+      if (!res || res.status >= 500) {
+        // Trigger yellow offline banner immediately for server/database error
+        window.dispatchEvent(new CustomEvent('app:server-down'));
+
+        // Attempt Offline Login from cached credentials
+        try {
+          const cachedRaw = localStorage.getItem('mirov_offline_auth_cache');
+          if (cachedRaw) {
+            const cached = JSON.parse(cachedRaw);
+            if (cached.email === formData.email && cached.password === formData.password) {
+              if (rememberMe) {
+                localStorage.setItem('rememberedEmail', formData.email);
+                localStorage.setItem('rememberedPassword', formData.password);
+              }
+              setUser(cached.user);
+              setToken(cached.token);
+              localStorage.setItem("token", cached.token);
+              localStorage.setItem("user", JSON.stringify(cached.user));
+              localStorage.setItem("lastActivity", Date.now().toString());
+
+              setMessage({ type: 'success', text: 'Offline Login successful! (Offline Mode)' });
+              setTimeout(() => {
+                navigate("/dashboard", { replace: true });
+              }, 1200);
+              return;
+            }
+          }
+        } catch {
+          // Fallthrough if cache reading fails
+        }
+      }
+
+      if (!res) {
+        throw new Error("Unable to connect to server. Please check your connection.");
+      }
 
       const data = await res.json();
 
@@ -331,6 +358,14 @@ export default function AuthPage() {
 
       const userData = data.data?.user || data.user;
       const tokenData = data.data?.token || data.token;
+
+      // Cache credentials for future offline login
+      localStorage.setItem('mirov_offline_auth_cache', JSON.stringify({
+        email: formData.email,
+        password: formData.password,
+        user: userData,
+        token: tokenData
+      }));
 
       if (rememberMe) {
         localStorage.setItem('rememberedEmail', formData.email);
@@ -379,7 +414,7 @@ export default function AuthPage() {
             animate={{ opacity: 1, y: 20, x: "-50%" }}
             exit={{ opacity: 0, y: -50, x: "-50%" }}
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-between w-fit max-w-[340px] gap-6 border rounded-xl px-4 py-2.5 shadow-lg shadow-black/5 ${
+            className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-between w-fit max-w-[90vw] gap-4 border rounded-xl px-4 py-2.5 shadow-lg shadow-black/5 ${
               message.type === 'success' 
                 ? 'bg-[#E8F8F0] border-[#A2E0C1]' 
                 : 'bg-[#FDF2F2] border-[#FDE8E8]'
@@ -399,7 +434,7 @@ export default function AuthPage() {
                   </svg>
                 </div>
               )}
-              <span className={`font-jakarta font-medium text-[14px] ${
+              <span className={`font-jakarta font-medium text-[13px] sm:text-[14px] whitespace-nowrap ${
                 message.type === 'success' ? 'text-[#065F46]' : 'text-[#9B1C1C]'
               }`}>
                 {message.text}
@@ -555,6 +590,10 @@ export default function AuthPage() {
             )}
           </button>
         </form>
+
+        <p className="text-[11px] text-gray-400 font-jakarta text-center mt-6 select-none">
+          © 2026 BSMR. All rights reserved.
+        </p>
         </div>
       </div>
     </div>
