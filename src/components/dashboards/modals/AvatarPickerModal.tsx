@@ -17,7 +17,7 @@ interface AvatarPickerModalProps {
 }
 
 const safeParams = '&mouth=default,smile,twinkle&eyes=default,happy,wink';
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:5000';
 
 const avatarOptions = [
   // --- Avatars (Pilihan Cewek) ---

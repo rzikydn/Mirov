@@ -1347,7 +1347,7 @@ const DatabaseTable: React.FC<DatabaseTableProps> = ({
     overscan: 10,
     measureElement: (el) => {
       if (!el) return 0;
-      return el.getBoundingClientRect().height;
+      return Math.round(el.getBoundingClientRect().height);
     },
   });
 

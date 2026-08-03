@@ -32,7 +32,7 @@ function formatDateTime(date: Date | string | number) {
   return { line1: `${hari}, ${tgl} ${bulan} ${tahun}`, line2: `${jam}.${menit} WIB` }
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:5000';
 
 function getUserAvatarUrl(userName?: string, userAvatarsMap: Record<string, string> = {}): string {
   if (!userName) return 'https://api.dicebear.com/7.x/avataaars/svg?seed=User&backgroundColor=b6e3f4&mouth=default,smile,twinkle&eyes=default,happy,wink';

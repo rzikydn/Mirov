@@ -1,7 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from '@vercel/speed-insights/react';
 import AuthPage from './components/Authpage.tsx';
 import DashboardPage from './components/DashboardPage.tsx';
 import DebugDashboard from './components/DebugDashboard.tsx';
@@ -11,8 +9,6 @@ function App() {
   return (
     <Router>
       <OfflineBanner />
-      <Analytics />
-      <SpeedInsights />
       <Toaster
         position="top-right"
         toastOptions={{
