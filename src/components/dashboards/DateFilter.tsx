@@ -218,7 +218,7 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({
           boxShadow: darkMode
             ? '0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)'
             : '0 20px 60px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.04)',
-          fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, 'Apple Color Emoji', Arial, sans-serif, 'Segoe UI Emoji', 'Segoe UI Symbol'",
         }}
       >
         {/* Navigation Header */}

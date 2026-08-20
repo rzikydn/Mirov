@@ -11,6 +11,7 @@ import noteRoutes from './routes/noteRoutes';
 import databaseRoutes from './routes/databaseRoutes';
 import setupRoutes from './routes/setupRoutes';
 import historyRoutes from './routes/historyRoutes';
+import chatbotRoutes from './routes/chatbotRoutes';
 
 dotenv.config();
 
@@ -99,6 +100,7 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/databases', databaseRoutes);
 app.use('/api/setup', generalLimiter, setupRoutes); // Setup gets general limit for safety
 app.use('/api/history', historyRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 // Health check (checks both Express server and MySQL database connection)
 app.get(['/health', '/api/health'], async (_req: Request, res: Response) => {

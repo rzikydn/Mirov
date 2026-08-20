@@ -17,15 +17,32 @@ import {
   Calendar as CalendarIcon,
   Settings,
   Bell,
+  MoreVertical,
+  Code,
+  Cpu,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { Database } from '../../types/database';
 import { menuItems } from '../../constants/dashboard';
 import DeleteModal from './modals/DeleteModal';
 import LogoutModal from './modals/LogoutModal';
 import AvatarPickerModal from './modals/AvatarPickerModal';
+import ApiIntegrationModal from './modals/ApiIntegrationModal';
+import SettingPromptDialog from './modals/SettingPromptDialog';
+import InstallationDialog from './modals/InstallationDialog';
 import BsmrLogo from '../BsmrLogo';
 import { useHistory } from '../../context/HistoryContext';
 import { NotificationList, getActiveNotificationCount } from '../animate-ui/components/community/notification-list';
+import { BotIcon } from '../ui/BotIcon';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 
 interface SidebarProps {
   databases: Database[];
@@ -69,6 +86,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [showFeatureUpdates, setShowFeatureUpdates] = useState(false);
+  const [showApiModal, setShowApiModal] = useState(false);
+  const [showSettingPromptDialog, setShowSettingPromptDialog] = useState(false);
+  const [showInstallationDialog, setShowInstallationDialog] = useState(false);
   
   // User Avatar state synchronized with user record and event listener
   const [userAvatar, setUserAvatar] = useState<string>('');
@@ -92,6 +112,25 @@ const Sidebar: React.FC<SidebarProps> = ({
       window.removeEventListener('userAvatarUpdated', syncUserAvatar);
     };
   }, [syncUserAvatar]);
+
+  // ponytail: track unread chat state to show/hide blue dot on AI Chatbot button; upgrade to realtime stream when backend API ready
+  const [hasUnreadChat, setHasUnreadChat] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const readIds = JSON.parse(localStorage.getItem('mirov_read_chat_sessions') || '[]');
+    return !readIds.includes('session-1');
+  });
+
+  React.useEffect(() => {
+    const syncUnread = () => {
+      const readIds = JSON.parse(localStorage.getItem('mirov_read_chat_sessions') || '[]');
+      setHasUnreadChat(!readIds.includes('session-1'));
+    };
+    syncUnread();
+    window.addEventListener('chatReadStatusUpdated', syncUnread);
+    return () => {
+      window.removeEventListener('chatReadStatusUpdated', syncUnread);
+    };
+  }, []);
 
   const { history } = useHistory();
 
@@ -201,6 +240,104 @@ const Sidebar: React.FC<SidebarProps> = ({
                     )}
                   </button>
                 ))}
+
+                {/* Tombol AI Chatbot Ke-2 (Top Navigation List) */}
+                {user && user.role !== 'UMUM' && (
+                  <button
+                    onClick={() => {
+                      onSelectMenu('chatbot-top');
+                      onSelectDatabase(null);
+                      setIsOpen(false);
+                    }}
+                    className={`w-full ${collapsed ? 'flex justify-center' : 'flex items-center justify-between text-left'} px-1.5 py-1.5 rounded-lg transition-colors duration-150 text-sm ${
+                      selectedMenu === 'chatbot-top' && !selectedDatabase
+                        ? darkMode
+                          ? 'bg-blue-900 text-blue-300'
+                          : 'bg-blue-50 text-[#2563eb]'
+                        : darkMode
+                          ? 'text-gray-300 hover:bg-gray-700 hover:text-blue-300'
+                          : 'text-gray-700 hover:bg-blue-50 hover:text-[#2563eb]'
+                    }`}
+                    title={collapsed ? 'AI Chatbot' : undefined}
+                  >
+                    {collapsed ? (
+                      <div className="relative flex items-center justify-center shrink-0">
+                        <BotIcon size={20} className="w-[20px] h-[20px] text-current" />
+                        {hasUnreadChat && (
+                          <span className="absolute -top-1 -left-1 flex h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-white dark:ring-gray-800" />
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <span className="whitespace-nowrap flex items-center gap-2 min-w-0">
+                          <div className="relative flex items-center justify-center shrink-0">
+                            <BotIcon size={20} className="w-[20px] h-[20px] text-current shrink-0" />
+                            {hasUnreadChat && (
+                              <span className="absolute -top-1 -left-1 flex h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-white dark:ring-gray-800" />
+                            )}
+                          </div>
+                          <span className="overflow-hidden font-medium">AI Chatbot</span>
+                        </span>
+                        {user && (user.role === 'SUPERUSER' || user.name?.toLowerCase().includes('superuser')) && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                }}
+                                className="p-1 rounded hover:bg-blue-200/50 dark:hover:bg-blue-800/50 transition-colors shrink-0 flex items-center justify-center text-current cursor-pointer"
+                                title="Chatbot Options"
+                              >
+                                <MoreVertical className="w-4 h-4 opacity-80 hover:opacity-100" />
+                              </div>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-52" side="right" align="start" sideOffset={8}>
+                              <DropdownMenuLabel className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
+                                <BotIcon size={16} />
+                                Chatbot Options
+                              </DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuGroup>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowSettingPromptDialog(true);
+                                  }}
+                                  className="cursor-pointer font-medium"
+                                >
+                                  <Settings className="w-4 h-4 mr-2 text-blue-500" />
+                                  Setting & Prompt
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowInstallationDialog(true);
+                                  }}
+                                  className="cursor-pointer font-medium"
+                                >
+                                  <Code className="w-4 h-4 mr-2 text-emerald-500" />
+                                  Installation
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowApiModal(true);
+                                  }}
+                                  className="cursor-pointer font-medium"
+                                >
+                                  <Cpu className="w-4 h-4 mr-2 text-amber-500" />
+                                  API Integration
+                                </DropdownMenuItem>
+                              </DropdownMenuGroup>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </>
+                    )}
+                  </button>
+                )}
               </nav>
 
               <div className="mb-3 flex-1">
@@ -363,6 +500,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
 
+
+
                 {/* History Button - Only for ADMIN and SUPERUSER */}
                 {user && user.role !== 'UMUM' && (
                   <button
@@ -396,7 +535,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         )}
                       </div>
                       {!collapsed && (
-                        <span className="font-medium truncate">History</span>
+                        <span className="font-medium truncate text-xs sm:text-sm">History</span>
                       )}
                     </div>
                     {!collapsed && history.length > 0 && (
@@ -561,6 +700,27 @@ const Sidebar: React.FC<SidebarProps> = ({
           setUserAvatar(newAvatar);
         }}
         onClose={() => setShowAvatarPicker(false)}
+      />
+
+      {/* API Integration Modal */}
+      <ApiIntegrationModal
+        show={showApiModal}
+        darkMode={darkMode}
+        onClose={() => setShowApiModal(false)}
+      />
+
+      {/* Setting & Prompt Dialog */}
+      <SettingPromptDialog
+        show={showSettingPromptDialog}
+        darkMode={darkMode}
+        onClose={() => setShowSettingPromptDialog(false)}
+      />
+
+      {/* Installation Dialog */}
+      <InstallationDialog
+        show={showInstallationDialog}
+        darkMode={darkMode}
+        onClose={() => setShowInstallationDialog(false)}
       />
     </>
   );

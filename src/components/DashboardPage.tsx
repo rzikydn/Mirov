@@ -6,6 +6,12 @@ import Header from './dashboards/Header';
 import DatabaseTable from './dashboards/DatabaseTable';
 import TeamNotes from './dashboards/TeamNotes';
 import HistoryPage from './dashboards/HistoryPage';
+import ChatbotDashboard from './dashboards/ChatbotDashboard';
+import StatisticCard7 from './ui/statistics-card-7';
+import TopQuestionsDonutChart from './ui/TopQuestionsDonutChart';
+import RagFileUploadCard from './ui/RagFileUploadCard';
+import PeakHoursLineChart from './ui/PeakHoursLineChart';
+import VisitorChatLogsWidget from './ui/VisitorChatLogsWidget';
 
 import { Database } from '../types/database';
 import { menuItems } from '../constants/dashboard';
@@ -231,6 +237,41 @@ export default function DashboardPage() {
                 <TeamNotes key="notes" darkMode={darkMode} />
               ) : selectedMenu === 'history' ? (
                 <HistoryPage key="history" darkMode={darkMode} />
+              ) : selectedMenu === 'chatbot-top' ? (
+                (user?.role === 'SUPERUSER' || user?.name?.toLowerCase().includes('superuser')) ? (
+                  <div key="chatbot-top-page" className={`w-full min-h-[calc(100vh-80px)] px-6 pt-7 pb-8 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+                    <div className="w-full flex flex-col gap-6">
+                      {/* Top Section: KPI Cards + Line Chart on left, Donut Chart aligned on right */}
+                      <div className="w-full flex flex-col xl:flex-row items-stretch gap-6">
+                        <div className="flex-1 min-w-0 flex flex-col gap-6">
+                          <StatisticCard7 darkMode={darkMode} />
+                          <PeakHoursLineChart darkMode={darkMode} />
+                        </div>
+                        <div className="shrink-0 w-full xl:w-[350px] flex flex-col">
+                          <TopQuestionsDonutChart darkMode={darkMode} className="h-full" />
+                        </div>
+                      </div>
+
+                      {/* Second Section: Visitor Chat Logs on left, RAG File Upload Card on right */}
+                      <div className="w-full flex flex-col xl:flex-row items-stretch gap-6">
+                        <div className="flex-1 min-w-0 flex flex-col">
+                          <VisitorChatLogsWidget darkMode={darkMode} />
+                        </div>
+                        <div className="shrink-0 w-full xl:w-[350px] flex flex-col">
+                          <RagFileUploadCard darkMode={darkMode} className="h-full" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div key="chatbot-admin-page" className={`w-full min-h-[calc(100vh-80px)] px-6 pt-7 pb-8 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+                    <div className="w-full h-full">
+                      <VisitorChatLogsWidget darkMode={darkMode} fullHeight={true} />
+                    </div>
+                  </div>
+                )
+              ) : selectedMenu === 'chatbot' ? (
+                <ChatbotDashboard key="chatbot-full-dashboard" darkMode={darkMode} />
               ) : null
             ) : currentDb ? (
               <DatabaseTable
@@ -249,6 +290,8 @@ export default function DashboardPage() {
           </AnimatePresence>
         </main>
       </div>
+      
+      {/* Floating AI Chatbot Widget removed from planner dashboard view per user request */}
     </div>
   );
 }

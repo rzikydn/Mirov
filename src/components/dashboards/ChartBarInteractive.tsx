@@ -277,10 +277,10 @@ export function ChartBarInteractive({
             onClick={() => setActiveChart("total")}
           >
             <span className={`text-[11px] sm:text-xs font-medium flex items-center gap-1.5 whitespace-nowrap ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              <span className="w-2 h-2 rounded-full bg-violet-500 inline-block" />
+              <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />
               All Contributions
             </span>
-            <span className="text-lg leading-none font-bold sm:text-2xl tracking-tight text-violet-400">
+            <span className={`text-lg leading-none font-bold sm:text-2xl tracking-tight ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
               {summaryMetrics.total.toLocaleString()}
             </span>
           </button>
@@ -372,14 +372,46 @@ export function ChartBarInteractive({
               }}
             />
             <ChartTooltip content={<CustomChartTooltip />} />
-            <Bar
-              key={`${activeChart}-${dateFilter?.startDate?.getTime() || 0}-${dateFilter?.endDate?.getTime() || 0}`}
-              dataKey={activeChart}
-              fill={barColor}
-              radius={[2, 2, 0, 0]}
-              isAnimationActive={false}
-              shape={<CustomAnimatedBar />}
-            />
+            {activeChart === 'total' ? (
+              <>
+                <Bar
+                  key={`created-stacked-${dateFilter?.startDate?.getTime() || 0}`}
+                  dataKey="created"
+                  stackId="all"
+                  fill="#10B981"
+                  radius={[0, 0, 0, 0]}
+                  isAnimationActive={false}
+                  shape={<CustomAnimatedBar />}
+                />
+                <Bar
+                  key={`edited-stacked-${dateFilter?.startDate?.getTime() || 0}`}
+                  dataKey="edited"
+                  stackId="all"
+                  fill="#3B82F6"
+                  radius={[0, 0, 0, 0]}
+                  isAnimationActive={false}
+                  shape={<CustomAnimatedBar />}
+                />
+                <Bar
+                  key={`deleted-stacked-${dateFilter?.startDate?.getTime() || 0}`}
+                  dataKey="deleted"
+                  stackId="all"
+                  fill="#F43F5E"
+                  radius={[2, 2, 0, 0]}
+                  isAnimationActive={false}
+                  shape={<CustomAnimatedBar />}
+                />
+              </>
+            ) : (
+              <Bar
+                key={`${activeChart}-${dateFilter?.startDate?.getTime() || 0}-${dateFilter?.endDate?.getTime() || 0}`}
+                dataKey={activeChart}
+                fill={barColor}
+                radius={[2, 2, 0, 0]}
+                isAnimationActive={false}
+                shape={<CustomAnimatedBar />}
+              />
+            )}
           </BarChart>
         </ChartContainer>
       </CardContent>
