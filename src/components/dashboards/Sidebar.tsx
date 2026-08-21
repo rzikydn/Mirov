@@ -32,6 +32,7 @@ import SettingPromptDialog from './modals/SettingPromptDialog';
 import InstallationDialog from './modals/InstallationDialog';
 import BsmrLogo from '../BsmrLogo';
 import { useHistory } from '../../context/HistoryContext';
+import { getVisitorChatSessions, getUnreadVisitorChatSessionsCount, fetchVisitorChatSessionsAsync } from '../../services/visitorChatLogsService';
 import { NotificationList, getActiveNotificationCount } from '../animate-ui/components/community/notification-list';
 import { BotIcon } from '../ui/BotIcon';
 import {
@@ -113,22 +114,59 @@ const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [syncUserAvatar]);
 
-  // ponytail: track unread chat state to show/hide blue dot on AI Chatbot button; upgrade to realtime stream when backend API ready
-  const [hasUnreadChat, setHasUnreadChat] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    const readIds = JSON.parse(localStorage.getItem('mirov_read_chat_sessions') || '[]');
-    return !readIds.includes('session-1');
+  // Track unread chat logs count in real-time to show notification number badge on AI Chatbot sidebar button
+  const [chatLogsCount, setChatLogsCount] = useState<number>(() => {
+    return getUnreadVisitorChatSessionsCount();
   });
 
   React.useEffect(() => {
-    const syncUnread = () => {
-      const readIds = JSON.parse(localStorage.getItem('mirov_read_chat_sessions') || '[]');
-      setHasUnreadChat(!readIds.includes('session-1'));
+    const syncLogsCount = async () => {
+      try {
+        const fresh = await fetchVisitorChatSessionsAsync();
+        if (Array.isArray(fresh)) {
+          const unreadCount = fresh.filter((s) => s && s.isUnread !== false).length;
+          setChatLogsCount(unreadCount);
+          return;
+        }
+      } catch (e) {}
+      setChatLogsCount(getUnreadVisitorChatSessionsCount());
     };
-    syncUnread();
-    window.addEventListener('chatReadStatusUpdated', syncUnread);
+
+    syncLogsCount();
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && (event.data.type === 'BSMR_CHAT_LOGS_UPDATED' || event.data.type === 'BSMR_ADMIN_REPLIED' || event.data.type === 'BSMR_CHAT_LOGS_UPDATED_BROADCAST')) {
+        syncLogsCount();
+      }
+    };
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        channel = new BroadcastChannel('bsmr_chat_sync_channel');
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'CHAT_LOGS_UPDATED' || event.data?.type === 'BSMR_CHAT_LOGS_UPDATED') {
+            syncLogsCount();
+          }
+        };
+      } catch (e) {}
+    }
+
+    window.addEventListener('bsmr_chat_logs_updated', syncLogsCount);
+    window.addEventListener('bsmr_visitor_chat_sessions_updated', syncLogsCount);
+    window.addEventListener('storage', syncLogsCount);
+    window.addEventListener('message', handleMessage);
+
+    // Polling fallback every 1.5 seconds so even when Admin is on any other page, new visitor chats instantly update the badge!
+    const interval = setInterval(syncLogsCount, 1500);
+
     return () => {
-      window.removeEventListener('chatReadStatusUpdated', syncUnread);
+      window.removeEventListener('bsmr_chat_logs_updated', syncLogsCount);
+      window.removeEventListener('bsmr_visitor_chat_sessions_updated', syncLogsCount);
+      window.removeEventListener('storage', syncLogsCount);
+      window.removeEventListener('message', handleMessage);
+      if (channel) channel.close();
+      clearInterval(interval);
     };
   }, []);
 
@@ -263,8 +301,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                     {collapsed ? (
                       <div className="relative flex items-center justify-center shrink-0">
                         <BotIcon size={20} className="w-[20px] h-[20px] text-current" />
-                        {hasUnreadChat && (
-                          <span className="absolute -top-1 -left-1 flex h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-white dark:ring-gray-800" />
+                        {chatLogsCount > 0 && (
+                          <span className={`absolute -top-1.5 -right-1.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-0.5 text-[8px] font-bold ring-2 ${
+                            darkMode
+                              ? 'bg-blue-600 text-white ring-gray-800'
+                              : 'bg-blue-600 text-white ring-white'
+                          }`}>
+                            {chatLogsCount}
+                          </span>
                         )}
                       </div>
                     ) : (
@@ -272,13 +316,18 @@ const Sidebar: React.FC<SidebarProps> = ({
                         <span className="whitespace-nowrap flex items-center gap-2 min-w-0">
                           <div className="relative flex items-center justify-center shrink-0">
                             <BotIcon size={20} className="w-[20px] h-[20px] text-current shrink-0" />
-                            {hasUnreadChat && (
-                              <span className="absolute -top-1 -left-1 flex h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-white dark:ring-gray-800" />
-                            )}
                           </div>
                           <span className="overflow-hidden font-medium">AI Chatbot</span>
                         </span>
-                        {user && (user.role === 'SUPERUSER' || user.name?.toLowerCase().includes('superuser')) && (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {chatLogsCount > 0 && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                              darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-600'
+                            }`}>
+                              {chatLogsCount}
+                            </span>
+                          )}
+                          {user && (user.role === 'SUPERUSER' || user.name?.toLowerCase().includes('superuser')) && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <div
@@ -334,6 +383,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}
+                        </div>
                       </>
                     )}
                   </button>

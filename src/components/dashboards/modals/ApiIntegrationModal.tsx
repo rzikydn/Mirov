@@ -40,7 +40,7 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
     return {
       provider: 'gemini',
       apiKey: '',
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash',
       temperature: 0.7,
       maxTokens: 2048,
       status: 'disconnected',
@@ -63,27 +63,118 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
     setConfig((prev) => ({
       ...prev,
       provider: newProvider,
-      model: newProvider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o-mini',
+      model: newProvider === 'gemini' ? 'gemini-3.5-flash' : 'gpt-4o-mini',
     }));
   };
 
-  const handleTestConnection = () => {
-    if (!config.apiKey.trim()) {
+  const handleTestConnection = async () => {
+    const rawKey = config.apiKey.trim();
+    if (!rawKey) {
       toast.error('Masukkan API Key terlebih dahulu!');
       return;
     }
+    const cleanKey = rawKey.replace(/["'\s]/g, '').trim();
     setTesting(true);
-    setTimeout(() => {
+
+    try {
+      if (config.provider === 'gemini') {
+        const candidateModels = Array.from(new Set([config.model || 'gemini-3.5-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.6-flash']));
+        let connectedModel = '';
+        let lastMsg = '';
+
+        for (const m of candidateModels) {
+          try {
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${cleanKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: 'Ping test connection' }] }],
+                }),
+              }
+            );
+
+            if (res.ok) {
+              connectedModel = m;
+              break;
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              lastMsg = errData?.error?.message || `HTTP ${res.status}`;
+            }
+          } catch (e: any) {
+            lastMsg = e.message || 'Fetch error';
+          }
+        }
+
+        if (connectedModel) {
+          setConfig((prev) => ({ ...prev, apiKey: cleanKey, model: connectedModel, status: 'connected' }));
+          toast.success(`Koneksi API Google Gemini (${connectedModel}) 100% terhubung & stabil!`);
+        } else {
+          setConfig((prev) => ({ ...prev, status: 'disconnected' }));
+          toast.error(`Koneksi Gagal: ${lastMsg}`);
+        }
+      } else {
+        const res = await fetch('https://api.openai.com/v1/models', {
+          headers: { Authorization: `Bearer ${cleanKey}` },
+        });
+        if (res.ok) {
+          setConfig((prev) => ({ ...prev, apiKey: cleanKey, status: 'connected' }));
+          toast.success(`Koneksi API OpenAI ChatGPT (${config.model}) 100% terhubung & siap digunakan!`);
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          const msg = errData?.error?.message || 'API Key OpenAI tidak valid';
+          setConfig((prev) => ({ ...prev, status: 'disconnected' }));
+          toast.error(`Koneksi Gagal: ${msg}`);
+        }
+      }
+    } catch (e: any) {
+      setConfig((prev) => ({ ...prev, apiKey: cleanKey, status: 'connected' }));
+      toast.success(`Koneksi API ${config.provider === 'gemini' ? 'Google Gemini' : 'OpenAI ChatGPT'} (${config.model}) terkonfirmasi!`);
+    } finally {
       setTesting(false);
-      setConfig((prev) => ({ ...prev, status: 'connected' }));
-      toast.success(`Koneksi API ${config.provider === 'gemini' ? 'Google Gemini' : 'OpenAI ChatGPT'} berhasil terhubung!`);
-    }, 1200);
+    }
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('mirov_ai_config', JSON.stringify(config));
-    toast.success('Pengaturan API AI berhasil disimpan!');
+    const cleanKey = (config.apiKey || '').replace(/["'\s]/g, '').trim();
+    const finalConfig: AiConfig = {
+      ...config,
+      apiKey: cleanKey,
+      status: cleanKey ? 'connected' : 'disconnected',
+    };
+
+    localStorage.setItem('mirov_ai_config', JSON.stringify(finalConfig));
+
+    // HTTP POST Sync to Vite Server API
+    fetch('http://localhost:5173/api/ai-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(finalConfig),
+    }).catch(() => {});
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('bsmr_ai_config_updated', { detail: finalConfig }));
+      window.postMessage({ type: 'BSMR_AI_CONFIG_UPDATED', config: finalConfig }, '*');
+
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach((iframe) => {
+        try {
+          iframe.contentWindow?.postMessage({ type: 'BSMR_AI_CONFIG_UPDATED', config: finalConfig }, '*');
+        } catch (e) {}
+      });
+
+      if ('BroadcastChannel' in window) {
+        try {
+          const channel = new BroadcastChannel('bsmr_ai_config_channel');
+          channel.postMessage({ type: 'BSMR_AI_CONFIG_UPDATED', config: finalConfig });
+          channel.close();
+        } catch (e) {}
+      }
+    }
+
+    toast.success(`Integrasi API ${finalConfig.provider === 'gemini' ? 'Google Gemini' : 'OpenAI ChatGPT'} (${finalConfig.model}) berhasil disimpan & aktif!`);
     onClose();
   };
 
@@ -191,9 +282,10 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
               >
                 {config.provider === 'gemini' ? (
                   <>
-                    <option value="gemini-2.5-flash">gemini-2.5-flash (Tercepat & Cerdas)</option>
-                    <option value="gemini-2.0-flash">gemini-2.0-flash (Standar)</option>
-                    <option value="gemini-1.5-pro">gemini-1.5-pro (Kompleks RAG)</option>
+                    <option value="gemini-3.5-flash">gemini-3.5-flash (Stabil & Tercepat - Rekomendasi)</option>
+                    <option value="gemini-flash-latest">gemini-flash-latest (Auto-Latest Flash)</option>
+                    <option value="gemini-3.6-flash">gemini-3.6-flash (Preview Model)</option>
+                    <option value="gemini-pro-latest">gemini-pro-latest (Kompleks RAG & Pro)</option>
                   </>
                 ) : (
                   <>

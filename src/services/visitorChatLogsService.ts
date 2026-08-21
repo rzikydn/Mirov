@@ -20,9 +20,11 @@ export interface ChatSession {
   summary: string;
   messages: ChatMessage[];
   isUnread?: boolean;
+  timestamp?: number;
 }
 
 const STORAGE_KEY = 'bsmr_visitor_chat_sessions';
+const DELETED_IDS_KEY = 'bsmr_deleted_visitor_session_ids';
 
 export const INITIAL_CHAT_SESSIONS: ChatSession[] = [];
 
@@ -32,57 +34,152 @@ let hasInitialized = false;
 
 // Purge Semua Sesi Test Lama secara Otomatis agar Demo & Production Mulai Bersih (Clean Slate)
 const LEGACY_TEST_IDS = [
-  "#4092", "#4088", "#4075", "#8246", "#2907", "#3309", "#7880", "#2295", "#9060", "#6718", "#6576",
+  "#5887", "#5589", "#4092", "#4088", "#4075", "#8246", "#2907", "#3309", "#7880", "#2295", "#9060", "#6718", "#6576",
   "#8319", "#6837", "#6332", "#5628", "#5239", "#8284", "#5362", "#4662",
   "#9585", "#9443", "#2281", "#6543", "#5871", "#3840", "#7091"
 ];
 
 const EXACT_LEGACY_IDS = new Set(["session-1", "session-2", "session-3", "session-esc-1", "session-esc-2"]);
 
+export function getDeletedSessionIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const data = localStorage.getItem(DELETED_IDS_KEY);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return new Set(parsed);
+    }
+  } catch (e) {}
+  return new Set();
+}
+
+export function markSessionsAsDeleted(ids: string[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const set = getDeletedSessionIds();
+    ids.forEach((id) => {
+      if (id) set.add(id);
+    });
+    const arr = Array.from(set);
+    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(arr));
+
+    // Send to server deleted sync
+    fetch(SYNC_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'DELETE', deletedIds: arr }),
+    }).catch(() => {});
+  } catch (e) {}
+}
+
 function filterOutLegacySessions(sessions: ChatSession[]): ChatSession[] {
   if (!Array.isArray(sessions)) return [];
+  const deletedSet = getDeletedSessionIds();
   return sessions.filter(
-    (s) => !LEGACY_TEST_IDS.includes(s.visitorId) && !EXACT_LEGACY_IDS.has(s.id)
+    (s) =>
+      s &&
+      s.id &&
+      !LEGACY_TEST_IDS.includes(s.visitorId) &&
+      !EXACT_LEGACY_IDS.has(s.id) &&
+      !deletedSet.has(s.id) &&
+      !deletedSet.has(s.visitorId)
   );
 }
 
-export function getVisitorChatSessions(): ChatSession[] {
-  if (hasInitialized) {
-    return cachedSessions;
+export function extractTimestampFromSession(s: ChatSession): number {
+  if (!s) return 0;
+  if (typeof s.timestamp === 'number' && !isNaN(s.timestamp) && s.timestamp > 0) {
+    return s.timestamp;
   }
+  if (s.id && typeof s.id === 'string' && s.id.includes('-')) {
+    const parts = s.id.split('-');
+    const num = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(num) && num > 1000000000000) {
+      return num;
+    }
+  }
+  if (s.time) {
+    const timeMatch = s.time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (timeMatch) {
+      let hours = parseInt(timeMatch[1], 10);
+      const minutes = parseInt(timeMatch[2], 10);
+      const ampm = timeMatch[3].toUpperCase();
+      if (ampm === 'PM' && hours < 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
+      const today = new Date();
+      today.setHours(hours, minutes, 0, 0);
+      let calculatedTime = today.getTime();
+      // If calculated time is in the future relative to current time, it refers to yesterday!
+      if (calculatedTime > Date.now() + 60000) {
+        calculatedTime -= 24 * 60 * 60 * 1000;
+      }
+      return calculatedTime;
+    }
+  }
+  return 0;
+}
+
+export function sortSessionsDescending(sessions: ChatSession[]): ChatSession[] {
+  if (!Array.isArray(sessions)) return [];
+  const filtered = filterOutLegacySessions(sessions);
+  return [...filtered].sort((a, b) => {
+    const tA = extractTimestampFromSession(a);
+    const tB = extractTimestampFromSession(b);
+    if (tB !== tA) {
+      return tB - tA; // Newest / latest timestamp at the very top!
+    }
+    return 0;
+  });
+}
+
+export function getVisitorChatSessions(): ChatSession[] {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
+    const data = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
     if (data !== null) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed)) {
-        const cleaned = filterOutLegacySessions(parsed);
+        const cleaned = sortSessionsDescending(parsed);
         cachedSessions = cleaned;
         hasInitialized = true;
-        if (cleaned.length !== parsed.length) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-        }
         return cleaned;
       }
     }
   } catch (e) {
     console.error('Failed to load visitor chat sessions:', e);
   }
-  cachedSessions = [];
+  cachedSessions = sortSessionsDescending(cachedSessions);
   hasInitialized = true;
-  return [];
+  return cachedSessions;
 }
 
 export async function fetchVisitorChatSessionsAsync(): Promise<ChatSession[]> {
   try {
-    const res = await fetch(SYNC_API_URL);
+    const cacheBustUrl = `${SYNC_API_URL}?_t=${Date.now()}`;
+    const res = await fetch(cacheBustUrl, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) {
-        const cleaned = filterOutLegacySessions(data);
+        const cleaned = sortSessionsDescending(data);
         cachedSessions = cleaned;
         hasInitialized = true;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-        window.dispatchEvent(new Event('bsmr_chat_logs_updated'));
+        // Cache admin messages from server for cross-origin preservation
+        for (const s of cleaned) {
+          if (s && s.id && Array.isArray(s.messages)) {
+            const adminMsgs = s.messages.filter((m) => m.sender === "admin");
+            if (adminMsgs.length > 0) {
+              _serverAdminMsgCache.set(s.id, adminMsgs);
+            }
+          }
+        }
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+        }
         return cleaned;
       }
     }
@@ -105,10 +202,12 @@ const getBroadcastChannel = () => {
 
 export function saveVisitorChatSessions(sessions: ChatSession[]): void {
   try {
-    const cleaned = filterOutLegacySessions(sessions);
+    const cleaned = sortSessionsDescending(sessions);
     cachedSessions = cleaned;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-    window.dispatchEvent(new Event('bsmr_chat_logs_updated'));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+      window.dispatchEvent(new Event('bsmr_chat_logs_updated'));
+    }
     
     // Broadcast via BroadcastChannel across same-origin tabs/windows
     const channel = getBroadcastChannel();
@@ -133,6 +232,18 @@ export function saveVisitorChatSessions(sessions: ChatSession[]): void {
   }
 }
 
+// ponytail: cache admin messages fetched from API server, so cross-origin saves don't lose them
+let _serverAdminMsgCache: Map<string, ChatMessage[]> = new Map();
+
+/**
+ * Update the admin messages cache for a session (called from fetchVisitorChatSessionsAsync / widget sync)
+ */
+export function cacheServerAdminMessages(sessionId: string, adminMessages: ChatMessage[]): void {
+  if (sessionId && adminMessages.length > 0) {
+    _serverAdminMsgCache.set(sessionId, adminMessages);
+  }
+}
+
 /**
  * Menyimpan atau memperbarui sesi obrolan pengunjung aktif secara real-time
  */
@@ -143,7 +254,7 @@ export function saveOrUpdateUserSession(
   isEscalated = false
 ): ChatSession {
   const sessions = getVisitorChatSessions();
-  const existingIdx = sessions.findIndex((s) => s.id === sessionId);
+  const existingIdx = sessions.findIndex((s) => s.id === sessionId || s.visitorId === sessionId);
 
   const randomNum = Math.floor(1000 + Math.random() * 9000);
   const cities = ["Jakarta", "Surabaya", "Bandung", "Medan", "Semarang", "Yogyakarta"];
@@ -154,7 +265,7 @@ export function saveOrUpdateUserSession(
 
   const formattedMessages: ChatMessage[] = userMessages.map((m) => ({
     id: m.id,
-    sender: m.sender,
+    sender: m.sender as "user" | "bot" | "admin",
     text: m.text,
     time: m.time,
   }));
@@ -162,16 +273,32 @@ export function saveOrUpdateUserSession(
   const existingSession = existingIdx >= 0 ? sessions[existingIdx] : null;
   const currentlyEscalated = existingSession ? (!existingSession.satisfied || isEscalated) : isEscalated;
 
-  // Preserve existing admin messages so widget auto-sync doesn't overwrite admin replies
+  // Preserve existing admin messages from ALL sources: localStorage + server cache
   let finalMessages = formattedMessages;
-  if (existingSession && Array.isArray(existingSession.messages)) {
-    const existingAdminMsgs = existingSession.messages.filter((m) => m.sender === "admin");
-    const currentAdminMsgIds = new Set(formattedMessages.filter((m) => m.sender === "admin").map((m) => m.id));
-    const currentAdminMsgTexts = new Set(formattedMessages.filter((m) => m.sender === "admin").map((m) => m.text));
 
-    const missingAdminMsgs = existingAdminMsgs.filter(
-      (m) => !currentAdminMsgIds.has(m.id) && !currentAdminMsgTexts.has(m.text)
-    );
+  // Collect all known admin messages from localStorage session AND server cache
+  const allKnownAdminMsgs: ChatMessage[] = [];
+  if (existingSession && Array.isArray(existingSession.messages)) {
+    allKnownAdminMsgs.push(...existingSession.messages.filter((m) => m.sender === "admin"));
+  }
+  // Also check server admin cache (critical for cross-origin: 127.0.0.1:8080 <-> localhost:5173)
+  const cachedAdminMsgs = _serverAdminMsgCache.get(sessionId);
+  if (cachedAdminMsgs) {
+    allKnownAdminMsgs.push(...cachedAdminMsgs);
+  }
+
+  if (allKnownAdminMsgs.length > 0) {
+    const currentAdminMsgIds = new Set(formattedMessages.filter((m) => m.sender === "admin").map((m) => m.id));
+    const currentAdminMsgTexts = new Set(formattedMessages.filter((m) => m.sender === "admin").map((m) => m.text.trim()));
+
+    // Deduplicate admin messages
+    const adminMsgMap = new Map<string, ChatMessage>();
+    for (const m of allKnownAdminMsgs) {
+      if (!currentAdminMsgIds.has(m.id) && !currentAdminMsgTexts.has(m.text.trim())) {
+        adminMsgMap.set(m.id || m.text, m);
+      }
+    }
+    const missingAdminMsgs = Array.from(adminMsgMap.values());
 
     if (missingAdminMsgs.length > 0) {
       finalMessages = [...formattedMessages, ...missingAdminMsgs];
@@ -196,6 +323,7 @@ export function saveOrUpdateUserSession(
       ? "Pengguna meminta terhubung dengan admin"
       : `Pengunjung sedang berinteraksi dengan AI Chatbot (${finalMessages.length} pesan)`,
     isUnread: true,
+    timestamp: Date.now(),
     messages: finalMessages,
   };
 
@@ -231,9 +359,19 @@ export function escalateSessionToAdmin(
  * Balasan dari User Admin di Dashboard Chat Logs untuk dikirimkan kembali ke sesi visitor
  */
 export function sendAdminReplyToSession(sessionId: string, replyText: string): void {
-  const sessions = getVisitorChatSessions();
+  const localSessions = getVisitorChatSessions();
+  const sessionMap = new Map<string, ChatSession>();
+  for (const s of cachedSessions) if (s && s.id) sessionMap.set(s.id, s);
+  for (const s of localSessions) if (s && s.id) sessionMap.set(s.id, s);
+  const sessions = Array.from(sessionMap.values());
+
+  let matchedVisitorId = "";
+  let matchedSessionId = sessionId;
+
   const updated = sessions.map((session) => {
-    if (session.id === sessionId) {
+    if (session.id === sessionId || session.visitorId === sessionId) {
+      matchedSessionId = session.id;
+      matchedVisitorId = session.visitorId;
       const adminMsg: ChatMessage = {
         id: `admin-reply-${Date.now()}`,
         sender: "admin",
@@ -242,23 +380,39 @@ export function sendAdminReplyToSession(sessionId: string, replyText: string): v
       };
       return {
         ...session,
-        messages: [...session.messages, adminMsg],
+        timestamp: Date.now(),
+        messages: [...(session.messages || []), adminMsg],
       };
     }
     return session;
   });
 
   saveVisitorChatSessions(updated);
-  window.dispatchEvent(new CustomEvent('bsmr_admin_replied_to_chat', { detail: { sessionId, replyText } }));
+
+  // Cache admin reply so cross-origin saveOrUpdateUserSession doesn't lose it
+  const matchedSession = updated.find(s => s.id === matchedSessionId);
+  if (matchedSession) {
+    const allAdminMsgs = matchedSession.messages.filter(m => m.sender === "admin");
+    cacheServerAdminMessages(matchedSessionId, allAdminMsgs);
+  }
+
+  const payload = { sessionId: matchedSessionId, visitorId: matchedVisitorId, replyText };
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('bsmr_admin_replied_to_chat', { detail: payload }));
+    window.dispatchEvent(new Event('bsmr_chat_logs_updated'));
+  }
 
   const channel = getBroadcastChannel();
   if (channel) {
-    channel.postMessage({ type: 'ADMIN_REPLIED', sessionId, replyText });
+    channel.postMessage({ type: 'ADMIN_REPLIED', ...payload });
+    channel.postMessage({ type: 'CHAT_LOGS_UPDATED', sessions: updated });
     channel.close();
   }
 
   if (typeof window !== 'undefined') {
-    window.postMessage({ type: 'BSMR_ADMIN_REPLIED', sessionId, replyText }, '*');
+    window.postMessage({ type: 'BSMR_ADMIN_REPLIED', ...payload }, '*');
+    window.postMessage({ type: 'BSMR_CHAT_LOGS_UPDATED', sessions: updated }, '*');
   }
 }
 
@@ -277,6 +431,7 @@ export function addVisitorMessageToEscalatedSession(sessionId: string, messageTe
       };
       return {
         ...session,
+        timestamp: Date.now(),
         messages: [...session.messages, userMsg],
       };
     }
@@ -287,11 +442,53 @@ export function addVisitorMessageToEscalatedSession(sessionId: string, messageTe
 }
 
 /**
+ * Menandai sesi obrolan sebagai sudah dibaca (isUnread: false) dan menyimpannya secara terpusat
+ */
+export function markSessionAsReadInService(sessionId: string): ChatSession[] {
+  const sessions = getVisitorChatSessions();
+  let hasChanged = false;
+  const updated = sessions.map((session) => {
+    if (session.id === sessionId && session.isUnread !== false) {
+      hasChanged = true;
+      return {
+        ...session,
+        isUnread: false,
+      };
+    }
+    return session;
+  });
+
+  if (hasChanged) {
+    saveVisitorChatSessions(updated);
+  }
+  return updated;
+}
+
+/**
+ * Mendapatkan jumlah sesi obrolan pengunjung yang belum dibaca (isUnread: true)
+ */
+export function getUnreadVisitorChatSessionsCount(): number {
+  try {
+    const sessions = getVisitorChatSessions();
+    if (Array.isArray(sessions)) {
+      return sessions.filter((s) => s && s.isUnread !== false).length;
+    }
+  } catch (e) {}
+  return 0;
+}
+
+/**
  * Menghapus satu sesi obrolan pengunjung berdasarkan ID
  */
 export function deleteVisitorChatSession(sessionId: string): ChatSession[] {
   const sessions = getVisitorChatSessions();
-  const updated = sessions.filter((s) => s.id !== sessionId);
+  const target = sessions.find((s) => s.id === sessionId);
+  const idsToDelete = [sessionId];
+  if (target && target.visitorId) idsToDelete.push(target.visitorId);
+
+  markSessionsAsDeleted(idsToDelete);
+
+  const updated = sessions.filter((s) => s.id !== sessionId && s.visitorId !== target?.visitorId);
   saveVisitorChatSessions(updated);
   return updated;
 }
@@ -301,8 +498,16 @@ export function deleteVisitorChatSession(sessionId: string): ChatSession[] {
  */
 export function deleteBulkVisitorChatSessions(sessionIds: string[]): ChatSession[] {
   const sessions = getVisitorChatSessions();
-  const setIds = new Set(sessionIds);
-  const updated = sessions.filter((s) => !setIds.has(s.id));
+  const idsToDelete: string[] = [...sessionIds];
+  sessionIds.forEach((id) => {
+    const target = sessions.find((s) => s.id === id);
+    if (target && target.visitorId) idsToDelete.push(target.visitorId);
+  });
+
+  markSessionsAsDeleted(idsToDelete);
+
+  const setIds = new Set(idsToDelete);
+  const updated = sessions.filter((s) => !setIds.has(s.id) && !setIds.has(s.visitorId));
   saveVisitorChatSessions(updated);
   return updated;
 }
@@ -311,6 +516,15 @@ export function deleteBulkVisitorChatSessions(sessionIds: string[]): ChatSession
  * Menghapus seluruh log chat pengunjung (Clear All)
  */
 export function clearAllVisitorChatSessions(): ChatSession[] {
+  const sessions = getVisitorChatSessions();
+  const allIds: string[] = [];
+  sessions.forEach((s) => {
+    if (s.id) allIds.push(s.id);
+    if (s.visitorId) allIds.push(s.visitorId);
+  });
+
+  markSessionsAsDeleted(allIds);
   saveVisitorChatSessions([]);
   return [];
 }
+

@@ -3,6 +3,11 @@ import { StickyBanner } from '@/components/ui/sticky-banner';
 import { useServerStatus } from '@/hooks/useServerStatus';
 
 export const OfflineBanner: React.FC = () => {
+  // Do not render banner inside widget iframe (/widget-only)
+  if (typeof window !== 'undefined' && window.location.pathname.includes('/widget-only')) {
+    return null;
+  }
+
   const { isOffline } = useServerStatus();
   const [showRestored, setShowRestored] = useState(false);
   const [yellowDismissed, setYellowDismissed] = useState(false);

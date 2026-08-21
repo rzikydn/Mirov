@@ -152,6 +152,7 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       try {
         localStorage.setItem('mirov_cached_notes', JSON.stringify(next));
+        localStorage.setItem('mirov_cache_notes', JSON.stringify(next));
       } catch (e) {}
       return next;
     });
@@ -163,7 +164,17 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
     if (ok && data) {
       const list = Array.isArray(data) ? data : (data.data && Array.isArray(data.data) ? data.data : null);
       if (list) {
-        updateNotesAndCache(list);
+        const formattedNotes: ColoredNote[] = list.map((note: any) => ({
+          id: note.id,
+          content: note.content,
+          text: note.content,
+          color: note.color || '#FEF08A',
+          date: formatDateIndonesian(note.createdAt),
+          createdAt: note.createdAt,
+          favorite: note.favorite || false,
+          user: note.user ? { name: note.user.name, role: note.user.role } : undefined
+        }));
+        updateNotesAndCache(formattedNotes);
       }
     }
   };
@@ -200,15 +211,28 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
       body: JSON.stringify({ content: note.text, color: note.color }),
     });
 
-    if (ok && data && data.data && data.data.id) {
+    const realNote = data && data.data ? (data.data.id ? data.data : (data.data.data ? data.data.data : null)) : null;
+    if (ok && realNote && realNote.id) {
       updateNotesAndCache((prev) =>
-        prev.map((n) => (n.id === tempId ? { ...data.data, content: data.data.content || note.text, text: data.data.content || note.text } : n))
+        prev.map((n) => (n.id === tempId ? {
+          ...n,
+          id: realNote.id,
+          content: realNote.content || note.text,
+          text: realNote.content || note.text,
+          date: formatDateIndonesian(realNote.createdAt || new Date().toISOString()),
+          createdAt: realNote.createdAt || new Date().toISOString()
+        } : n))
       );
     }
+    fetchNotes();
   };
 
   // Realtime Optimistic Update note (0ms UI response)
   const editNote = async (id: string | number, note: { text: string; color: string; favorite: boolean }) => {
+    if (typeof id === 'string' && id.startsWith('temp-')) {
+      return;
+    }
+
     // Optimistic UI update (INSTANT 0ms)
     updateNotesAndCache((prev) =>
       prev.map((n) => (n.id === id ? { ...n, content: note.text, text: note.text, color: note.color, favorite: note.favorite } : n))
@@ -233,10 +257,18 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
         favorite: note.favorite
       }),
     });
+
+    fetchNotes();
   };
 
   // Realtime Optimistic Hapus note (0ms UI response)
   const removeNote = async (id: string | number) => {
+    // If temp ID, remove locally only
+    if (typeof id === 'string' && id.startsWith('temp-')) {
+      updateNotesAndCache((prev) => prev.filter((n) => n.id !== id));
+      return;
+    }
+
     // Optimistic UI delete (INSTANT 0ms)
     updateNotesAndCache((prev) => prev.filter((n) => n.id !== id));
 
@@ -253,21 +285,29 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
     await apiFetch(`${API_URL}/${id}`, {
       method: "DELETE"
     });
+
+    fetchNotes();
   };
 
   // Realtime Polling & Window Focus Listener & Data Synced Listener
   useEffect(() => {
     fetchNotes();
     const interval = setInterval(fetchNotes, 3000);
-    const handleFocus = () => fetchNotes();
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        fetchNotes();
+      }
+    };
     const handleDataSynced = () => fetchNotes();
 
-    window.addEventListener('focus', handleFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
     window.addEventListener('app:data-synced', handleDataSynced);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
       window.removeEventListener('app:data-synced', handleDataSynced);
     };
   }, []);
@@ -338,19 +378,16 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
 
     // Kemudian update ke backend
     try {
-      const res = await fetch(`${API_URL}/${note.id}`, {
+      const { ok } = await apiFetch(`${API_URL}/${note.id}`, {
         method: "PUT",
-        headers: getAuthHeaders(),
         body: JSON.stringify({
           content: noteContent,
           color: note.color,
           favorite: newFavoriteStatus
         }),
       });
-      const data = await res.json();
 
-      if (data.success) {
-        // Add to history dengan deskripsi spesifik untuk favorit
+      if (ok) {
         if (user) {
           await addHistory({
             userName: user.name,
@@ -361,27 +398,12 @@ const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
             description: `${user.name} ${newFavoriteStatus ? 'added note to favorites' : 'removed note from favorites'}`
           });
         }
+        fetchNotes();
       } else {
-        // Jika gagal, kembalikan state ke semula
-        setNotes(prevNotes =>
-          prevNotes.map(n =>
-            n.id === note.id
-              ? { ...n, favorite: note.favorite }
-              : n
-          )
-        );
-        console.error('❌ Toggle favorite failed:', data);
+        fetchNotes();
       }
-    } catch (err) {
-      // Jika error, kembalikan state ke semula
-      setNotes(prevNotes =>
-        prevNotes.map(n =>
-          n.id === note.id
-            ? { ...n, favorite: note.favorite }
-            : n
-        )
-      );
-      console.error("Failed to toggle favorite:", err);
+    } catch (e) {
+      fetchNotes();
     }
   };
 

@@ -19,15 +19,15 @@ export function useServerStatus() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2500);
 
-      let res = await fetch(`${API_BASE}/api/health?t=${Date.now()}`, {
+      let res = await fetch(`${API_BASE}/health?t=${Date.now()}`, {
         method: 'GET',
         cache: 'no-store',
         signal: controller.signal
       }).catch(() => null);
 
       if (!res || !res.ok) {
-        // Fallback check to /health (without /api) for backward compatibility
-        res = await fetch(`${API_BASE}/health?t=${Date.now()}`, {
+        // Fallback check to /api/health for compatibility
+        res = await fetch(`${API_BASE}/api/health?t=${Date.now()}`, {
           method: 'GET',
           cache: 'no-store',
           signal: controller.signal
@@ -90,8 +90,8 @@ export function useServerStatus() {
     // Initial check
     checkServer();
 
-    // Fast 3-second polling interval for responsive status updates
-    const interval = setInterval(checkServer, 3000);
+    // 10-second polling interval for clean, responsive status updates
+    const interval = setInterval(checkServer, 10000);
 
     const handleVisibilityChange = () => {
       if (!document.hidden) {

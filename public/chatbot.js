@@ -37,8 +37,12 @@
 
   // Relay cross-origin messages between iframe widget and parent host pages
   window.addEventListener('message', function (event) {
-    if (event.data && (event.data.type === 'BSMR_CHAT_LOGS_UPDATED' || event.data.type === 'BSMR_ADMIN_REPLIED')) {
+    if (event.data && (event.data.type === 'BSMR_CHAT_LOGS_UPDATED' || event.data.type === 'BSMR_ADMIN_REPLIED' || event.data.type === 'BSMR_SETTINGS_UPDATED')) {
       try {
+        if (event.data.type === 'BSMR_SETTINGS_UPDATED' && event.data.settings) {
+          localStorage.setItem('mirov_chatbot_settings', JSON.stringify(event.data.settings));
+          window.dispatchEvent(new Event('bsmr_settings_updated'));
+        }
         if (event.data.sessions && Array.isArray(event.data.sessions)) {
           localStorage.setItem('bsmr_visitor_chat_sessions', JSON.stringify(event.data.sessions));
           window.dispatchEvent(new Event('bsmr_chat_logs_updated'));
@@ -47,7 +51,7 @@
           iframe.contentWindow.postMessage(event.data, '*');
         }
       } catch (e) {
-        console.warn('BSMR Chatbot Embed: Failed to sync localStorage', e);
+        console.warn('BSMR Chatbot Embed: Failed to sync settings/logs', e);
       }
     }
   });

@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { db } from './index';
-import { users, schedules, notes, chatbotSettings, chatbotFaqs } from './schema';
+import { users, schedules, notes } from './schema';
 
 async function main() {
   console.log('🌱 Starting database seeding...');
@@ -139,57 +139,6 @@ async function main() {
   });
 
   console.log('✅ Sample notes created');
-
-  console.log('✨ Creating default AI Chatbot Settings...');
-  await db.insert(chatbotSettings).values({
-    botName: 'BSMR AI Assistant',
-    welcomeMessage: 'Halo! Selamat datang di Website Resmi BSMR. Ada yang bisa kami bantu terkait Sertifikasi Manajemen Risiko Perbankan?',
-    waNumber: '6281299008899',
-    systemPrompt: 'Anda adalah AI Assistant Resmi BSMR (Badan Sertifikasi Manajemen Risiko). Berikan jawaban yang ramah, profesional, akurat sesuai dengan dokumen Knowledge Base BSMR.',
-    temperature: '0.7',
-    modelName: 'gemini-1.5-flash',
-    autoEscalation: true,
-  });
-
-  console.log('✨ Creating default Chatbot FAQs...');
-  await db.insert(chatbotFaqs).values([
-    {
-      question: 'Jadwal Asesmen Level 2',
-      answer: 'Asesmen Level 2 BSMR dilaksanakan setiap bulan pada minggu ke-2 dan ke-4. Silakan cek menu Jadwal Asesmen di portal resmi.',
-      category: 'Sertifikasi',
-      hits: 420,
-      status: 'ACTIVE',
-    },
-    {
-      question: 'Mekanisme Perpanjangan',
-      answer: 'Perpanjangan sertifikasi dilakukan dengan memenuhi kecukupan poin SKP Maintenance minimal 50 poin per periode 3 tahun.',
-      category: 'Perpanjangan',
-      hits: 310,
-      status: 'ACTIVE',
-    },
-    {
-      question: 'Rincian Biaya Sertifikasi',
-      answer: 'Biaya Ujian Sertifikasi Level 1 s.d. Level 5 bervariasi sesuai regulasi BSMR. Silakan hubungi Sekretariat BSMR untuk rincian penawaran.',
-      category: 'Biaya',
-      hits: 240,
-      status: 'ACTIVE',
-    },
-    {
-      question: 'Syarat Poin SKP Maintenance',
-      answer: 'SKP Maintenance dikumpulkan melalui partisipasi dalam seminar, workshop, pelatihan, atau mengajar materi Manajemen Risiko.',
-      category: 'SKP',
-      hits: 180,
-      status: 'ACTIVE',
-    },
-    {
-      question: 'Persyaratan Asesi Umum',
-      answer: 'Persyaratan dasar meliputi KTP, Pasfoto 3x4, Ijazah Terakhir/Surat Keterangan Kerja di Industri Perbankan/Jasa Keuangan.',
-      category: 'Persyaratan',
-      hits: 120,
-      status: 'ACTIVE',
-    },
-  ]);
-  console.log('✅ Default AI Chatbot Settings & FAQs created');
 
   console.log('\n📋 SEED DATA SUMMARY');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

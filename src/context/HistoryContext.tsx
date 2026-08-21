@@ -48,9 +48,9 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
           action: (entry.action || 'edit').toLowerCase(),
           target: (entry.target || 'database').toLowerCase(),
           createdAt: (() => {
-            const raw = String(entry.createdAt || '');
-            const cleaned = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
-            const d = new Date(cleaned);
+            const raw = entry.createdAt;
+            if (!raw) return new Date();
+            const d = new Date(raw);
             return isNaN(d.getTime()) ? new Date() : d;
           })()
         }));
@@ -62,20 +62,38 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Load history whenever authentication state changes or data synced
+  // Load history whenever authentication state changes, tab regains focus, or data synced
   useEffect(() => {
     if (isAuthenticated) {
       refreshHistory();
     } else {
       setHistory([]);
+      return;
     }
 
-    const handleDataSynced = () => {
-      refreshHistory();
+    const handleFocusOrSynced = () => {
+      if (document.visibilityState === 'visible') {
+        refreshHistory();
+      }
     };
-    window.addEventListener('app:data-synced', handleDataSynced);
 
-    return () => window.removeEventListener('app:data-synced', handleDataSynced);
+    window.addEventListener('app:data-synced', handleFocusOrSynced);
+    window.addEventListener('focus', handleFocusOrSynced);
+    document.addEventListener('visibilitychange', handleFocusOrSynced);
+
+    // Auto-refresh history every 30 seconds to keep multi-user / prod updates in sync
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refreshHistory();
+      }
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('app:data-synced', handleFocusOrSynced);
+      window.removeEventListener('focus', handleFocusOrSynced);
+      document.removeEventListener('visibilitychange', handleFocusOrSynced);
+      clearInterval(interval);
+    };
   }, [isAuthenticated, refreshHistory]);
 
   const addHistory = async (entry: Omit<HistoryEntry, 'id' | 'createdAt' | 'userId'>) => {
@@ -102,7 +120,7 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
       });
 
       // Send to server or queue for background sync if offline
-      await apiFetch(API_URL, {
+      const res = await apiFetch(API_URL, {
         method: 'POST',
         body: JSON.stringify({
           userId: user.id,
@@ -114,6 +132,10 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
           description: entry.description
         })
       });
+
+      if (res.ok && !res.isOfflineFallback) {
+        refreshHistory();
+      }
     } catch (error) {
       console.error('❌ Error adding history:', error);
     }
@@ -128,9 +150,13 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
         return updated;
       });
 
-      await apiFetch(`${API_URL}/${id}`, {
+      const res = await apiFetch(`${API_URL}/${id}`, {
         method: 'DELETE'
       });
+
+      if (res.ok && !res.isOfflineFallback) {
+        refreshHistory();
+      }
 
       return true;
     } catch (error) {
@@ -149,13 +175,17 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
       });
 
       // Send delete requests via apiFetch (queueing if offline)
-      await Promise.all(
+      const results = await Promise.all(
         ids.map((id) =>
           apiFetch(`${API_URL}/${id}`, {
             method: 'DELETE'
           })
         )
       );
+
+      if (results.some((r) => r.ok && !r.isOfflineFallback)) {
+        refreshHistory();
+      }
 
       return true;
     } catch (error) {

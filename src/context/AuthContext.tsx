@@ -74,6 +74,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      console.warn('🔑 401 Unauthorized detected. Performing logout.');
+      performLogout();
+    };
+
+    window.addEventListener('app:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('app:unauthorized', handleUnauthorized);
+  }, []);
+
   // Update lastActivity saat ada interaksi user supaya sesi tidak mati kalau web terbuka & dipakai
   useEffect(() => {
     if (!token) return;

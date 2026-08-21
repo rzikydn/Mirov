@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import {
   FileText,
   Upload,
@@ -17,9 +18,12 @@ import {
   Sparkles,
   PhoneCall,
   RefreshCw,
+  Mail,
+  Save,
 } from 'lucide-react';
 import { BotIcon } from '../ui/BotIcon';
 import VisitorChatLogsWidget from '../ui/VisitorChatLogsWidget';
+import { getChatbotSettings, saveChatbotSettings } from '../../services/chatbotSettingsService';
 
 interface ChatbotDashboardProps {
   darkMode: boolean;
@@ -158,10 +162,37 @@ export default function ChatbotDashboard({ darkMode }: ChatbotDashboardProps) {
   const [resolveAnswer, setResolveAnswer] = useState('');
 
   // Settings State
-  const [welcomeMsg, setWelcomeMsg] = useState('Halo! Selamat datang di Website Resmi BSMR. Ada yang bisa kami bantu terkait Sertifikasi Manajemen Risiko Perbankan?');
-  const [waNumber, setWaNumber] = useState('6281299008899');
-  const [systemPrompt, setSystemPrompt] = useState('Anda adalah AI Assistant Resmi BSMR (Badan Sertifikasi Manajemen Risiko). Berikan jawaban yang ramah, profesional, akurat sesuai dengan dokumen Knowledge Base BSMR.');
+  const [welcomeMsg, setWelcomeMsg] = useState(() => getChatbotSettings().welcomeMsg);
+  const [waNumber, setWaNumber] = useState(() => getChatbotSettings().waNumber);
+  const [adminEmail, setAdminEmail] = useState(() => getChatbotSettings().adminEmail);
+  const [systemPrompt, setSystemPrompt] = useState(() => getChatbotSettings().systemPrompt);
   const [copiedScript, setCopiedScript] = useState(false);
+
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      const fresh = getChatbotSettings();
+      setWelcomeMsg(fresh.welcomeMsg);
+      setWaNumber(fresh.waNumber);
+      setAdminEmail(fresh.adminEmail);
+      setSystemPrompt(fresh.systemPrompt);
+    };
+
+    window.addEventListener("bsmr_settings_updated", handleSettingsUpdate);
+    return () => {
+      window.removeEventListener("bsmr_settings_updated", handleSettingsUpdate);
+    };
+  }, []);
+
+  const handleSaveDashboardSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveChatbotSettings({
+      welcomeMsg,
+      waNumber,
+      adminEmail,
+      systemPrompt,
+    });
+    toast.success('Pengaturan & System Prompt AI berhasil disimpan!');
+  };
 
   const embedCode = `<script src="https://planner.bsmr.org/chatbot.js" data-bsmr-bot="v2"></script>`;
 
@@ -617,8 +648,13 @@ export default function ChatbotDashboard({ darkMode }: ChatbotDashboardProps) {
       {/* Tab 5: Settings & Prompt AI */}
       {activeTab === 'settings' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className={`p-5 rounded-xl border space-y-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-            <h3 className="font-bold text-sm border-b pb-3 border-gray-200 dark:border-gray-700">Pengaturan Widget & Pesan</h3>
+          <form onSubmit={handleSaveDashboardSettings} className={`p-5 rounded-xl border space-y-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+            <h3 className="font-bold text-sm border-b pb-3 border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <span>Pengaturan Widget & Pesan</span>
+              <span className="text-[10px] font-normal text-blue-500 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200/50">
+                Terhubung Real-Time ke Widget
+              </span>
+            </h3>
 
             <div>
               <label className="block text-xs font-medium mb-1">Pesan Pembuka Widget (Welcome Message)</label>
@@ -644,6 +680,20 @@ export default function ChatbotDashboard({ darkMode }: ChatbotDashboardProps) {
             </div>
 
             <div>
+              <label className="block text-xs font-medium mb-1 flex items-center gap-1">
+                <Mail className="w-3.5 h-3.5 text-blue-500" />
+                Alamat Email Admin CS BSMR
+              </label>
+              <input
+                type="email"
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                placeholder="cs@bsmr.org"
+                className={`w-full p-2.5 text-xs rounded-lg border outline-none ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+              />
+            </div>
+
+            <div>
               <label className="block text-xs font-medium mb-1">System Prompt AI Bot</label>
               <textarea
                 rows={4}
@@ -653,10 +703,11 @@ export default function ChatbotDashboard({ darkMode }: ChatbotDashboardProps) {
               />
             </div>
 
-            <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium shadow-sm transition-colors">
+            <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer">
+              <Save className="w-3.5 h-3.5" />
               Simpan Pengaturan
             </button>
-          </div>
+          </form>
 
           {/* Embed Script Snippet */}
           <div className={`p-5 rounded-xl border space-y-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>

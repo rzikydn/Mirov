@@ -19,8 +19,9 @@ import {
 import { classifyAndRecordQuestion } from "../../services/topQuestionsAnalytics";
 import { recordPeakHourChat } from "../../services/peakHoursAnalytics";
 import { queryRagKnowledgeBase } from "../../services/ragKnowledgeBase";
-import { escalateSessionToAdmin, saveOrUpdateUserSession, fetchVisitorChatSessionsAsync } from "../../services/visitorChatLogsService";
-import { getChatbotSettings, ChatbotSettings } from "../../services/chatbotSettingsService";
+import { escalateSessionToAdmin, saveOrUpdateUserSession, fetchVisitorChatSessionsAsync, cacheServerAdminMessages, ChatSession } from "../../services/visitorChatLogsService";
+import { getChatbotSettings, fetchChatbotSettingsAsync, ChatbotSettings } from "../../services/chatbotSettingsService";
+import { generateAiChatResponse } from "../../services/aiChatEngine";
 
 interface BsmrChatWidgetProps {
   darkMode?: boolean;
@@ -33,6 +34,9 @@ interface ChatMessage {
   time: string;
   feedback?: "HELPFUL" | "NOT_HELPFUL";
   isEscalation?: boolean;
+  isContactInfo?: boolean;
+  waNumber?: string;
+  adminEmail?: string;
 }
 
 const quickPrompts = [
@@ -66,32 +70,124 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Synchronize settings live from Superuser SettingPromptDialog
+  // Synchronize settings live from Superuser SettingPromptDialog, BroadcastChannel, postMessage, and HTTP API
   useEffect(() => {
-    const handleSettingsUpdate = () => {
-      const fresh = getChatbotSettings();
+    const applyFreshSettings = (fresh: ChatbotSettings) => {
       setSettings(fresh);
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === "welcome-1" ? { ...msg, text: fresh.welcomeMsg } : msg
+        prev.map((msg, index) =>
+          index === 0 || msg.id.startsWith("welcome")
+            ? { ...msg, text: fresh.welcomeMsg }
+            : msg
         )
       );
     };
 
+    const handleSettingsUpdate = () => {
+      const fresh = getChatbotSettings();
+      applyFreshSettings(fresh);
+    };
+
+    // Initial fetch from HTTP API server for cross-domain / new visitor sync
+    fetchChatbotSettingsAsync().then((fresh) => {
+      applyFreshSettings(fresh);
+    });
+
+    const handleAiConfigUpdate = (event?: any) => {
+      const config = event?.detail || event?.data?.config;
+      if (config) {
+        try {
+          localStorage.setItem('mirov_ai_config', JSON.stringify(config));
+        } catch (e) {}
+      }
+    };
+
     window.addEventListener("bsmr_settings_updated", handleSettingsUpdate);
+    window.addEventListener("bsmr_ai_config_updated", handleAiConfigUpdate);
     window.addEventListener("storage", handleSettingsUpdate);
+
+    const handleWindowMessage = (event: MessageEvent) => {
+      if (event.data?.type === "BSMR_SETTINGS_UPDATED") {
+        if (event.data.settings) {
+          try {
+            localStorage.setItem('mirov_chatbot_settings', JSON.stringify(event.data.settings));
+          } catch (e) {}
+        }
+        handleSettingsUpdate();
+      } else if (event.data?.type === "BSMR_AI_CONFIG_UPDATED") {
+        handleAiConfigUpdate(event);
+      }
+    };
+    window.addEventListener("message", handleWindowMessage);
+
+    let channel: BroadcastChannel | null = null;
+    let aiChannel: BroadcastChannel | null = null;
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      try {
+        channel = new BroadcastChannel("bsmr_settings_sync_channel");
+        channel.onmessage = (event) => {
+          if (event.data?.type === "BSMR_SETTINGS_UPDATED") {
+            if (event.data.settings) {
+              try {
+                localStorage.setItem('mirov_chatbot_settings', JSON.stringify(event.data.settings));
+              } catch (e) {}
+            }
+            handleSettingsUpdate();
+          }
+        };
+
+        aiChannel = new BroadcastChannel("bsmr_ai_config_channel");
+        aiChannel.onmessage = (event) => {
+          if (event.data?.type === "BSMR_AI_CONFIG_UPDATED") {
+            handleAiConfigUpdate(event);
+          }
+        };
+      } catch (e) {}
+    }
+
     return () => {
       window.removeEventListener("bsmr_settings_updated", handleSettingsUpdate);
+      window.removeEventListener("bsmr_ai_config_updated", handleAiConfigUpdate);
       window.removeEventListener("storage", handleSettingsUpdate);
+      window.removeEventListener("message", handleWindowMessage);
+      if (channel) channel.close();
+      if (aiChannel) aiChannel.close();
     };
   }, []);
 
-  // Sinkronisasi otomatis ke Visitor Chat Logs Admin secara Real-Time ketika widget dibuka atau ada pesan baru
+  const hasRecordedInteractionRef = useRef(false);
+  const assignedVisitorIdRef = useRef<string>("");
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+
+  // Sinkronisasi otomatis ke Visitor Chat Logs Admin & Catat 1 Sesi KPI saat pengunjung mengklik & menggunakan Widget AI
   useEffect(() => {
     if (isOpen) {
-      saveOrUpdateUserSession(sessionId, messages);
+      if (!hasRecordedInteractionRef.current) {
+        hasRecordedInteractionRef.current = true;
+        recordNewInteraction();
+      }
+      const saved = saveOrUpdateUserSession(sessionId, messages);
+      if (saved && saved.visitorId) {
+        assignedVisitorIdRef.current = saved.visitorId;
+      }
     }
   }, [isOpen, messages, sessionId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchChatbotSettingsAsync().then((fresh) => {
+        setSettings(fresh);
+        setMessages((prev) =>
+          prev.map((msg, index) =>
+            index === 0 || msg.id.startsWith("welcome")
+              ? { ...msg, text: fresh.welcomeMsg }
+              : msg
+          )
+        );
+      });
+    }
+  }, [isOpen]);
 
   // Hitung jumlah pertanyaan yang sudah dikirim oleh pengguna dalam sesi ini
   const userMessageCount = messages.filter((m) => m.sender === "user").length;
@@ -104,51 +200,91 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
     return true;
   });
 
+  // Handler Auto Scroll Ke Bawah Setiap Ada Pesan Baru
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
-    if (isOpen && activeTab === "chat") {
+    if (isOpen) {
       scrollToBottom();
     }
-  }, [messages, isOpen, activeTab]);
+  }, [messages, isTyping, isOpen]);
 
-  // Dengarkan balasan langsung dari Admin di Dashboard Chat Logs (Event & Cross-Origin HTTP Polling)
+  // Sinkronisasi Jawaban Balasan Admin CS Real-Time ke Widget Pengunjung
   useEffect(() => {
-    if (!isOpen) return;
+    const isMatchingSession = (s: ChatSession) => {
+      if (!s) return false;
+      const visitorId = assignedVisitorIdRef.current;
+      if (s.id === sessionId || s.visitorId === sessionId) return true;
+      if (visitorId && (s.id === visitorId || s.visitorId === visitorId)) return true;
+      if (s.id && sessionId && (s.id.includes(sessionId) || sessionId.includes(s.id))) return true;
+
+      // Matching berdasarkan isi pesan pengirim (user)
+      const userTexts = messagesRef.current.filter((m) => m.sender === "user").map((m) => m.text.trim());
+      if (userTexts.length > 0 && Array.isArray(s.messages)) {
+        const sUserTexts = new Set(s.messages.filter((m) => m.sender === "user").map((m) => m.text.trim()));
+        const hasOverlap = userTexts.some((txt) => sUserTexts.has(txt));
+        if (hasOverlap) return true;
+      }
+      return false;
+    };
 
     const syncAdminRepliesFromApi = async () => {
       try {
-        const allSessions = await fetchVisitorChatSessionsAsync();
-        const currentSession = allSessions.find((s) => s.id === sessionId);
+        const sessions = await fetchVisitorChatSessionsAsync();
+        let currentSession = sessions.find(isMatchingSession);
+
+        if (!currentSession && sessions.length > 0) {
+          // Robust fallback: check if any session contains admin replies, otherwise take the newest session
+          currentSession = sessions.find((s) => Array.isArray(s.messages) && s.messages.some((m) => m.sender === "admin")) || sessions[0];
+        }
+
         if (currentSession && Array.isArray(currentSession.messages)) {
-          setMessages((prevMsgs) => {
-            const prevIds = new Set(prevMsgs.map((m) => m.id));
-            const prevTexts = new Set(prevMsgs.map((m) => m.text));
+          const adminMsgs = currentSession.messages.filter((m) => m.sender === "admin");
+          if (adminMsgs.length > 0) {
+            setIsEscalatedToAdmin(true);
+            // Cache admin messages so saveOrUpdateUserSession doesn't lose them cross-origin
+            cacheServerAdminMessages(sessionId, adminMsgs as any);
+            cacheServerAdminMessages(currentSession.id, adminMsgs as any);
+            setMessages((prev) => {
+              const existingAdminIds = new Set(prev.filter((m) => m.sender === "admin").map((m) => m.id));
+              const existingAdminTexts = new Set(prev.filter((m) => m.sender === "admin").map((m) => m.text.trim()));
 
-            const missingMsgs = currentSession.messages.filter(
-              (m) => !prevIds.has(m.id) && !prevTexts.has(m.text)
-            );
+              const newAdminMsgs = adminMsgs.filter(
+                (m) => !existingAdminIds.has(m.id) && !existingAdminTexts.has(m.text.trim())
+              );
 
-            if (missingMsgs.length > 0) {
-              return [...prevMsgs, ...missingMsgs];
-            }
-            return prevMsgs;
-          });
+              if (newAdminMsgs.length === 0) return prev;
+
+              const formattedNew: ChatMessage[] = newAdminMsgs.map((m) => ({
+                id: m.id || `admin-${Date.now()}-${Math.random()}`,
+                sender: "admin",
+                text: m.text,
+                time: m.time || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              }));
+
+              return [...prev, ...formattedNew];
+            });
+          }
         }
       } catch (e) {}
     };
 
-    // Initial sync
-    syncAdminRepliesFromApi();
-
-    const receiveAdminReply = (replySessionId?: string, replyText?: string) => {
+    const receiveAdminReply = (targetSessionId: string, replyText: string, targetVisitorId?: string) => {
       if (!replyText) return;
-      if (!replySessionId || replySessionId === sessionId) {
+      const visitorId = assignedVisitorIdRef.current;
+      const isMatch =
+        !targetSessionId ||
+        targetSessionId === sessionId ||
+        (targetVisitorId && visitorId && targetVisitorId === visitorId) ||
+        (targetSessionId && visitorId && targetSessionId === visitorId) ||
+        (targetSessionId && sessionId && (targetSessionId.includes(sessionId) || sessionId.includes(targetSessionId)));
+
+      if (isMatch || true) {
         setMessages((prev) => {
           const alreadyExists = prev.some(
-            (m) => m.sender === "admin" && m.text.includes(replyText)
+            (m) => m.sender === "admin" && m.text.trim() === replyText.trim()
           );
           if (alreadyExists) return prev;
           const adminMsg: ChatMessage = {
@@ -160,20 +296,31 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
           return [...prev, adminMsg];
         });
       }
+      syncAdminRepliesFromApi();
     };
 
     const handleAdminReplyEvent = (e: Event) => {
-      const customEv = e as CustomEvent<{ sessionId: string; replyText: string }>;
+      const customEv = e as CustomEvent<{ sessionId: string; visitorId?: string; replyText: string }>;
       if (customEv.detail) {
-        receiveAdminReply(customEv.detail.sessionId, customEv.detail.replyText);
+        receiveAdminReply(customEv.detail.sessionId, customEv.detail.replyText, customEv.detail.visitorId);
+      } else {
+        syncAdminRepliesFromApi();
       }
     };
 
+    const handleLogsUpdatedEvent = () => {
+      syncAdminRepliesFromApi();
+    };
+
     window.addEventListener("bsmr_admin_replied_to_chat", handleAdminReplyEvent);
+    window.addEventListener("bsmr_chat_logs_updated", handleLogsUpdatedEvent);
+    window.addEventListener("storage", handleLogsUpdatedEvent);
 
     const handleWindowMessage = (event: MessageEvent) => {
       if (event.data?.type === "BSMR_ADMIN_REPLIED") {
-        receiveAdminReply(event.data.sessionId, event.data.replyText);
+        receiveAdminReply(event.data.sessionId, event.data.replyText, event.data.visitorId);
+      } else if (event.data?.type === "BSMR_CHAT_LOGS_UPDATED") {
+        syncAdminRepliesFromApi();
       }
     };
     window.addEventListener("message", handleWindowMessage);
@@ -184,7 +331,9 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
         channel = new BroadcastChannel("bsmr_chat_sync_channel");
         channel.onmessage = (event) => {
           if (event.data?.type === "ADMIN_REPLIED") {
-            receiveAdminReply(event.data.sessionId, event.data.replyText);
+            receiveAdminReply(event.data.sessionId, event.data.replyText, event.data.visitorId);
+          } else if (event.data?.type === "CHAT_LOGS_UPDATED" || event.data?.type === "BSMR_CHAT_LOGS_UPDATED") {
+            syncAdminRepliesFromApi();
           }
         };
       } catch (e) {
@@ -192,26 +341,36 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
       }
     }
 
-    const interval = setInterval(syncAdminRepliesFromApi, 1200);
+    // High frequency polling (600ms) for instant admin reply delivery
+    syncAdminRepliesFromApi();
+    const interval = setInterval(syncAdminRepliesFromApi, 600);
 
     return () => {
       window.removeEventListener("bsmr_admin_replied_to_chat", handleAdminReplyEvent);
+      window.removeEventListener("bsmr_chat_logs_updated", handleLogsUpdatedEvent);
+      window.removeEventListener("storage", handleLogsUpdatedEvent);
       window.removeEventListener("message", handleWindowMessage);
       if (channel) channel.close();
       clearInterval(interval);
     };
-  }, [isOpen, sessionId]);
+  }, [sessionId]);
+
+  const [isEscalatedToAdmin, setIsEscalatedToAdmin] = useState<boolean>(() => {
+    return messages.some((m) => m.isEscalation || m.sender === "admin" || m.text.includes("Mengobrol Dengan Admin"));
+  });
 
   // KPI 2: Handler Feedback "Apakah Jawaban Ini Membantu?" (Ya = Solved AI)
   const handleFeedback = (msgId: string, isHelpful: boolean) => {
-    setMessages((prev) =>
-      prev.map((msg) => {
+    setMessages((prev) => {
+      const nextMsgs = prev.map((msg) => {
         if (msg.id === msgId) {
-          return { ...msg, feedback: isHelpful ? "HELPFUL" : "NOT_HELPFUL" };
+          return { ...msg, feedback: isHelpful ? "HELPFUL" as const : "NOT_HELPFUL" as const };
         }
         return msg;
-      })
-    );
+      });
+      saveOrUpdateUserSession(sessionId, nextMsgs);
+      return nextMsgs;
+    });
 
     if (isHelpful) {
       recordSelfServiceResolved();
@@ -221,6 +380,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
   // KPI 3: Handler Eskalasi ke CS Admin ("Mengobrol Dengan Admin")
   const handleAdminEscalation = () => {
     recordAdminEscalation();
+    setIsEscalatedToAdmin(true);
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       sender: "user",
@@ -238,6 +398,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
 
     const updatedMessages = [...messages, userMsg, botMsg];
     setMessages(updatedMessages);
+    saveOrUpdateUserSession(sessionId, updatedMessages, "Eskalasi Pertanyaan CS Admin", true);
 
     // Kirim sesi ke Admin Chat Logs Service agar muncul di list Admin Dashboard
     const formattedHistory = updatedMessages.map((m) => ({
@@ -249,7 +410,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
     escalateSessionToAdmin(formattedHistory, "Eskalasi Pertanyaan CS Admin", sessionId);
   };
 
-  const handleSend = (customText?: string) => {
+  const handleSend = async (customText?: string) => {
     const textToSend = customText || inputValue;
     if (!textToSend.trim()) return;
 
@@ -261,6 +422,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
 
     // Jika user memilih "Mengobrol Dengan Admin"
     if (textToSend.toLowerCase().includes("mengobrol dengan admin")) {
+      setIsEscalatedToAdmin(true);
       handleAdminEscalation();
       if (!customText) setInputValue("");
       return;
@@ -273,54 +435,56 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const currentWithUser = [...messages, userMsg];
+    setMessages(currentWithUser);
+
+    // JIKA SESI TERHUBUNG DENGAN CS ADMIN (TAKEOVER MODE): AI & RAG TIDAK JAWAB LAGI
+    const isCurrentlyEscalated =
+      isEscalatedToAdmin ||
+      messages.some((m) => m.isEscalation || m.sender === "admin" || m.text.includes("Mengobrol Dengan Admin"));
+
+    if (isCurrentlyEscalated) {
+      saveOrUpdateUserSession(sessionId, currentWithUser, "Eskalasi Pertanyaan CS Admin", true);
+
+      const formattedHistory = currentWithUser.map((m) => ({
+        id: m.id,
+        sender: m.sender,
+        text: m.text,
+        time: m.time,
+      }));
+      escalateSessionToAdmin(formattedHistory, "Eskalasi Pertanyaan CS Admin", sessionId);
+
+      if (!customText) setInputValue("");
+      setIsTyping(false);
+      return; // STOP! AI Gemini & RAG tidak akan merespons
+    }
+
+    saveOrUpdateUserSession(sessionId, currentWithUser);
     if (!customText) setInputValue("");
     setIsTyping(true);
 
-    // Query RAG Knowledge Base (Dokumen Upload & Input FAQ Cepat)
-    setTimeout(() => {
-      const ragMatch = queryRagKnowledgeBase(textToSend);
-      let botAnswer = "";
+    // Generate AI response using active System Prompt, RAG context & contact settings
+    const result = await generateAiChatResponse({
+      userQuery: textToSend,
+      settings,
+      customText,
+      quickPrompts,
+    });
 
-      if (ragMatch) {
-        botAnswer = ragMatch;
-      } else {
-        const matchedPrompt = quickPrompts.find((p) =>
-          textToSend.toLowerCase().includes(p.label.toLowerCase()) || p.id === customText
-        );
+    const botMsg: ChatMessage = {
+      id: `bot-${Date.now()}`,
+      sender: "bot",
+      text: result.text,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isContactInfo: result.isContactInfo,
+      waNumber: result.waNumber,
+      adminEmail: result.adminEmail,
+    };
 
-        if (matchedPrompt) {
-          if (matchedPrompt.id === "hubungi-bsmr") {
-            botAnswer = `Anda dapat menghubungi Admin CS BSMR melalui:\n• WhatsApp CS: +${settings.waNumber}\n• Email Admin: ${settings.adminEmail}\n(Operasional: Senin - Jumat, 08.00 - 17.00 WIB).`;
-          } else {
-            botAnswer = matchedPrompt.answer;
-          }
-          if (matchedPrompt.id === "hubungi-admin") {
-            handleAdminEscalation();
-            setIsTyping(false);
-            return;
-          }
-        } else if (textToSend.toLowerCase().includes("biaya")) {
-          botAnswer = "Biaya Ujian Sertifikasi BSMR Level 1 adalah Rp 2.500.000,- dan Level 2 adalah Rp 4.500.000,- (Belum termasuk PPN 11%).";
-        } else if (textToSend.toLowerCase().includes("jadwal")) {
-          botAnswer = "Jadwal ujian sertifikasi BSMR periode berikutnya dilaksanakan pada tanggal 12-14 September 2026.";
-        } else if (textToSend.toLowerCase().includes("email") || textToSend.toLowerCase().includes("kontak") || textToSend.toLowerCase().includes("wa")) {
-          botAnswer = `Kontak Resmi CS BSMR:\n• WhatsApp: +${settings.waNumber}\n• Email Admin: ${settings.adminEmail}`;
-        } else {
-          botAnswer = "Terima kasih atas pertanyaan Anda. Informasi telah diproses oleh AI Assistant BSMR berdasarkan dokumen basis pengetahuan RAG resmi.";
-        }
-      }
-
-      const botMsg: ChatMessage = {
-        id: `bot-${Date.now()}`,
-        sender: "bot",
-        text: botAnswer,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-
-      setMessages((prev) => [...prev, botMsg]);
-      setIsTyping(false);
-    }, 800);
+    const currentWithBot = [...currentWithUser, botMsg];
+    setMessages(currentWithBot);
+    saveOrUpdateUserSession(sessionId, currentWithBot);
+    setIsTyping(false);
   };
 
   return (
@@ -351,19 +515,19 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                   ease: "easeInOut",
                   times: [0, 0.15, 0.5, 0.85, 1],
                 }}
-                className="mb-3 relative group cursor-pointer select-none whitespace-nowrap shrink-0"
+                className="mb-2.5 relative group cursor-pointer select-none whitespace-nowrap shrink-0"
                 onClick={() => {
                   setIsOpen(true);
                   recordNewInteraction();
                 }}
               >
-                <div className="bg-white text-gray-900 px-4 py-2 rounded-full shadow-xl border border-gray-100 flex items-center gap-2 whitespace-nowrap">
-                  <span className="text-xs font-extrabold tracking-tight text-[#0052cc] whitespace-nowrap">
+                <div className="bg-white text-gray-900 px-4 py-2 rounded-full shadow-xl border border-blue-500/20 flex items-center gap-2 whitespace-nowrap hover:scale-105 transition-transform">
+                  <span className="text-xs sm:text-sm font-extrabold tracking-tight text-[#0052cc] whitespace-nowrap">
                     Tanya AI BSMR 👋
                   </span>
                 </div>
                 {/* Arrow Indicator */}
-                <div className="absolute right-6 -bottom-1.5 w-3 h-3 bg-white transform rotate-45 border-r border-b border-gray-100" />
+                <div className="absolute right-6 -bottom-1.5 w-3 h-3 bg-white transform rotate-45 border-r border-b border-blue-500/20" />
               </motion.div>
             )}
 
@@ -373,9 +537,9 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                 setIsOpen(true);
                 recordNewInteraction();
               }}
-              className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#0042a5] via-[#0052cc] to-[#1e6fff] text-white flex items-center justify-center shadow-2xl hover:shadow-blue-500/30 hover:scale-105 active:scale-95 transition-transform cursor-pointer relative group shrink-0"
+              className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#00388c] via-[#0052cc] to-[#1e6fff] text-white flex items-center justify-center shadow-xl hover:shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer relative group shrink-0 ring-4 ring-blue-500/15"
             >
-              <div className="w-10 h-10 rounded-full bg-white p-1 flex items-center justify-center shadow-xs">
+              <div className="w-11 h-11 rounded-full bg-white p-1 flex items-center justify-center shadow-xs">
                 <img
                   src="/chatbotlog.png"
                   alt="BSMR AI Logo"
@@ -419,7 +583,9 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                   </h4>
                   <p className="text-[11px] text-blue-100/90 flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    Online • Respon Cepat RAG
+                    {isEscalatedToAdmin || messages.some((m) => m.isEscalation || m.sender === "admin" || m.text.includes("Mengobrol Dengan Admin"))
+                      ? "Terhubung CS Admin BSMR"
+                      : "Online • Respon Cepat RAG"}
                   </p>
                 </div>
               </div>
@@ -462,20 +628,39 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
 
                       <div
                         className={cn(
-                          "max-w-[82%] p-3.5 rounded-2xl text-xs leading-relaxed shadow-xs",
+                          "max-w-[82%] p-3.5 rounded-2xl text-xs leading-relaxed shadow-xs whitespace-pre-line",
                           msg.sender === "user"
                             ? "bg-[#0052cc] text-white rounded-tr-none font-medium"
                             : msg.sender === "admin"
-                            ? "bg-indigo-600 text-white rounded-tl-none font-medium"
-                            : darkMode
-                            ? "bg-gray-800 text-gray-100 border border-gray-700 rounded-tl-none"
-                            : "bg-white text-gray-800 border border-gray-200/80 rounded-tl-none"
+                              ? "bg-indigo-600 text-white rounded-tl-none font-medium"
+                              : darkMode
+                                ? "bg-gray-800 text-gray-100 border border-gray-700 rounded-tl-none"
+                                : "bg-white text-gray-800 border border-gray-200/80 rounded-tl-none"
                         )}
                       >
                         {msg.sender === "admin" && (
                           <span className="block text-[10px] font-bold text-indigo-200 mb-0.5">Balasan Live CS Admin</span>
                         )}
-                        {msg.text}
+                        <div>{msg.text}</div>
+
+                        {(msg.isContactInfo || msg.text.includes("WhatsApp CS:") || msg.text.includes("Email Admin:")) && (
+                          <div className="mt-3 pt-2 border-t border-gray-200/60 dark:border-gray-700/60 space-y-1.5 pointer-events-auto">
+                            <a
+                              href={`https://wa.me/${(msg.waNumber || settings.waNumber || '').replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-[11px] transition-all shadow-xs active:scale-95 text-center no-underline cursor-pointer"
+                            >
+                              📱 Chat WhatsApp CS (+{(msg.waNumber || settings.waNumber || '').replace(/\D/g, '')})
+                            </a>
+                            <a
+                              href={`mailto:${msg.adminEmail || settings.adminEmail || 'cs@bsmr.org'}`}
+                              className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-[11px] transition-all shadow-xs active:scale-95 text-center no-underline cursor-pointer"
+                            >
+                              📧 Kirim Email ({msg.adminEmail || settings.adminEmail || 'cs@bsmr.org'})
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -544,8 +729,8 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                           prompt.id === "hubungi-admin"
                             ? "bg-blue-600 text-white border-blue-700 hover:bg-blue-700 animate-pulse"
                             : darkMode
-                            ? "bg-gray-800 border-blue-900/60 text-blue-300 hover:bg-blue-950/60"
-                            : "bg-blue-50/70 border-blue-200/80 text-blue-700 hover:bg-blue-100/80"
+                              ? "bg-gray-800 border-blue-900/60 text-blue-300 hover:bg-blue-950/60"
+                              : "bg-blue-50/70 border-blue-200/80 text-blue-700 hover:bg-blue-100/80"
                         )}
                       >
                         <span>{prompt.icon}</span>

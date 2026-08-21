@@ -6,6 +6,24 @@ import { fileURLToPath, URL } from 'url';
 
 function chatSyncPlugin(): Plugin {
   let serverSessions: any[] = [];
+  let serverDeletedIds = new Set<string>();
+  let serverSettings: any = null;
+  let serverAiConfig: any = null;
+
+  const LEGACY_TEST_IDS = [
+    "#5887", "#5589", "#4092", "#4088", "#4075", "#8246", "#2907", "#3309", "#7880", "#2295", "#9060", "#6718", "#6576",
+    "#8319", "#6837", "#6332", "#5628", "#5239", "#8284", "#5362", "#4662",
+    "#9585", "#9443", "#2281", "#6543", "#5871", "#3840", "#7091"
+  ];
+  const EXACT_LEGACY_IDS = new Set(["session-1", "session-2", "session-3", "session-esc-1", "session-esc-2"]);
+
+  function isSessionDeleted(s: any): boolean {
+    if (!s) return true;
+    if (EXACT_LEGACY_IDS.has(s.id)) return true;
+    if (LEGACY_TEST_IDS.includes(s.visitorId)) return true;
+    if (serverDeletedIds.has(s.id) || serverDeletedIds.has(s.visitorId)) return true;
+    return false;
+  }
 
   return {
     name: 'chat-sync-plugin',
@@ -20,10 +38,10 @@ function chatSyncPlugin(): Plugin {
           return res.end();
         }
 
-        if (req.url === '/api/visitor-chat-sessions') {
+        if (req.url === '/api/ai-config') {
           if (req.method === 'GET') {
             res.setHeader('Content-Type', 'application/json');
-            return res.end(JSON.stringify(serverSessions));
+            return res.end(JSON.stringify(serverAiConfig || {}));
           }
           if (req.method === 'POST') {
             let body = '';
@@ -31,19 +49,75 @@ function chatSyncPlugin(): Plugin {
             req.on('end', () => {
               try {
                 const parsed = JSON.parse(body);
-                if (Array.isArray(parsed)) {
+                if (parsed && typeof parsed === 'object') {
+                  serverAiConfig = parsed;
+                }
+              } catch (e) {}
+              res.setHeader('Content-Type', 'application/json');
+              return res.end(JSON.stringify({ success: true, config: serverAiConfig }));
+            });
+            return;
+          }
+        }
+
+        if (req.url === '/api/chatbot-settings') {
+          if (req.method === 'GET') {
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify(serverSettings || {}));
+          }
+          if (req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk) => { body += chunk; });
+            req.on('end', () => {
+              try {
+                const parsed = JSON.parse(body);
+                if (parsed && typeof parsed === 'object') {
+                  serverSettings = parsed;
+                }
+              } catch (e) {}
+              res.setHeader('Content-Type', 'application/json');
+              return res.end(JSON.stringify({ success: true, settings: serverSettings }));
+            });
+            return;
+          }
+        }
+
+        if (req.url && req.url.startsWith('/api/visitor-chat-sessions')) {
+          if (req.method === 'GET') {
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            const valid = serverSessions.filter(s => !isSessionDeleted(s));
+            return res.end(JSON.stringify(valid));
+          }
+          if (req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk) => { body += chunk; });
+            req.on('end', () => {
+              try {
+                const parsed = JSON.parse(body);
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                  if (parsed.action === 'DELETE' && Array.isArray(parsed.deletedIds)) {
+                    parsed.deletedIds.forEach((id: string) => serverDeletedIds.add(id));
+                    serverSessions = serverSessions.filter(s => !isSessionDeleted(s));
+                  } else if (parsed.action === 'CLEAR') {
+                    serverSessions = [];
+                  }
+                } else if (Array.isArray(parsed)) {
                   if (parsed.length === 0) {
                     serverSessions = [];
                   } else {
-                    const parsedIds = new Set(parsed.map(s => s ? s.id : null).filter(Boolean));
+                    const cleanIncoming = parsed.filter(s => !isSessionDeleted(s));
+                    
                     const sessionMap = new Map();
                     for (const s of serverSessions) {
-                      if (s && s.id && parsedIds.has(s.id)) {
+                      if (s && s.id && !isSessionDeleted(s)) {
                         sessionMap.set(s.id, s);
                       }
                     }
-                    for (const newS of parsed) {
-                      if (!newS || !newS.id) continue;
+                    for (const newS of cleanIncoming) {
+                      if (!newS || !newS.id || isSessionDeleted(newS)) continue;
                       if (sessionMap.has(newS.id)) {
                         const existing = sessionMap.get(newS.id);
                         const msgMap = new Map();
@@ -63,10 +137,12 @@ function chatSyncPlugin(): Plugin {
                         sessionMap.set(newS.id, newS);
                       }
                     }
-                    serverSessions = Array.from(sessionMap.values());
+                    serverSessions = Array.from(sessionMap.values()).filter(s => !isSessionDeleted(s));
                   }
                 }
               } catch (e) {}
+              const adminMsgCount = serverSessions.reduce((n, s) => n + (s.messages || []).filter((m: any) => m.sender === 'admin').length, 0);
+              console.log(`[API POST] sessions=${serverSessions.length}, adminMsgs=${adminMsgCount}`);
               res.setHeader('Content-Type', 'application/json');
               return res.end(JSON.stringify({ success: true, count: serverSessions.length }));
             });

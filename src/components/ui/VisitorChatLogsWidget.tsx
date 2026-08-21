@@ -12,6 +12,8 @@ import {
   deleteBulkVisitorChatSessions,
   deleteVisitorChatSession,
   clearAllVisitorChatSessions,
+  sortSessionsDescending,
+  markSessionAsReadInService,
   ChatSession,
   ChatMessage
 } from "../../services/visitorChatLogsService";
@@ -116,13 +118,32 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
   }, []);
 
   const markSessionAsRead = React.useCallback((sessionId: string) => {
-    if (typeof window === 'undefined') return;
-    setSessions((prev) =>
-      prev.map((s) => (s.id === sessionId ? { ...s, isUnread: false } : s))
-    );
+    if (typeof window === 'undefined' || !sessionId) return;
+    const updated = markSessionAsReadInService(sessionId);
+    if (Array.isArray(updated)) {
+      setSessions(updated);
+    }
   }, []);
 
-  const safeSessions = Array.isArray(sessions) ? sessions : [];
+  const safeSessions = sortSessionsDescending(Array.isArray(sessions) ? sessions : []);
+
+  useEffect(() => {
+    if (safeSessions.length > 0) {
+      const exists = safeSessions.some((s) => s.id === selectedSessionId);
+      if (!exists || !selectedSessionId) {
+        setSelectedSessionId(safeSessions[0].id);
+      }
+    } else if (selectedSessionId !== "") {
+      setSelectedSessionId("");
+    }
+  }, [safeSessions, selectedSessionId]);
+
+  useEffect(() => {
+    if (selectedSessionId && selectedSessionId !== "empty") {
+      markSessionAsRead(selectedSessionId);
+    }
+  }, [selectedSessionId, markSessionAsRead]);
+
   const selectedSession = safeSessions.find((s) => s.id === selectedSessionId) || safeSessions[0] || {
     id: "empty",
     visitorId: "#0000",
@@ -373,7 +394,7 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
                           )
                         )}
                         <span className={cn("text-xs font-bold truncate", darkMode ? "text-gray-100" : "text-gray-900")}>
-                          Pengunjung {session.visitorId} ({session.location})
+                          Pengunjung {session.visitorId}
                         </span>
                       </div>
                       

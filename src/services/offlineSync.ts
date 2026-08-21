@@ -109,12 +109,15 @@ export async function flushOfflineQueue(): Promise<{ syncedCount: number; failed
         syncedCount++;
         const resData = await res.json().catch(() => null);
 
-        // Map temporary database ID to real server ID in remaining queued actions
+        // Map temporary database or note ID to real server ID in remaining queued actions
         if (act.method.toUpperCase() === 'POST' && resData?.data?.id) {
           const newRealId = resData.data.id;
           for (let j = i + 1; j < actions.length; j++) {
             if (actions[j].url.includes('/api/databases/')) {
               actions[j].url = actions[j].url.replace(/\/api\/databases\/[^\/]+/, `/api/databases/${newRealId}`);
+            }
+            if (actions[j].url.includes('/api/notes/')) {
+              actions[j].url = actions[j].url.replace(/\/api\/notes\/[^\/]+/, `/api/notes/${newRealId}`);
             }
           }
         }
@@ -156,7 +159,23 @@ export async function apiFetch<T = any>(
       if (cacheKey && method === 'GET') {
         setCache(cacheKey, data.data !== undefined ? data.data : data);
       }
+      if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+        if (url.includes('/api/notes')) {
+          localStorage.removeItem('mirov_cache_notes');
+          localStorage.removeItem('mirov_cached_notes');
+        }
+        if (url.includes('/api/history')) {
+          localStorage.removeItem('mirov_cache_history_logs');
+        }
+        if (url.includes('/api/databases')) {
+          localStorage.removeItem('mirov_cache_databases');
+        }
+      }
       return { ok: true, data };
+    }
+    if (res.status === 401) {
+      console.warn(`[apiFetch] 401 Unauthorized for ${method} ${url}`);
+      window.dispatchEvent(new CustomEvent('app:unauthorized'));
     }
     return { ok: false, data: null };
   } catch (err) {

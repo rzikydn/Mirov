@@ -15,16 +15,42 @@ export default function StatisticCard7({ darkMode }: StatisticCard7Props) {
 
     window.addEventListener('bsmr_analytics_updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'BSMR_ANALYTICS_UPDATED') {
+        handleUpdate();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        channel = new BroadcastChannel('bsmr_analytics_sync_channel');
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'BSMR_ANALYTICS_UPDATED') {
+            handleUpdate();
+          }
+        };
+      } catch (e) {}
+    }
+
+    const interval = setInterval(handleUpdate, 1200);
+
     return () => {
       window.removeEventListener('bsmr_analytics_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('message', handleMessage);
+      if (channel) channel.close();
+      clearInterval(interval);
     };
   }, []);
 
-  const total = Math.max(analytics.totalInteractions, 1);
-  const solvedPercent = ((analytics.solvedCount / total) * 100).toFixed(1);
-  const escalatedPercent = ((analytics.escalatedCount / total) * 100).toFixed(1);
-  const outOfHoursPercent = ((analytics.outOfHoursCount / total) * 100).toFixed(1);
+  const hasInteractions = analytics.totalInteractions > 0;
+  const total = hasInteractions ? analytics.totalInteractions : 1;
+  const solvedPercent = hasInteractions ? Math.min(100, Math.max(0, (analytics.solvedCount / total) * 100)).toFixed(1) : '0';
+  const escalatedPercent = hasInteractions ? Math.min(100, Math.max(0, (analytics.escalatedCount / total) * 100)).toFixed(1) : '0';
+  const outOfHoursPercent = hasInteractions ? Math.min(100, Math.max(0, (analytics.outOfHoursCount / total) * 100)).toFixed(1) : '0';
 
   const cards = [
     {
