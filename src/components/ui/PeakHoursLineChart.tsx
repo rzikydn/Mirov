@@ -12,7 +12,7 @@ import {
 import { ChartContainer, ChartTooltip } from "./line-charts-1";
 import { cn } from "../../lib/utils";
 import { Clock } from "lucide-react";
-import { getPeakHoursData, PeakHourBucket, INITIAL_PEAK_HOURS } from "../../services/peakHoursAnalytics";
+import { getPeakHoursData, fetchPeakHoursAsync, PeakHourBucket, INITIAL_PEAK_HOURS } from "../../services/peakHoursAnalytics";
 
 interface PeakHoursLineChartProps {
   darkMode?: boolean;
@@ -65,7 +65,7 @@ const CustomTooltip = ({ active, payload, label, darkMode }: CustomTooltipProps)
           <span className="flex items-center gap-1">
             <Clock className="w-3.5 h-3.5 text-teal-500" /> Jam {label} WIB
           </span>
-          {chatValue > 180 && (
+          {chatValue > 80 && (
             <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 font-semibold px-1.5 py-0.5 rounded">
               Puncak
             </span>
@@ -81,7 +81,7 @@ const CustomTooltip = ({ active, payload, label, darkMode }: CustomTooltipProps)
           <div className="flex items-center justify-between gap-3">
             <ChartLabel label="Kapasitas RAG AI:" color={chartConfig.capacity.color} />
             <span className="font-extrabold font-mono text-xs">
-              150 chat
+              80 chat
             </span>
           </div>
         </div>
@@ -94,27 +94,70 @@ const CustomTooltip = ({ active, payload, label, darkMode }: CustomTooltipProps)
 export default function PeakHoursLineChart({ darkMode }: PeakHoursLineChartProps) {
   const [data, setData] = useState<PeakHourBucket[]>(() => {
     const initial = getPeakHoursData();
-    return Array.isArray(initial) && initial.length > 0 ? initial : INITIAL_PEAK_HOURS;
+    return Array.isArray(initial) && initial.length === 24 ? initial : INITIAL_PEAK_HOURS;
   });
 
   useEffect(() => {
     const handleUpdate = () => {
       const fresh = getPeakHoursData();
-      if (Array.isArray(fresh) && fresh.length > 0) {
+      if (Array.isArray(fresh) && fresh.length === 24) {
         setData(fresh);
       }
     };
 
+    const handleAsyncUpdate = async () => {
+      handleUpdate();
+      const freshApi = await fetchPeakHoursAsync();
+      if (Array.isArray(freshApi) && freshApi.length === 24) {
+        setData(freshApi);
+      }
+    };
+
+    handleAsyncUpdate();
+
     window.addEventListener("bsmr_peak_hours_updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === "BSMR_PEAK_HOURS_UPDATED") {
+        if (Array.isArray(e.data.data) && e.data.data.length === 24) {
+          setData(e.data.data);
+        } else {
+          handleAsyncUpdate();
+        }
+      }
+    };
+    window.addEventListener("message", handleMessage);
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      try {
+        channel = new BroadcastChannel("bsmr_peak_hours_sync");
+        channel.onmessage = (event) => {
+          if (event.data?.type === "PEAK_HOURS_UPDATED" && Array.isArray(event.data.data)) {
+            setData(event.data.data);
+          } else {
+            handleAsyncUpdate();
+          }
+        };
+      } catch (e) {}
+    }
+
+    const interval = setInterval(handleAsyncUpdate, 1500);
+
     return () => {
       window.removeEventListener("bsmr_peak_hours_updated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("message", handleMessage);
+      if (channel) channel.close();
+      clearInterval(interval);
     };
   }, []);
 
-  const totalChatCount = Array.isArray(data) ? data.reduce((acc, item) => acc + (item.chat || 0), 0) : 0;
-  const safeData = Array.isArray(data) && data.length > 0 && totalChatCount > 0 ? data : INITIAL_PEAK_HOURS;
+  const safeData = (Array.isArray(data) && data.length === 24 ? data : INITIAL_PEAK_HOURS).map((b) => ({
+    ...b,
+    capacity: 80,
+  }));
 
   return (
     <div
@@ -187,7 +230,8 @@ export default function PeakHoursLineChart({ darkMode }: PeakHoursLineChartProps
                   {payload.value}
                 </text>
               )}
-              domain={[0, 'auto']}
+              domain={[0, 160]}
+              ticks={[0, 40, 80, 120, 160]}
             />
 
             <ChartTooltip

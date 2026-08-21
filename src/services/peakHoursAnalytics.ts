@@ -1,4 +1,4 @@
-// Peak Hours 24-Hour Analytics Service for BSMR Chatbot (with New Day Auto-Reset)
+// Peak Hours 24-Hour Analytics Service for BSMR Chatbot (Real-Time 24-Hour Analytics)
 
 export interface PeakHourBucket {
   hour: string;
@@ -8,52 +8,53 @@ export interface PeakHourBucket {
 
 const STORAGE_KEY = 'bsmr_peak_hours_analytics';
 const DATE_STORAGE_KEY = 'bsmr_peak_hours_last_date';
+const DUMMY_CLEARED_KEY = 'bsmr_peak_hours_dummy_purged_v2';
+const SYNC_API_URL = 'http://localhost:5173/api/peak-hours';
 
-export const INITIAL_PEAK_HOURS: PeakHourBucket[] = [
-  { hour: "00:00", chat: 32, capacity: 150 },
-  { hour: "01:00", chat: 18, capacity: 150 },
-  { hour: "02:00", chat: 12, capacity: 150 },
-  { hour: "03:00", chat: 8, capacity: 150 },
-  { hour: "04:00", chat: 15, capacity: 150 },
-  { hour: "05:00", chat: 25, capacity: 150 },
-  { hour: "06:00", chat: 42, capacity: 150 },
-  { hour: "07:00", chat: 65, capacity: 150 },
-  { hour: "08:00", chat: 110, capacity: 150 },
-  { hour: "09:00", chat: 168, capacity: 150 },
-  { hour: "10:00", chat: 195, capacity: 150 },
-  { hour: "11:00", chat: 140, capacity: 150 },
-  { hour: "12:00", chat: 98, capacity: 150 },
-  { hour: "13:00", chat: 175, capacity: 150 },
-  { hour: "14:00", chat: 242, capacity: 150 },
-  { hour: "15:00", chat: 210, capacity: 150 },
-  { hour: "16:00", chat: 165, capacity: 150 },
-  { hour: "17:00", chat: 125, capacity: 150 },
-  { hour: "18:00", chat: 82, capacity: 150 },
-  { hour: "19:00", chat: 115, capacity: 150 },
-  { hour: "20:00", chat: 148, capacity: 150 },
-  { hour: "21:00", chat: 120, capacity: 150 },
-  { hour: "22:00", chat: 90, capacity: 150 },
-  { hour: "23:00", chat: 55, capacity: 150 },
-];
+// Clean 24-Hour Initial Buckets (00:00 to 23:00) with 0 chat interactions
+export const INITIAL_PEAK_HOURS: PeakHourBucket[] = Array.from({ length: 24 }, (_, i) => ({
+  hour: `${String(i).padStart(2, '0')}:00`,
+  chat: 0,
+  capacity: 80,
+}));
+
+let cachedPeakHours: PeakHourBucket[] = [...INITIAL_PEAK_HOURS];
+
+/**
+ * Purge legacy dummy data once on initial upgrade to give user a clean slate for real-time testing
+ */
+function purgeLegacyDummyData(): void {
+  try {
+    if (typeof window === 'undefined') return;
+    const isPurged = localStorage.getItem(DUMMY_CLEARED_KEY);
+    if (!isPurged) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_PEAK_HOURS));
+      localStorage.setItem(DUMMY_CLEARED_KEY, 'true');
+    }
+  } catch (e) {}
+}
 
 /**
  * Memeriksa dan mereset data chart Peak Hours secara otomatis saat berganti hari/tanggal baru
  */
 export function checkAndResetPeakHoursNewDay(): void {
   try {
+    purgeLegacyDummyData();
     const todayStr = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
-    const lastSavedDate = localStorage.getItem(DATE_STORAGE_KEY);
+    const lastSavedDate = typeof window !== 'undefined' ? localStorage.getItem(DATE_STORAGE_KEY) : null;
 
     if (lastSavedDate && lastSavedDate !== todayStr) {
-      // Memasuki hari/tanggal baru! Reset seluruh 24 jam interaksi menjadi 0
       const resetBuckets: PeakHourBucket[] = INITIAL_PEAK_HOURS.map((bucket) => ({
         ...bucket,
         chat: 0,
       }));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(resetBuckets));
-      localStorage.setItem(DATE_STORAGE_KEY, todayStr);
-      window.dispatchEvent(new Event('bsmr_peak_hours_updated'));
-    } else if (!lastSavedDate) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(resetBuckets));
+        localStorage.setItem(DATE_STORAGE_KEY, todayStr);
+        window.dispatchEvent(new Event('bsmr_peak_hours_updated'));
+      }
+      cachedPeakHours = resetBuckets;
+    } else if (!lastSavedDate && typeof window !== 'undefined') {
       localStorage.setItem(DATE_STORAGE_KEY, todayStr);
     }
   } catch (e) {
@@ -62,35 +63,90 @@ export function checkAndResetPeakHoursNewDay(): void {
 }
 
 /**
- * Membaca data jam sibuk dari localStorage dengan validasi Array ketat & Auto-Reset Hari Baru
+ * Membaca data jam sibuk dari localStorage
  */
 export function getPeakHoursData(): PeakHourBucket[] {
   checkAndResetPeakHoursNewDay();
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (data) {
-      const parsed = JSON.parse(data);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const totalChat = parsed.reduce((acc: number, item: any) => acc + (item.chat || 0), 0);
-        if (totalChat > 0) {
-          return parsed;
+    if (typeof window !== 'undefined') {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length === 24) {
+          const sanitized = parsed.map(b => ({ ...b, capacity: 80 }));
+          cachedPeakHours = sanitized;
+          return sanitized;
         }
       }
     }
   } catch (e) {
     console.error('Failed to load peak hours analytics:', e);
   }
-  return INITIAL_PEAK_HOURS;
+  return cachedPeakHours.length === 24 ? cachedPeakHours.map(b => ({ ...b, capacity: 80 })) : INITIAL_PEAK_HOURS;
 }
 
 /**
- * Menyimpan data jam sibuk ke localStorage
+ * Fetch data peak hours dari API Server secara async (Cross-Origin Support)
+ */
+export async function fetchPeakHoursAsync(): Promise<PeakHourBucket[]> {
+  try {
+    const cacheBustUrl = `${SYNC_API_URL}?_t=${Date.now()}`;
+    const res = await fetch(cacheBustUrl, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length === 24) {
+        const sanitized = data.map((b: any) => ({ ...b, capacity: 80 }));
+        cachedPeakHours = sanitized;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+          window.dispatchEvent(new Event('bsmr_peak_hours_updated'));
+        }
+        return sanitized;
+      }
+    }
+  } catch (e) {
+    // Silently fallback
+  }
+  return getPeakHoursData();
+}
+
+/**
+ * Menyimpan data jam sibuk ke localStorage dan Sync ke Server API
  */
 export function savePeakHoursData(data: PeakHourBucket[]): void {
   try {
-    if (!Array.isArray(data)) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    window.dispatchEvent(new Event('bsmr_peak_hours_updated'));
+    if (!Array.isArray(data) || data.length !== 24) return;
+    const sanitized = data.map(b => ({ ...b, capacity: 80 }));
+    cachedPeakHours = sanitized;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+      window.dispatchEvent(new Event('bsmr_peak_hours_updated'));
+
+      if ('BroadcastChannel' in window) {
+        try {
+          const channel = new BroadcastChannel('bsmr_peak_hours_sync');
+          channel.postMessage({ type: 'PEAK_HOURS_UPDATED', data: sanitized });
+          channel.close();
+        } catch (e) {}
+      }
+
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'BSMR_PEAK_HOURS_UPDATED', data: sanitized }, '*');
+      }
+    }
+
+    // HTTP Sync POST ke Vite API
+    fetch(SYNC_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sanitized),
+    }).catch(() => {});
   } catch (e) {
     console.error('Failed to save peak hours analytics:', e);
   }
@@ -105,7 +161,11 @@ export function recordPeakHourChat(date = new Date()): void {
   const data = getPeakHoursData();
   
   if (Array.isArray(data) && data[currentHour]) {
-    data[currentHour].chat += 1;
-    savePeakHoursData(data);
+    const updated = [...data];
+    updated[currentHour] = {
+      ...updated[currentHour],
+      chat: (updated[currentHour].chat || 0) + 1,
+    };
+    savePeakHoursData(updated);
   }
 }

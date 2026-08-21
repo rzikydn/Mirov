@@ -10,6 +10,12 @@ function chatSyncPlugin(): Plugin {
   let serverSettings: any = null;
   let serverAiConfig: any = null;
 
+  let serverPeakHours: any[] = Array.from({ length: 24 }, (_, i) => ({
+    hour: `${String(i).padStart(2, '0')}:00`,
+    chat: 0,
+    capacity: 80,
+  }));
+
   const LEGACY_TEST_IDS = [
     "#5887", "#5589", "#4092", "#4088", "#4075", "#8246", "#2907", "#3309", "#7880", "#2295", "#9060", "#6718", "#6576",
     "#8319", "#6837", "#6332", "#5628", "#5239", "#8284", "#5362", "#4662",
@@ -36,6 +42,31 @@ function chatSyncPlugin(): Plugin {
         if (req.method === 'OPTIONS') {
           res.statusCode = 204;
           return res.end();
+        }
+
+        if (req.url && req.url.startsWith('/api/peak-hours')) {
+          if (req.method === 'GET') {
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            const sanitized = serverPeakHours.map((b: any) => ({ ...b, capacity: 80 }));
+            return res.end(JSON.stringify(sanitized));
+          }
+          if (req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk) => { body += chunk; });
+            req.on('end', () => {
+              try {
+                const parsed = JSON.parse(body);
+                if (Array.isArray(parsed) && parsed.length === 24) {
+                  serverPeakHours = parsed.map((b: any) => ({ ...b, capacity: 80 }));
+                }
+              } catch (e) {}
+              res.setHeader('Content-Type', 'application/json');
+              return res.end(JSON.stringify({ success: true, data: serverPeakHours }));
+            });
+            return;
+          }
         }
 
         if (req.url === '/api/ai-config') {
