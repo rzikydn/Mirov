@@ -233,12 +233,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
     const syncAdminRepliesFromApi = async () => {
       try {
         const sessions = await fetchVisitorChatSessionsAsync();
-        let currentSession = sessions.find(isMatchingSession);
-
-        if (!currentSession && sessions.length > 0) {
-          // Robust fallback: check if any session contains admin replies, otherwise take the newest session
-          currentSession = sessions.find((s) => Array.isArray(s.messages) && s.messages.some((m) => m.sender === "admin")) || sessions[0];
-        }
+        const currentSession = sessions.find(isMatchingSession);
 
         if (currentSession && Array.isArray(currentSession.messages)) {
           const adminMsgs = currentSession.messages.filter((m) => m.sender === "admin");
@@ -281,7 +276,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
         (targetSessionId && visitorId && targetSessionId === visitorId) ||
         (targetSessionId && sessionId && (targetSessionId.includes(sessionId) || sessionId.includes(targetSessionId)));
 
-      if (isMatch || true) {
+      if (isMatch) {
         setMessages((prev) => {
           const alreadyExists = prev.some(
             (m) => m.sender === "admin" && m.text.trim() === replyText.trim()

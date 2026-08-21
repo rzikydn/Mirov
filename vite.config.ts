@@ -16,6 +16,58 @@ function chatSyncPlugin(): Plugin {
     capacity: 80,
   }));
 
+  let serverTopQuestions: any[] = [
+    {
+      id: "jadwal-asesmen",
+      label: "Jadwal & Lokasi Asesmen",
+      count: 0,
+      color: "hsl(214.7 95% 40%)",
+      keywords: ["jadwal", "kapan", "asesmen", "ujian", "level", "tanggal", "periode", "lokasi", "tempat", "cbt"],
+    },
+    {
+      id: "perpanjangan-sertifikat",
+      label: "Mekanisme Perpanjangan",
+      count: 0,
+      color: "hsl(142.1 76.2% 36.3%)",
+      keywords: ["perpanjang", "perpanjangan", "expired", "habis", "mekanisme", "re-sertifikasi", "renew", "masa berlaku", "tenggat"],
+    },
+    {
+      id: "biaya-pendaftaran",
+      label: "Rincian Biaya & Pendaftaran",
+      count: 0,
+      color: "hsl(47.9 95.8% 53.1%)",
+      keywords: ["biaya", "harga", "tarif", "bayar", "rincian", "ppn", "daftar", "pendaftaran", "rekening", "registrasi"],
+    },
+    {
+      id: "skp-maintenance",
+      label: "Syarat Poin SKP Maintenance",
+      count: 0,
+      color: "hsl(262.1 83.3% 57.8%)",
+      keywords: ["skp", "poin", "kredit", "maintenance", "pemeliharaan", "syarat poin", "kredit poin"],
+    },
+    {
+      id: "persyaratan-berkas",
+      label: "Persyaratan & Dokumen",
+      count: 0,
+      color: "hsl(0 0% 63.9%)",
+      keywords: ["syarat", "persyaratan", "berkas", "dokumen", "umum", "kualifikasi", "ijazah", "ktp", "pas foto"],
+    },
+    {
+      id: "informasi-bsmr",
+      label: "Informasi Umum BSMR",
+      count: 0,
+      color: "hsl(198 93% 60%)",
+      keywords: ["apa itu", "bsmr", "lembaga", "ojk", "bnsp", "profil", "tentang"],
+    },
+    {
+      id: "eskalasi-admin",
+      label: "Eskalasi CS Admin",
+      count: 0,
+      color: "hsl(340 82% 52%)",
+      keywords: ["admin", "cs", "obrol", "mengobrol", "hubungi", "operator", "bantuan", "pesan"],
+    },
+  ];
+
   const LEGACY_TEST_IDS = [
     "#5887", "#5589", "#4092", "#4088", "#4075", "#8246", "#2907", "#3309", "#7880", "#2295", "#9060", "#6718", "#6576",
     "#8319", "#6837", "#6332", "#5628", "#5239", "#8284", "#5362", "#4662",
@@ -31,6 +83,131 @@ function chatSyncPlugin(): Plugin {
     return false;
   }
 
+  function computePeakHoursServer(sessions: any[]): any[] {
+    const buckets = Array.from({ length: 24 }, (_, i) => ({
+      hour: `${String(i).padStart(2, '0')}:00`,
+      chat: 0,
+      capacity: 80,
+    }));
+    if (!Array.isArray(sessions)) return buckets;
+    for (const session of sessions) {
+      if (!session || isSessionDeleted(session) || !Array.isArray(session.messages)) continue;
+      for (const m of session.messages) {
+        if (m && m.sender === 'user') {
+          let hour = -1;
+          if (m.time) {
+            const match = m.time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+            if (match) {
+              let h = parseInt(match[1], 10);
+              const isPM = match[3] && match[3].toUpperCase() === 'PM';
+              const isAM = match[3] && match[3].toUpperCase() === 'AM';
+              if (isPM && h < 12) h += 12;
+              if (isAM && h === 12) h = 0;
+              if (h >= 0 && h <= 23) hour = h;
+            }
+          }
+          if (hour === -1 && session.timestamp) {
+            hour = new Date(session.timestamp).getHours();
+          }
+          if (hour >= 0 && hour < 24) {
+            buckets[hour].chat += 1;
+          }
+        }
+      }
+    }
+    return buckets;
+  }
+
+  function computeTopQuestionsServer(sessions: any[]): any[] {
+    const defaultCats = [
+      {
+        id: "jadwal-asesmen",
+        label: "Jadwal & Lokasi Asesmen",
+        count: 0,
+        color: "hsl(214.7 95% 40%)",
+        keywords: ["jadwal", "kapan", "asesmen", "ujian", "level", "tanggal", "periode", "lokasi", "tempat", "cbt"],
+      },
+      {
+        id: "perpanjangan-sertifikat",
+        label: "Mekanisme Perpanjangan",
+        count: 0,
+        color: "hsl(142.1 76.2% 36.3%)",
+        keywords: ["perpanjang", "perpanjangan", "expired", "habis", "mekanisme", "re-sertifikasi", "renew", "masa berlaku", "tenggat"],
+      },
+      {
+        id: "biaya-pendaftaran",
+        label: "Rincian Biaya & Pendaftaran",
+        count: 0,
+        color: "hsl(47.9 95.8% 53.1%)",
+        keywords: ["biaya", "harga", "tarif", "bayar", "rincian", "ppn", "daftar", "pendaftaran", "rekening", "registrasi"],
+      },
+      {
+        id: "skp-maintenance",
+        label: "Syarat Poin SKP Maintenance",
+        count: 0,
+        color: "hsl(262.1 83.3% 57.8%)",
+        keywords: ["skp", "poin", "kredit", "maintenance", "pemeliharaan", "syarat poin", "kredit poin"],
+      },
+      {
+        id: "persyaratan-berkas",
+        label: "Persyaratan & Dokumen",
+        count: 0,
+        color: "hsl(0 0% 63.9%)",
+        keywords: ["syarat", "persyaratan", "berkas", "dokumen", "umum", "kualifikasi", "ijazah", "ktp", "pas foto"],
+      },
+      {
+        id: "informasi-bsmr",
+        label: "Informasi Umum BSMR",
+        count: 0,
+        color: "hsl(198 93% 60%)",
+        keywords: ["apa itu", "bsmr", "lembaga", "ojk", "bnsp", "profil", "tentang"],
+      },
+      {
+        id: "eskalasi-admin",
+        label: "Eskalasi CS Admin",
+        count: 0,
+        color: "hsl(340 82% 52%)",
+        keywords: ["admin", "cs", "obrol", "mengobrol", "hubungi", "operator", "bantuan", "pesan"],
+      },
+    ];
+
+    const categories = defaultCats.map(c => ({ ...c, count: 0 }));
+    if (!Array.isArray(sessions)) return categories;
+
+    for (const session of sessions) {
+      if (!session || isSessionDeleted(session) || !Array.isArray(session.messages)) continue;
+      for (const m of session.messages) {
+        if (m && m.sender === 'user' && m.text) {
+          const text = m.text.toLowerCase().trim();
+          let bestIdx = -1;
+          let highestScore = 0;
+
+          categories.forEach((cat, idx) => {
+            let score = 0;
+            cat.keywords.forEach((kw) => {
+              if (text.includes(kw.toLowerCase())) score += 1;
+            });
+            if (score > highestScore) {
+              highestScore = score;
+              bestIdx = idx;
+            }
+          });
+
+          if (bestIdx !== -1 && highestScore > 0) {
+            categories[bestIdx].count += 1;
+          } else {
+            const fallbackIdx = categories.findIndex((c) => c.id === "informasi-bsmr");
+            if (fallbackIdx >= 0) categories[fallbackIdx].count += 1;
+            else categories[0].count += 1;
+          }
+        }
+      }
+    }
+
+    categories.sort((a, b) => b.count - a.count);
+    return categories;
+  }
+
   return {
     name: 'chat-sync-plugin',
     configureServer(server) {
@@ -44,13 +221,40 @@ function chatSyncPlugin(): Plugin {
           return res.end();
         }
 
+        if (req.url && req.url.startsWith('/api/top-questions')) {
+          if (req.method === 'GET') {
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            const valid = serverSessions.filter(s => !isSessionDeleted(s));
+            const computed = computeTopQuestionsServer(valid);
+            return res.end(JSON.stringify(computed));
+          }
+          if (req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk) => { body += chunk; });
+            req.on('end', () => {
+              try {
+                const parsed = JSON.parse(body);
+                if (Array.isArray(parsed)) {
+                  serverTopQuestions = parsed;
+                }
+              } catch (e) {}
+              res.setHeader('Content-Type', 'application/json');
+              return res.end(JSON.stringify({ success: true, data: serverTopQuestions }));
+            });
+            return;
+          }
+        }
+
         if (req.url && req.url.startsWith('/api/peak-hours')) {
           if (req.method === 'GET') {
             res.setHeader('Content-Type', 'application/json');
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.setHeader('Pragma', 'no-cache');
-            const sanitized = serverPeakHours.map((b: any) => ({ ...b, capacity: 80 }));
-            return res.end(JSON.stringify(sanitized));
+            const valid = serverSessions.filter(s => !isSessionDeleted(s));
+            const computed = computePeakHoursServer(valid);
+            return res.end(JSON.stringify(computed));
           }
           if (req.method === 'POST') {
             let body = '';

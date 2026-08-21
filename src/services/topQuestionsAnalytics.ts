@@ -1,4 +1,5 @@
-// Intent Categorization & Analytics Service for BSMR Top Questions Donut Chart
+// Intent Categorization & Analytics Service (Driven Directly by Active Chat Logs)
+import { getVisitorChatSessions, ChatSession } from "./visitorChatLogsService";
 
 export interface QuestionCategory {
   id: string;
@@ -8,108 +9,142 @@ export interface QuestionCategory {
   keywords: string[];
 }
 
-const STORAGE_KEY = 'bsmr_top_questions_analytics';
-
 export const DEFAULT_TOP_QUESTIONS: QuestionCategory[] = [
   {
     id: "jadwal-asesmen",
-    label: "Jadwal Asesmen Level 2",
-    count: 420,
+    label: "Jadwal & Lokasi Asesmen",
+    count: 0,
     color: "hsl(214.7 95% 40%)", // Blue
-    keywords: ["jadwal", "kapan", "asesmen", "ujian", "level 2", "tanggal", "periode", "lokasi"],
+    keywords: ["jadwal", "kapan", "asesmen", "ujian", "level", "tanggal", "periode", "lokasi", "tempat", "cbt"],
   },
   {
-    id: "mekanisme-perpanjangan",
+    id: "perpanjangan-sertifikat",
     label: "Mekanisme Perpanjangan",
-    count: 310,
+    count: 0,
     color: "hsl(142.1 76.2% 36.3%)", // Green
-    keywords: ["perpanjang", "perpanjangan", "expired", "habis", "mekanisme", "re-sertifikasi", "renew", "masa berlaku"],
+    keywords: ["perpanjang", "perpanjangan", "expired", "habis", "mekanisme", "re-sertifikasi", "renew", "masa berlaku", "tenggat"],
   },
   {
-    id: "rincian-biaya",
-    label: "Rincian Biaya Sertifikasi",
-    count: 240,
+    id: "biaya-pendaftaran",
+    label: "Rincian Biaya & Pendaftaran",
+    count: 0,
     color: "hsl(47.9 95.8% 53.1%)", // Yellow
-    keywords: ["biaya", "harga", "tarif", "bayar", "rincian", "ppn", "biaya sertifikasi", "rekening"],
+    keywords: ["biaya", "harga", "tarif", "bayar", "rincian", "ppn", "daftar", "pendaftaran", "rekening", "registrasi"],
   },
   {
     id: "skp-maintenance",
     label: "Syarat Poin SKP Maintenance",
-    count: 180,
+    count: 0,
     color: "hsl(262.1 83.3% 57.8%)", // Purple
-    keywords: ["skp", "poin", "kredit", "maintenance", "pemeliharaan", "syarat poin"],
+    keywords: ["skp", "poin", "kredit", "maintenance", "pemeliharaan", "syarat poin", "kredit poin"],
   },
   {
-    id: "persyaratan-asesi",
-    label: "Persyaratan Asesi Umum",
-    count: 120,
+    id: "persyaratan-berkas",
+    label: "Persyaratan & Dokumen",
+    count: 0,
     color: "hsl(0 0% 63.9%)", // Gray
-    keywords: ["syarat", "persyaratan", "berkas", "dokumen", "umum", "kualifikasi", "pendaftaran"],
+    keywords: ["syarat", "persyaratan", "berkas", "dokumen", "umum", "kualifikasi", "ijazah", "ktp", "pas foto"],
+  },
+  {
+    id: "informasi-bsmr",
+    label: "Informasi Umum BSMR",
+    count: 0,
+    color: "hsl(198 93% 60%)", // Cyan
+    keywords: ["apa itu", "bsmr", "lembaga", "ojk", "bnsp", "profil", "tentang"],
+  },
+  {
+    id: "eskalasi-admin",
+    label: "Eskalasi CS Admin",
+    count: 0,
+    color: "hsl(340 82% 52%)", // Rose
+    keywords: ["admin", "cs", "obrol", "mengobrol", "hubungi", "operator", "bantuan", "pesan"],
   },
 ];
 
 /**
- * Membaca data Top Pertanyaan dari localStorage
+ * Computes Top Questions categories directly derived from active, non-deleted chat logs
  */
-export function getTopQuestionsData(): QuestionCategory[] {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (data) {
-      return JSON.parse(data);
-    }
-  } catch (e) {
-    console.error('Failed to load top questions analytics:', e);
+export function computeTopQuestionsFromSessions(sessions: ChatSession[]): QuestionCategory[] {
+  const categories: QuestionCategory[] = DEFAULT_TOP_QUESTIONS.map((cat) => ({
+    ...cat,
+    count: 0,
+  }));
+
+  if (!Array.isArray(sessions) || sessions.length === 0) {
+    return categories;
   }
-  return DEFAULT_TOP_QUESTIONS;
-}
 
-/**
- * Menyimpan data Top Pertanyaan ke localStorage
- */
-export function saveTopQuestionsData(categories: QuestionCategory[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
-    window.dispatchEvent(new Event('bsmr_top_questions_updated'));
-  } catch (e) {
-    console.error('Failed to save top questions analytics:', e);
-  }
-}
+  for (const session of sessions) {
+    if (!session || !Array.isArray(session.messages)) continue;
+    for (const msg of session.messages) {
+      if (msg && msg.sender === "user" && msg.text) {
+        const text = msg.text.toLowerCase().trim();
+        let bestIdx = -1;
+        let highestScore = 0;
 
-/**
- * Klasifikasi pertanyaan pengguna berdasarkan intent/kata kunci dan perbarui frekuensi Top 5
- */
-export function classifyAndRecordQuestion(userQuestion: string): void {
-  if (!userQuestion || !userQuestion.trim()) return;
-  const text = userQuestion.toLowerCase().trim();
+        categories.forEach((cat, idx) => {
+          let score = 0;
+          cat.keywords.forEach((kw) => {
+            if (text.includes(kw.toLowerCase())) {
+              score += 1;
+            }
+          });
+          if (score > highestScore) {
+            highestScore = score;
+            bestIdx = idx;
+          }
+        });
 
-  const categories = getTopQuestionsData();
-  let bestMatchIndex = -1;
-  let highestScore = 0;
-
-  categories.forEach((cat, index) => {
-    let score = 0;
-    cat.keywords.forEach((keyword) => {
-      if (text.includes(keyword.toLowerCase())) {
-        score += 1;
+        if (bestIdx !== -1 && highestScore > 0) {
+          categories[bestIdx].count += 1;
+        } else {
+          const fallbackIdx = categories.findIndex((c) => c.id === "informasi-bsmr");
+          if (fallbackIdx >= 0) categories[fallbackIdx].count += 1;
+          else categories[0].count += 1;
+        }
       }
-    });
-    if (score > highestScore) {
-      highestScore = score;
-      bestMatchIndex = index;
     }
-  });
-
-  // Jika cocok dengan salah satu kategori populer, tambahkan jumlah frekuensinya
-  if (bestMatchIndex !== -1 && highestScore > 0) {
-    categories[bestMatchIndex].count += 1;
-  } else {
-    // Jika pertanyaan baru unik yang belum masuk 5 besar, tambahkan ke kategori umum atau kategori acak terdekat
-    // Default tambahkan ke kategori pertama (Jadwal/Informasi Umum)
-    categories[0].count += 1;
   }
 
-  // Urutkan kembali berdasarkan jumlah pertanyaan terbanyak (Descending)
   categories.sort((a, b) => b.count - a.count);
+  return categories;
+}
 
-  saveTopQuestionsData(categories);
+export function getTopQuestionsData(): QuestionCategory[] {
+  const sessions = getVisitorChatSessions();
+  return computeTopQuestionsFromSessions(sessions);
+}
+
+const SYNC_API_URL = "http://localhost:5173/api/top-questions";
+
+export async function fetchTopQuestionsAsync(): Promise<QuestionCategory[]> {
+  try {
+    const cacheBustUrl = `${SYNC_API_URL}?_t=${Date.now()}`;
+    const res = await fetch(cacheBustUrl, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+      },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        return data;
+      }
+    }
+  } catch (e) {}
+  return getTopQuestionsData();
+}
+
+export function saveTopQuestionsData(categories: QuestionCategory[]): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("bsmr_top_questions_updated"));
+  }
+}
+
+export function classifyAndRecordQuestion(userQuestion: string): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("bsmr_top_questions_updated"));
+  }
 }

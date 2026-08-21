@@ -1,4 +1,5 @@
-// Peak Hours 24-Hour Analytics Service for BSMR Chatbot (Real-Time 24-Hour Analytics)
+// Peak Hours 24-Hour Analytics Service for BSMR Chatbot (Driven Directly by Active Chat Logs)
+import { getVisitorChatSessions, ChatSession } from "./visitorChatLogsService";
 
 export interface PeakHourBucket {
   hour: string;
@@ -6,87 +7,71 @@ export interface PeakHourBucket {
   capacity: number;
 }
 
-const STORAGE_KEY = 'bsmr_peak_hours_analytics';
-const DATE_STORAGE_KEY = 'bsmr_peak_hours_last_date';
-const DUMMY_CLEARED_KEY = 'bsmr_peak_hours_dummy_purged_v2';
-const SYNC_API_URL = 'http://localhost:5173/api/peak-hours';
-
-// Clean 24-Hour Initial Buckets (00:00 to 23:00) with 0 chat interactions
 export const INITIAL_PEAK_HOURS: PeakHourBucket[] = Array.from({ length: 24 }, (_, i) => ({
   hour: `${String(i).padStart(2, '0')}:00`,
   chat: 0,
   capacity: 80,
 }));
 
-let cachedPeakHours: PeakHourBucket[] = [...INITIAL_PEAK_HOURS];
-
-/**
- * Purge legacy dummy data once on initial upgrade to give user a clean slate for real-time testing
- */
-function purgeLegacyDummyData(): void {
-  try {
-    if (typeof window === 'undefined') return;
-    const isPurged = localStorage.getItem(DUMMY_CLEARED_KEY);
-    if (!isPurged) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_PEAK_HOURS));
-      localStorage.setItem(DUMMY_CLEARED_KEY, 'true');
+function parseHourFromMessage(msg: any, session: ChatSession): number {
+  if (msg && msg.time) {
+    const match = msg.time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (match) {
+      let h = parseInt(match[1], 10);
+      const isPM = match[3] && match[3].toUpperCase() === 'PM';
+      const isAM = match[3] && match[3].toUpperCase() === 'AM';
+      if (isPM && h < 12) h += 12;
+      if (isAM && h === 12) h = 0;
+      if (h >= 0 && h <= 23) return h;
     }
-  } catch (e) {}
-}
-
-/**
- * Memeriksa dan mereset data chart Peak Hours secara otomatis saat berganti hari/tanggal baru
- */
-export function checkAndResetPeakHoursNewDay(): void {
-  try {
-    purgeLegacyDummyData();
-    const todayStr = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
-    const lastSavedDate = typeof window !== 'undefined' ? localStorage.getItem(DATE_STORAGE_KEY) : null;
-
-    if (lastSavedDate && lastSavedDate !== todayStr) {
-      const resetBuckets: PeakHourBucket[] = INITIAL_PEAK_HOURS.map((bucket) => ({
-        ...bucket,
-        chat: 0,
-      }));
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(resetBuckets));
-        localStorage.setItem(DATE_STORAGE_KEY, todayStr);
-        window.dispatchEvent(new Event('bsmr_peak_hours_updated'));
-      }
-      cachedPeakHours = resetBuckets;
-    } else if (!lastSavedDate && typeof window !== 'undefined') {
-      localStorage.setItem(DATE_STORAGE_KEY, todayStr);
-    }
-  } catch (e) {
-    console.error('Failed to check peak hours new day reset:', e);
   }
+  if (session && session.timestamp) {
+    return new Date(session.timestamp).getHours();
+  }
+  return new Date().getHours();
 }
 
 /**
- * Membaca data jam sibuk dari localStorage
+ * Computes peak hours 24-hour buckets directly derived from active, non-deleted chat logs
  */
-export function getPeakHoursData(): PeakHourBucket[] {
-  checkAndResetPeakHoursNewDay();
-  try {
-    if (typeof window !== 'undefined') {
-      const data = localStorage.getItem(STORAGE_KEY);
-      if (data) {
-        const parsed = JSON.parse(data);
-        if (Array.isArray(parsed) && parsed.length === 24) {
-          const sanitized = parsed.map(b => ({ ...b, capacity: 80 }));
-          cachedPeakHours = sanitized;
-          return sanitized;
+export function computePeakHoursFromSessions(sessions: ChatSession[]): PeakHourBucket[] {
+  const buckets: PeakHourBucket[] = Array.from({ length: 24 }, (_, i) => ({
+    hour: `${String(i).padStart(2, '0')}:00`,
+    chat: 0,
+    capacity: 80,
+  }));
+
+  if (!Array.isArray(sessions) || sessions.length === 0) {
+    return buckets;
+  }
+
+  for (const session of sessions) {
+    if (!session || !Array.isArray(session.messages)) continue;
+    for (const m of session.messages) {
+      if (m && m.sender === 'user') {
+        const hour = parseHourFromMessage(m, session);
+        if (hour >= 0 && hour < 24) {
+          buckets[hour].chat += 1;
         }
       }
     }
-  } catch (e) {
-    console.error('Failed to load peak hours analytics:', e);
   }
-  return cachedPeakHours.length === 24 ? cachedPeakHours.map(b => ({ ...b, capacity: 80 })) : INITIAL_PEAK_HOURS;
+
+  return buckets;
 }
 
 /**
- * Fetch data peak hours dari API Server secara async (Cross-Origin Support)
+ * Membaca data jam sibuk yang dihitung secara dinamis dari active Chat Logs
+ */
+export function getPeakHoursData(): PeakHourBucket[] {
+  const sessions = getVisitorChatSessions();
+  return computePeakHoursFromSessions(sessions);
+}
+
+const SYNC_API_URL = 'http://localhost:5173/api/peak-hours';
+
+/**
+ * Fetch data peak hours dari API Server secara async
  */
 export async function fetchPeakHoursAsync(): Promise<PeakHourBucket[]> {
   try {
@@ -101,71 +86,21 @@ export async function fetchPeakHoursAsync(): Promise<PeakHourBucket[]> {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length === 24) {
-        const sanitized = data.map((b: any) => ({ ...b, capacity: 80 }));
-        cachedPeakHours = sanitized;
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
-          window.dispatchEvent(new Event('bsmr_peak_hours_updated'));
-        }
-        return sanitized;
+        return data.map((b: any) => ({ ...b, capacity: 80 }));
       }
     }
-  } catch (e) {
-    // Silently fallback
-  }
+  } catch (e) {}
   return getPeakHoursData();
 }
 
-/**
- * Menyimpan data jam sibuk ke localStorage dan Sync ke Server API
- */
 export function savePeakHoursData(data: PeakHourBucket[]): void {
-  try {
-    if (!Array.isArray(data) || data.length !== 24) return;
-    const sanitized = data.map(b => ({ ...b, capacity: 80 }));
-    cachedPeakHours = sanitized;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
-      window.dispatchEvent(new Event('bsmr_peak_hours_updated'));
-
-      if ('BroadcastChannel' in window) {
-        try {
-          const channel = new BroadcastChannel('bsmr_peak_hours_sync');
-          channel.postMessage({ type: 'PEAK_HOURS_UPDATED', data: sanitized });
-          channel.close();
-        } catch (e) {}
-      }
-
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage({ type: 'BSMR_PEAK_HOURS_UPDATED', data: sanitized }, '*');
-      }
-    }
-
-    // HTTP Sync POST ke Vite API
-    fetch(SYNC_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sanitized),
-    }).catch(() => {});
-  } catch (e) {
-    console.error('Failed to save peak hours analytics:', e);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('bsmr_peak_hours_updated'));
   }
 }
 
-/**
- * Catat interaksi pesan pengguna berdasarkan jam saat ini (00:00 s.d. 23:00)
- */
 export function recordPeakHourChat(date = new Date()): void {
-  checkAndResetPeakHoursNewDay();
-  const currentHour = date.getHours(); // 0 - 23
-  const data = getPeakHoursData();
-  
-  if (Array.isArray(data) && data[currentHour]) {
-    const updated = [...data];
-    updated[currentHour] = {
-      ...updated[currentHour],
-      chat: (updated[currentHour].chat || 0) + 1,
-    };
-    savePeakHoursData(updated);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('bsmr_peak_hours_updated'));
   }
 }

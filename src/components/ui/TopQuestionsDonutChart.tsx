@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { DonutChart } from "./donut-chart";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../../lib/utils";
-import { getTopQuestionsData, QuestionCategory } from "../../services/topQuestionsAnalytics";
+import { getTopQuestionsData, fetchTopQuestionsAsync, QuestionCategory } from "../../services/topQuestionsAnalytics";
 
 interface TopQuestionsDonutChartProps {
   darkMode?: boolean;
@@ -17,19 +17,65 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
 
   useEffect(() => {
     const handleUpdate = () => {
-      setCategories(getTopQuestionsData());
+      const fresh = getTopQuestionsData();
+      if (Array.isArray(fresh)) {
+        setCategories(fresh);
+      }
     };
+
+    const handleAsyncUpdate = async () => {
+      handleUpdate();
+      const freshApi = await fetchTopQuestionsAsync();
+      if (Array.isArray(freshApi)) {
+        setCategories(freshApi);
+      }
+    };
+
+    handleAsyncUpdate();
 
     window.addEventListener("bsmr_top_questions_updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === "BSMR_TOP_QUESTIONS_UPDATED" && Array.isArray(e.data.categories)) {
+        setCategories(e.data.categories);
+      } else {
+        handleAsyncUpdate();
+      }
+    };
+    window.addEventListener("message", handleMessage);
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      try {
+        channel = new BroadcastChannel("bsmr_top_questions_sync");
+        channel.onmessage = (event) => {
+          if (event.data?.type === "TOP_QUESTIONS_UPDATED" && Array.isArray(event.data.categories)) {
+            setCategories(event.data.categories);
+          } else {
+            handleAsyncUpdate();
+          }
+        };
+      } catch (e) {}
+    }
+
+    const interval = setInterval(handleAsyncUpdate, 1500);
+
     return () => {
       window.removeEventListener("bsmr_top_questions_updated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("message", handleMessage);
+      if (channel) channel.close();
+      clearInterval(interval);
     };
   }, []);
 
-  // Ambil Top 5 Kategori Teratas
-  const top5 = categories.slice(0, 5);
+  // Filter HANYA kategori yang memiliki minimal 1 pertanyaan (count > 0) & urutkan terbanyak (Descending)
+  const activeCategories = categories
+    .filter((cat) => (cat.count || 0) > 0)
+    .sort((a, b) => b.count - a.count);
+  const top5 = activeCategories.slice(0, 5);
+
   const chartData = top5.map((cat) => ({
     value: cat.count,
     color: cat.color,
@@ -50,6 +96,11 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
       : 0
     : 100;
 
+  // Placeholder data untuk DonutChart saat belum ada pertanyaan sama sekali
+  const placeholderChartData = [
+    { value: 1, color: darkMode ? "#374151" : "#e5e7eb", label: "Belum Ada Data" }
+  ];
+
   return (
     <div
       className={cn(
@@ -64,12 +115,12 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
 
       <div className="relative flex items-center justify-center py-1">
         <DonutChart
-          data={chartData}
+          data={chartData.length > 0 ? chartData : placeholderChartData}
           size={200}
           strokeWidth={24}
           animationDuration={1.2}
           animationDelayPerSegment={0.05}
-          highlightOnHover={true}
+          highlightOnHover={chartData.length > 0}
           centerContent={
             <AnimatePresence mode="wait">
               <motion.div
@@ -81,12 +132,12 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
                 className="flex flex-col items-center justify-center text-center p-1"
               >
                 <p className={`text-[11px] font-medium truncate max-w-[120px] ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {displayLabel}
+                  {chartData.length > 0 ? displayLabel : "Total Pertanyaan"}
                 </p>
                 <p className="text-2xl font-extrabold tracking-tight">
-                  {displayValue.toLocaleString('id-ID')}
+                  {chartData.length > 0 ? displayValue.toLocaleString('id-ID') : "0"}
                 </p>
-                {activeSegment && (
+                {activeSegment && chartData.length > 0 && (
                   <p className={`text-xs font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                     [{displayPercentage.toFixed(0)}%]
                   </p>
@@ -98,37 +149,43 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
       </div>
 
       <div className={`flex flex-col space-y-1.5 w-full pt-3 border-t text-xs ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-        {chartData.map((segment, index) => (
-          <motion.div
-            key={segment.label}
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 + index * 0.05, duration: 0.3 }}
-            className={cn(
-              "flex items-center justify-between p-1.5 rounded-md transition-all duration-150 cursor-pointer",
-              hoveredSegment === segment.label
-                ? darkMode
-                  ? "bg-gray-700/60"
-                  : "bg-gray-100"
-                : "hover:bg-gray-50 dark:hover:bg-gray-700/40"
-            )}
-            onMouseEnter={() => setHoveredSegment(segment.label)}
-            onMouseLeave={() => setHoveredSegment(null)}
-          >
-            <div className="flex items-center space-x-2.5 min-w-0">
-              <span
-                className="h-2.5 w-2.5 rounded-full shrink-0"
-                style={{ backgroundColor: segment.color }}
-              />
-              <span className="text-[11px] font-medium truncate">
-                {segment.label}
+        {chartData.length > 0 ? (
+          chartData.map((segment, index) => (
+            <motion.div
+              key={segment.label}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 + index * 0.05, duration: 0.3 }}
+              className={cn(
+                "flex items-center justify-between p-1.5 rounded-md transition-all duration-150 cursor-pointer",
+                hoveredSegment === segment.label
+                  ? darkMode
+                    ? "bg-gray-700/60"
+                    : "bg-gray-100"
+                  : "hover:bg-gray-50 dark:hover:bg-gray-700/40"
+              )}
+              onMouseEnter={() => setHoveredSegment(segment.label)}
+              onMouseLeave={() => setHoveredSegment(null)}
+            >
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <span
+                  className="h-2.5 w-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: segment.color }}
+                />
+                <span className="text-[11px] font-medium truncate">
+                  {segment.label}
+                </span>
+              </div>
+              <span className={`text-[11px] font-bold shrink-0 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                {segment.value.toLocaleString('id-ID')}
               </span>
-            </div>
-            <span className={`text-[11px] font-bold shrink-0 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-              {segment.value.toLocaleString('id-ID')}
-            </span>
-          </motion.div>
-        ))}
+            </motion.div>
+          ))
+        ) : (
+          <div className="text-center py-3 text-gray-400 dark:text-gray-500 text-[11px]">
+            Belum ada data pertanyaan dari pengunjung
+          </div>
+        )}
       </div>
     </div>
   );
