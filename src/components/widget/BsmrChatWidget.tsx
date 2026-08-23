@@ -18,7 +18,6 @@ import {
 } from "../../services/chatbotAnalytics";
 import { classifyAndRecordQuestion } from "../../services/topQuestionsAnalytics";
 import { recordPeakHourChat } from "../../services/peakHoursAnalytics";
-import { queryRagKnowledgeBase } from "../../services/ragKnowledgeBase";
 import { escalateSessionToAdmin, saveOrUpdateUserSession, fetchVisitorChatSessionsAsync, cacheServerAdminMessages, ChatSession } from "../../services/visitorChatLogsService";
 import { getChatbotSettings, fetchChatbotSettingsAsync, ChatbotSettings } from "../../services/chatbotSettingsService";
 import { generateAiChatResponse } from "../../services/aiChatEngine";

@@ -239,7 +239,7 @@ function chatSyncPlugin(): Plugin {
                 if (Array.isArray(parsed)) {
                   serverTopQuestions = parsed;
                 }
-              } catch (e) {}
+              } catch (e) { }
               res.setHeader('Content-Type', 'application/json');
               return res.end(JSON.stringify({ success: true, data: serverTopQuestions }));
             });
@@ -265,7 +265,7 @@ function chatSyncPlugin(): Plugin {
                 if (Array.isArray(parsed) && parsed.length === 24) {
                   serverPeakHours = parsed.map((b: any) => ({ ...b, capacity: 80 }));
                 }
-              } catch (e) {}
+              } catch (e) { }
               res.setHeader('Content-Type', 'application/json');
               return res.end(JSON.stringify({ success: true, data: serverPeakHours }));
             });
@@ -287,7 +287,7 @@ function chatSyncPlugin(): Plugin {
                 if (parsed && typeof parsed === 'object') {
                   serverAiConfig = parsed;
                 }
-              } catch (e) {}
+              } catch (e) { }
               res.setHeader('Content-Type', 'application/json');
               return res.end(JSON.stringify({ success: true, config: serverAiConfig }));
             });
@@ -309,7 +309,7 @@ function chatSyncPlugin(): Plugin {
                 if (parsed && typeof parsed === 'object') {
                   serverSettings = parsed;
                 }
-              } catch (e) {}
+              } catch (e) { }
               res.setHeader('Content-Type', 'application/json');
               return res.end(JSON.stringify({ success: true, settings: serverSettings }));
             });
@@ -344,7 +344,7 @@ function chatSyncPlugin(): Plugin {
                     serverSessions = [];
                   } else {
                     const cleanIncoming = parsed.filter(s => !isSessionDeleted(s));
-                    
+
                     const sessionMap = new Map();
                     for (const s of serverSessions) {
                       if (s && s.id && !isSessionDeleted(s)) {
@@ -375,7 +375,7 @@ function chatSyncPlugin(): Plugin {
                     serverSessions = Array.from(sessionMap.values()).filter(s => !isSessionDeleted(s));
                   }
                 }
-              } catch (e) {}
+              } catch (e) { }
               const adminMsgCount = serverSessions.reduce((n, s) => n + (s.messages || []).filter((m: any) => m.sender === 'admin').length, 0);
               console.log(`[API POST] sessions=${serverSessions.length}, adminMsgs=${adminMsgCount}`);
               res.setHeader('Content-Type', 'application/json');

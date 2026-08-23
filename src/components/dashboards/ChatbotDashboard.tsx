@@ -24,63 +24,17 @@ import {
 import { BotIcon } from '../ui/BotIcon';
 import VisitorChatLogsWidget from '../ui/VisitorChatLogsWidget';
 import { getChatbotSettings, saveChatbotSettings } from '../../services/chatbotSettingsService';
+import {
+  listRagDocuments,
+  uploadRagDocument,
+  addRagFAQ,
+  deleteRagDocument,
+  RagDocument
+} from '../../services/ragKnowledgeBase';
 
 interface ChatbotDashboardProps {
   darkMode: boolean;
 }
-
-// Demo data for Knowledge Base
-interface KBItem {
-  id: string;
-  title: string;
-  type: 'PDF' | 'Word' | 'FAQ';
-  category: string;
-  updatedAt: string;
-  size?: string;
-  status: 'Indexed' | 'Processing';
-  question?: string;
-  answer?: string;
-}
-
-const initialKB: KBItem[] = [
-  {
-    id: 'kb-1',
-    title: 'Silabus_Sertifikasi_BSMR_Level_2_Revisi_2026.pdf',
-    type: 'PDF',
-    category: 'Silabus',
-    updatedAt: '18 Aug 2026',
-    size: '2.4 MB',
-    status: 'Indexed',
-  },
-  {
-    id: 'kb-2',
-    title: 'Jadwal_Asesmen_Periode_Q3_2026.pdf',
-    type: 'PDF',
-    category: 'Jadwal Asesmen',
-    updatedAt: '15 Aug 2026',
-    size: '1.1 MB',
-    status: 'Indexed',
-  },
-  {
-    id: 'kb-3',
-    title: 'Tabel_Biaya_Sertifikasi_Terbaru.docx',
-    type: 'Word',
-    category: 'Biaya & Administrasi',
-    updatedAt: '10 Aug 2026',
-    size: '850 KB',
-    status: 'Indexed',
-  },
-  {
-    id: 'kb-4',
-    title: 'Berapa masa berlaku sertifikat BSMR?',
-    question: 'Berapa masa berlaku sertifikat BSMR?',
-    answer: 'Sertifikat BSMR berlaku selama 3 (tiga) tahun sejak tanggal diterbitkan. Pemegang sertifikat wajib melakukan pemeliharaan melalui kegiatan Pemeliharaan Sertifikasi (Maintenance Program) sebelum masa berlaku berakhir.',
-    type: 'FAQ',
-    category: 'Masa Berlaku & Maintenance',
-    updatedAt: '12 Aug 2026',
-    status: 'Indexed',
-  },
-];
 
 // Demo Chat Logs
 interface ChatLog {
@@ -148,13 +102,31 @@ const initialUnresolved: UnresolvedItem[] = [
 export default function ChatbotDashboard({ darkMode }: ChatbotDashboardProps) {
   const [activeTab, setActiveTab] = useState<'kb' | 'logs' | 'unresolved' | 'analytics' | 'settings'>('kb');
 
-  // Knowledge Base State
-  const [kbList, setKbList] = useState<KBItem[]>(initialKB);
+  // Knowledge Base State — Real Server Documents
+  const [kbList, setKbList] = useState<RagDocument[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const [searchKB, setSearchKB] = useState('');
   const [showFAQModal, setShowFAQModal] = useState(false);
   const [faqQuestion, setFaqQuestion] = useState('');
   const [faqAnswer, setFaqAnswer] = useState('');
   const [faqCategory, setFaqCategory] = useState('Umum');
+
+  // Fetch documents from server
+  const refreshDocuments = async () => {
+    try {
+      const docs = await listRagDocuments();
+      setKbList(docs);
+    } catch (e) {
+      console.error('Failed to load RAG documents:', e);
+    }
+  };
+
+  useEffect(() => {
+    refreshDocuments();
+    // Poll every 4 seconds to update processing status in real time
+    const interval = setInterval(refreshDocuments, 4000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Unresolved state
   const [unresolvedList, setUnresolvedList] = useState<UnresolvedItem[]>(initialUnresolved);
@@ -196,49 +168,75 @@ export default function ChatbotDashboard({ darkMode }: ChatbotDashboardProps) {
 
   const embedCode = `<script src="https://planner.bsmr.org/chatbot.js" data-bsmr-bot="v2"></script>`;
 
-  const handleAddFAQ = (e: React.FormEvent) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
+    setIsUploading(true);
+    const toastId = toast.loading(`Mengunggah "${file.name}" ke Vector RAG DB...`);
+    try {
+      const res = await uploadRagDocument(file, 'Dokumen Resmi');
+      if (res.success) {
+        toast.success(`File "${file.name}" berhasil diunggah! Sedang diproses & di-chunk...`, { id: toastId });
+        await refreshDocuments();
+      } else {
+        toast.error(`Gagal mengunggah: ${res.message || 'Error'}`, { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(`Gagal mengunggah: ${err.message}`, { id: toastId });
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleAddFAQ = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!faqQuestion || !faqAnswer) return;
 
-    const newItem: KBItem = {
-      id: `kb-${Date.now()}`,
-      title: faqQuestion,
-      question: faqQuestion,
-      answer: faqAnswer,
-      type: 'FAQ',
-      category: faqCategory,
-      updatedAt: 'Baru saja',
-      status: 'Indexed',
-    };
-
-    setKbList([newItem, ...kbList]);
-    setFaqQuestion('');
-    setFaqAnswer('');
-    setShowFAQModal(false);
+    const toastId = toast.loading('Menyimpan FAQ ke RAG Knowledge Base...');
+    try {
+      const res = await addRagFAQ(faqQuestion, faqAnswer, faqCategory);
+      if (res.success) {
+        toast.success('FAQ berhasil ditambahkan & di-index!', { id: toastId });
+        setFaqQuestion('');
+        setFaqAnswer('');
+        setShowFAQModal(false);
+        await refreshDocuments();
+      } else {
+        toast.error('Gagal menambahkan FAQ', { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`, { id: toastId });
+    }
   };
 
-  const handleResolveToKB = () => {
+  const handleResolveToKB = async () => {
     if (!selectedUnresolved || !resolveAnswer) return;
 
-    const newItem: KBItem = {
-      id: `kb-${Date.now()}`,
-      title: selectedUnresolved.question,
-      question: selectedUnresolved.question,
-      answer: resolveAnswer,
-      type: 'FAQ',
-      category: 'Hasil Evaluasi Inquiry',
-      updatedAt: 'Baru saja',
-      status: 'Indexed',
-    };
-
-    setKbList([newItem, ...kbList]);
-    setUnresolvedList(unresolvedList.filter((u) => u.id !== selectedUnresolved.id));
-    setSelectedUnresolved(null);
-    setResolveAnswer('');
+    const toastId = toast.loading('Memproses evaluasi ke FAQ RAG...');
+    try {
+      const res = await addRagFAQ(selectedUnresolved.question, resolveAnswer, 'Hasil Evaluasi Inquiry');
+      if (res.success) {
+        toast.success('Jawaban resmi berhasil dipublikasi ke Vector RAG AI!', { id: toastId });
+        setUnresolvedList(unresolvedList.filter((u) => u.id !== selectedUnresolved.id));
+        setSelectedUnresolved(null);
+        setResolveAnswer('');
+        await refreshDocuments();
+      }
+    } catch (err: any) {
+      toast.error(`Gagal: ${err.message}`, { id: toastId });
+    }
   };
 
-  const handleDeleteKB = (id: string) => {
-    setKbList(kbList.filter((k) => k.id !== id));
+  const handleDeleteKB = async (id: number) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus materi ini dari Vector DB?')) return;
+    try {
+      await deleteRagDocument(id);
+      toast.success('Dokumen & vector chunks berhasil dihapus!');
+      await refreshDocuments();
+    } catch (e: any) {
+      toast.error(`Gagal menghapus: ${e.message}`);
+    }
   };
 
   const handleCopyScript = () => {
@@ -250,7 +248,8 @@ export default function ChatbotDashboard({ darkMode }: ChatbotDashboardProps) {
   const filteredKB = kbList.filter(
     (item) =>
       item.title.toLowerCase().includes(searchKB.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchKB.toLowerCase())
+      (item.category && item.category.toLowerCase().includes(searchKB.toLowerCase())) ||
+      (item.question && item.question.toLowerCase().includes(searchKB.toLowerCase()))
   );
 
   return (
@@ -363,32 +362,25 @@ export default function ChatbotDashboard({ darkMode }: ChatbotDashboardProps) {
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <label
                 className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg border cursor-pointer transition-colors ${
-                  darkMode
+                  isUploading
+                    ? 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 dark:bg-gray-800'
+                    : darkMode
                     ? 'bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-200'
                     : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-700 shadow-sm'
                 }`}
               >
-                <Upload className="w-3.5 h-3.5 text-blue-500" />
-                <span>Upload PDF / Word</span>
+                {isUploading ? (
+                  <RefreshCw className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                ) : (
+                  <Upload className="w-3.5 h-3.5 text-blue-500" />
+                )}
+                <span>{isUploading ? 'Mengunggah...' : 'Upload PDF / DOCX / PPTX'}</span>
                 <input
                   type="file"
-                  accept=".pdf,.docx,.doc"
+                  accept=".pdf,.docx,.pptx"
+                  disabled={isUploading}
                   className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      const file = e.target.files[0];
-                      const newItem: KBItem = {
-                        id: `kb-${Date.now()}`,
-                        title: file.name,
-                        type: file.name.endsWith('.pdf') ? 'PDF' : 'Word',
-                        category: 'Dokumen Resmi',
-                        updatedAt: 'Baru saja',
-                        size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-                        status: 'Indexed',
-                      };
-                      setKbList([newItem, ...kbList]);
-                    }
-                  }}
+                  onChange={handleFileUpload}
                 />
               </label>
 
@@ -416,45 +408,72 @@ export default function ChatbotDashboard({ darkMode }: ChatbotDashboardProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredKB.map((item) => (
-                  <tr key={item.id} className={`${darkMode ? 'hover:bg-gray-800/40' : 'hover:bg-gray-50/80'} transition-colors`}>
-                    <td className="p-3.5 font-medium">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`p-2 rounded-lg ${item.type === 'PDF' ? 'bg-red-100 text-red-600 dark:bg-red-900/30' : item.type === 'Word' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30'}`}>
-                          <FileText className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-900 dark:text-gray-100">{item.title}</p>
-                          {item.answer && (
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">{item.answer}</p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-3.5">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                        {item.type}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-gray-600 dark:text-gray-400">{item.category}</td>
-                    <td className="p-3.5">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                        <CheckCircle2 className="w-3 h-3" />
-                        {item.status}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-gray-500 dark:text-gray-400">{item.updatedAt}</td>
-                    <td className="p-3.5 text-right">
-                      <button
-                        onClick={() => handleDeleteKB(item.id)}
-                        className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                        title="Hapus materi"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                {filteredKB.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-6 text-center text-gray-400">
+                      Belum ada dokumen RAG atau FAQ yang tersimpan. Silakan unggah dokumen PDF/DOCX/PPTX atau tambahkan FAQ baru.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredKB.map((item) => (
+                    <tr key={item.id} className={`${darkMode ? 'hover:bg-gray-800/40' : 'hover:bg-gray-50/80'} transition-colors`}>
+                      <td className="p-3.5 font-medium">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`p-2 rounded-lg ${item.type === 'PDF' ? 'bg-red-100 text-red-600 dark:bg-red-900/30' : item.type === 'DOCX' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' : item.type === 'PPTX' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30'}`}>
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900 dark:text-gray-100">{item.title}</p>
+                            {item.answer && (
+                              <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">{item.answer}</p>
+                            )}
+                            {item.fileSize && (
+                              <p className="text-[10px] text-gray-400 mt-0.5">
+                                Ukuran: {(item.fileSize / 1024).toFixed(1)} KB
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3.5">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                          {item.type}
+                        </span>
+                      </td>
+                      <td className="p-3.5 text-gray-600 dark:text-gray-400">{item.category || 'Umum'}</td>
+                      <td className="p-3.5">
+                        {item.status === 'INDEXED' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Indexed ({item.totalChunks ?? 0} chunks)
+                          </span>
+                        ) : item.status === 'PROCESSING' || item.status === 'UPLOADING' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            {item.status}...
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" title={item.errorMessage || ''}>
+                            <AlertCircle className="w-3 h-3" />
+                            ERROR
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3.5 text-gray-500 dark:text-gray-400">
+                        {new Date(item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="p-3.5 text-right">
+                        <button
+                          onClick={() => handleDeleteKB(item.id)}
+                          className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                          title="Hapus materi"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

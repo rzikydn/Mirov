@@ -121,3 +121,44 @@ export type NewDatabaseRowTrash = typeof databaseRowTrash.$inferInsert;
 export type Role = 'SUPERUSER' | 'ADMIN' | 'UMUM';
 export type HistoryAction = 'CREATE' | 'EDIT' | 'DELETE';
 export type HistoryTarget = 'NOTE' | 'DATABASE' | 'SCHEDULE';
+
+// RAG Document types
+export const ragDocStatusEnum = mysqlEnum('status', ['UPLOADING', 'PROCESSING', 'INDEXED', 'ERROR']);
+export const ragDocTypeEnum = mysqlEnum('type', ['PDF', 'DOCX', 'PPTX', 'FAQ']);
+
+// RAG Documents table — uploaded files + FAQ entries
+export const ragDocuments = mysqlTable('rag_documents', {
+  id: int('id').primaryKey().autoincrement(),
+  title: varchar('title', { length: 500 }).notNull(),
+  type: mysqlEnum('type', ['PDF', 'DOCX', 'PPTX', 'FAQ']).notNull(),
+  category: varchar('category', { length: 255 }),
+  fileSize: int('fileSize'),
+  totalChunks: int('totalChunks').default(0),
+  status: mysqlEnum('status', ['UPLOADING', 'PROCESSING', 'INDEXED', 'ERROR']).notNull().default('UPLOADING'),
+  errorMessage: text('errorMessage'),
+  question: text('question'),
+  answer: text('answer'),
+  uploadedBy: int('uploadedBy'),
+  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+});
+
+// RAG Chunks table — chunked text with embedding vectors
+export const ragChunks = mysqlTable('rag_chunks', {
+  id: int('id').primaryKey().autoincrement(),
+  documentId: int('documentId').notNull(),
+  chunkIndex: int('chunkIndex').notNull(),
+  content: text('content').notNull(),
+  heading: varchar('heading', { length: 500 }),
+  pageOrSlide: int('pageOrSlide'),
+  tokenCount: int('tokenCount'),
+  embedding: json('embedding'), // float[] stored as JSON
+  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+}, (table) => ({
+  documentIdx: index('rag_chunks_documentId_idx').on(table.documentId),
+}));
+
+export type RagDocument = typeof ragDocuments.$inferSelect;
+export type NewRagDocument = typeof ragDocuments.$inferInsert;
+export type RagChunk = typeof ragChunks.$inferSelect;
+export type NewRagChunk = typeof ragChunks.$inferInsert;

@@ -115,21 +115,28 @@ export async function generateAiChatResponse(options: AiEngineOptions): Promise<
     return { text: matchedPrompt.answer, source: 'prompt' };
   }
 
-  // 4. Priority 2: Instant RAG Vector Knowledge Base Search (<20ms)
-  const ragMatch = queryRagKnowledgeBase(userQuery);
-  // If RAG search returns direct FAQ or high-confidence document match, return instantly
-  if (ragMatch && (ragMatch.includes('[Berdasarkan FAQ Resmi BSMR]') || queryLower.includes('level sertifikasi') || queryLower.includes('biaya') || queryLower.includes('jadwal') || queryLower.includes('perpanjang'))) {
-    return { text: ragMatch, source: 'rag' };
+  // 4. Fetch active AI config (for Gemini/OpenAI API key)
+  const aiConfig = await fetchAiConfigAsync();
+  const apiKey = aiConfig?.apiKey ? (aiConfig.apiKey || '').replace(/["'\s]/g, '').trim() : undefined;
+
+  // 5. Priority 2: Instant RAG Vector Knowledge Base Search
+  const ragMatch = await queryRagKnowledgeBase(userQuery, apiKey);
+
+  // If RAG search returns direct FAQ match, return instantly
+  if (ragMatch && ragMatch.isFaq && ragMatch.conciseFallback) {
+    return { text: ragMatch.conciseFallback, source: 'rag' };
   }
 
-  // 5. Priority 3: External LLM API (Gemini / OpenAI) with 3-second Fast Timeout
+  // 6. Priority 3: External LLM API (Gemini / OpenAI) with 3.2-second Fast Timeout
   try {
-    const aiConfig = await fetchAiConfigAsync();
     if (aiConfig && aiConfig.apiKey && aiConfig.apiKey.trim() !== '') {
-      const ragContext = ragMatch || queryRagKnowledgeBase(userQuery);
+      const ragContext = ragMatch?.contextForLlm || '';
       const contextPrompt = ragContext
-        ? `\n\nDokumen RAG Knowledge Base BSMR:\n${ragContext}`
+        ? `\n\n[KONTEKS RAG DOKUMEN]:\n${ragContext}`
         : '';
+      const strictSystemInstruction = ragContext
+        ? `${settings.systemPrompt}\n\nINSTRUKSI PENTING: Jawab pertanyaan pengguna secara SINGKAT, PADAT, dan LANGSUNG PADA INTI (straight to the point, 1-2 kalimat saja). HANYA jawab poin spesifik yang ditanyakan. DILARANG menyertakan rincian, tabel, atau informasi tambahan lain yang tidak ditanyakan.`
+        : settings.systemPrompt;
       const key = (aiConfig.apiKey || '').replace(/["'\s]/g, '').trim();
 
       if (aiConfig.provider === 'gemini') {
@@ -154,7 +161,7 @@ export async function generateAiChatResponse(options: AiEngineOptions): Promise<
                 signal: controller.signal,
                 body: JSON.stringify({
                   systemInstruction: {
-                    parts: [{ text: settings.systemPrompt }],
+                    parts: [{ text: strictSystemInstruction }],
                   },
                   contents: [
                     {
@@ -163,8 +170,8 @@ export async function generateAiChatResponse(options: AiEngineOptions): Promise<
                     },
                   ],
                   generationConfig: {
-                    temperature: aiConfig.temperature ?? 0.7,
-                    maxOutputTokens: aiConfig.maxTokens ?? 1000,
+                    temperature: aiConfig.temperature ?? 0.4, // Lower temp for concise factual answers
+                    maxOutputTokens: aiConfig.maxTokens ?? 300,
                   },
                 }),
               }
@@ -199,10 +206,10 @@ export async function generateAiChatResponse(options: AiEngineOptions): Promise<
               body: JSON.stringify({
                 model: aiConfig.model || 'gpt-4o-mini',
                 messages: [
-                  { role: 'system', content: `${settings.systemPrompt}${contextPrompt}` },
+                  { role: 'system', content: `${strictSystemInstruction}${contextPrompt}` },
                   { role: 'user', content: userQuery },
                 ],
-                temperature: aiConfig.temperature ?? 0.7,
+                temperature: aiConfig.temperature ?? 0.4,
               }),
             }
           );
@@ -222,9 +229,9 @@ export async function generateAiChatResponse(options: AiEngineOptions): Promise<
     console.warn('API LLM Call failed, falling back to RAG & System Prompt engine:', e);
   }
 
-  // 6. RAG Fallback if API was skipped or timed out
-  if (ragMatch) {
-    return { text: ragMatch, source: 'rag' };
+  // 7. RAG Fallback if API was skipped, timed out, or not set
+  if (ragMatch && ragMatch.conciseFallback) {
+    return { text: ragMatch.conciseFallback, source: 'rag' };
   }
 
   // 7. Keyword-Based Fallback Rules
