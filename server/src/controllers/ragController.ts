@@ -49,6 +49,7 @@ export async function uploadDocument(req: Request, res: Response) {
     }
 
     const category = (req.body.category as string) || 'Dokumen Resmi';
+    const reqApiKey = (req.body.apiKey as string) || (req.headers['x-gemini-api-key'] as string);
 
     // 1. Insert document record with PROCESSING status
     const [inserted] = await db.insert(ragDocuments).values({
@@ -62,7 +63,7 @@ export async function uploadDocument(req: Request, res: Response) {
     const docId = inserted.id;
 
     // 2. Process async (don't block response)
-    processDocumentAsync(docId, file.buffer, docType).catch(err => {
+    processDocumentAsync(docId, file.buffer, docType, reqApiKey).catch(err => {
       console.error(`[RAG] Processing failed for doc ${docId}:`, err);
     });
 
@@ -80,7 +81,7 @@ export async function uploadDocument(req: Request, res: Response) {
 /**
  * Background processing: extract → chunk → embed → store
  */
-async function processDocumentAsync(docId: number, buffer: Buffer, type: string) {
+async function processDocumentAsync(docId: number, buffer: Buffer, type: string, apiKey?: string) {
   try {
     // 1. Extract
     console.log(`[RAG] Extracting doc ${docId} (${type})...`);
@@ -116,7 +117,7 @@ async function processDocumentAsync(docId: number, buffer: Buffer, type: string)
 
     let embeddings: number[][];
     try {
-      embeddings = await embedBatch(texts);
+      embeddings = await embedBatch(texts, apiKey);
     } catch (embErr: any) {
       // If embedding fails (no API key, quota exceeded), still store chunks without embeddings
       console.warn(`[RAG] Embedding failed for doc ${docId}, storing without vectors:`, embErr.message);

@@ -55,6 +55,21 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
   const [showCurvedTooltip, setShowCurvedTooltip] = useState(true);
   const [inputValue, setInputValue] = useState("");
   const [sessionId] = useState(() => `session-${Date.now()}`);
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("isMobile") === "1") return true;
+      if (params.get("isMobile") === "0") return false;
+      if (window.self === window.top) {
+        return window.innerWidth < 768;
+      }
+      return (
+        window.screen.width < 768 ||
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      );
+    }
+    return false;
+  });
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const s = getChatbotSettings();
     return [
@@ -67,7 +82,8 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
     ];
   });
   const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const isUserScrolledUpRef = useRef(false);
 
   // Synchronize settings live from Superuser SettingPromptDialog, BroadcastChannel, postMessage, and HTTP API
   useEffect(() => {
@@ -86,6 +102,21 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
       const fresh = getChatbotSettings();
       applyFreshSettings(fresh);
     };
+
+    const handleViewportResize = (event: MessageEvent) => {
+      if (event.data?.type === "BSMR_VIEWPORT_RESIZE" && typeof event.data.isMobile === "boolean") {
+        setIsMobile(event.data.isMobile);
+      }
+    };
+
+    const handleWindowResize = () => {
+      if (window.self === window.top) {
+        setIsMobile(window.innerWidth < 768);
+      }
+    };
+
+    window.addEventListener("message", handleViewportResize);
+    window.addEventListener("resize", handleWindowResize);
 
     // Initial fetch from HTTP API server for cross-domain / new visitor sync
     fetchChatbotSettingsAsync().then((fresh) => {
@@ -149,6 +180,8 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
       window.removeEventListener("bsmr_ai_config_updated", handleAiConfigUpdate);
       window.removeEventListener("storage", handleSettingsUpdate);
       window.removeEventListener("message", handleWindowMessage);
+      window.removeEventListener("message", handleViewportResize);
+      window.removeEventListener("resize", handleWindowResize);
       if (channel) channel.close();
       if (aiChannel) aiChannel.close();
     };
@@ -199,16 +232,41 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
     return true;
   });
 
-  // Handler Auto Scroll Ke Bawah Setiap Ada Pesan Baru
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  // Handler Auto Scroll Ke Bawah (Hanya jika user tidak sedang scroll ke atas)
+  const handleChatScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+    isUserScrolledUpRef.current = distanceFromBottom > 60;
+  };
+
+  const scrollToBottom = (force = false) => {
+    if (!chatContainerRef.current) return;
+    if (force || !isUserScrolledUpRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.parent.postMessage(
+        { type: isOpen ? "BSMR_CHAT_OPENED" : "BSMR_CHAT_CLOSED" },
+        "*"
+      );
+    }
     if (isOpen) {
+      isUserScrolledUpRef.current = false;
+      setTimeout(() => scrollToBottom(true), 60);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && !isUserScrolledUpRef.current) {
       scrollToBottom();
     }
-  }, [messages, isTyping, isOpen]);
+  }, [messages.length, isTyping, isOpen]);
 
   // Sinkronisasi Jawaban Balasan Admin CS Real-Time ke Widget Pengunjung
   useEffect(() => {
@@ -455,6 +513,8 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
 
     saveOrUpdateUserSession(sessionId, currentWithUser);
     if (!customText) setInputValue("");
+    isUserScrolledUpRef.current = false;
+    setTimeout(() => scrollToBottom(true), 50);
     setIsTyping(true);
 
     // Generate AI response using active System Prompt, RAG context & contact settings
@@ -482,7 +542,14 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 pointer-events-none flex flex-col items-end">
+    <div
+      className={cn(
+        "fixed z-50 pointer-events-none flex flex-col",
+        isMobile
+          ? "inset-x-0 bottom-3.5 px-3 items-center justify-end"
+          : "bottom-6 right-6 items-end"
+      )}
+    >
       {/* Floating Launcher Button & Tooltip (Absolute Bottom-0 Right-0) */}
       <AnimatePresence>
         {!isOpen && (
@@ -492,7 +559,10 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ duration: 0.2 }}
-            className="absolute bottom-0 right-0 flex flex-col items-end pointer-events-auto whitespace-nowrap"
+            className={cn(
+              "flex flex-col pointer-events-auto whitespace-nowrap",
+              isMobile ? "self-end items-end" : "absolute bottom-0 right-0 items-end"
+            )}
           >
             {/* Dynamic Pop-up Curved Tooltip Button "Tanya AI BSMR 👋" */}
             {showCurvedTooltip && (
@@ -509,19 +579,37 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                   ease: "easeInOut",
                   times: [0, 0.15, 0.5, 0.85, 1],
                 }}
-                className="mb-2.5 relative group cursor-pointer select-none whitespace-nowrap shrink-0"
+                className={cn(
+                  "relative group cursor-pointer select-none whitespace-nowrap shrink-0",
+                  isMobile ? "mb-1.5" : "mb-2.5"
+                )}
                 onClick={() => {
                   setIsOpen(true);
                   recordNewInteraction();
                 }}
               >
-                <div className="bg-white text-gray-900 px-4 py-2 rounded-full shadow-xl border border-blue-500/20 flex items-center gap-2 whitespace-nowrap hover:scale-105 transition-transform">
-                  <span className="text-xs sm:text-sm font-extrabold tracking-tight text-[#0052cc] whitespace-nowrap">
+                <div
+                  className={cn(
+                    "bg-white text-gray-900 rounded-full shadow-lg sm:shadow-xl border border-blue-500/20 flex items-center whitespace-nowrap hover:scale-105 transition-transform",
+                    isMobile ? "px-2.5 py-1 gap-1.5" : "px-4 py-2 gap-2"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "font-extrabold tracking-tight text-[#0052cc] whitespace-nowrap",
+                      isMobile ? "text-[11px]" : "text-sm"
+                    )}
+                  >
                     Tanya AI BSMR 👋
                   </span>
                 </div>
                 {/* Arrow Indicator */}
-                <div className="absolute right-6 -bottom-1.5 w-3 h-3 bg-white transform rotate-45 border-r border-b border-blue-500/20" />
+                <div
+                  className={cn(
+                    "absolute bg-white transform rotate-45 border-r border-b border-blue-500/20",
+                    isMobile ? "right-4 -bottom-1 w-2 sm:w-2.5 h-2 sm:h-2.5" : "right-6 -bottom-1.5 w-3 h-3"
+                  )}
+                />
               </motion.div>
             )}
 
@@ -531,9 +619,17 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                 setIsOpen(true);
                 recordNewInteraction();
               }}
-              className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#00388c] via-[#0052cc] to-[#1e6fff] text-white flex items-center justify-center shadow-xl hover:shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer relative group shrink-0 ring-4 ring-blue-500/15"
+              className={cn(
+                "rounded-full bg-gradient-to-tr from-[#00388c] via-[#0052cc] to-[#1e6fff] text-white flex items-center justify-center shadow-lg sm:shadow-xl hover:shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer relative group shrink-0",
+                isMobile ? "w-12 h-12 ring-2 ring-blue-500/15" : "w-16 h-16 ring-4 ring-blue-500/15"
+              )}
             >
-              <div className="w-11 h-11 rounded-full bg-white p-1 flex items-center justify-center shadow-xs">
+              <div
+                className={cn(
+                  "rounded-full bg-white flex items-center justify-center shadow-xs",
+                  isMobile ? "w-8 h-8 p-0.5" : "w-11 h-11 p-1"
+                )}
+              >
                 <img
                   src="/chatbotlog.png"
                   alt="BSMR AI Logo"
@@ -555,16 +651,29 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
             className={cn(
-              "absolute bottom-0 right-0 w-[380px] sm:w-[420px] h-[610px] rounded-3xl shadow-2xl border flex flex-col overflow-hidden backdrop-blur-xl transition-colors pointer-events-auto",
+              "shadow-2xl border flex flex-col overflow-hidden backdrop-blur-xl transition-colors pointer-events-auto",
+              isMobile
+                ? "w-full max-w-[390px] h-[560px] max-h-[82vh] rounded-2xl mx-auto"
+                : "absolute bottom-0 right-0 w-[420px] h-[610px] rounded-3xl",
               darkMode
                 ? "bg-gray-900/95 border-gray-800 text-white"
                 : "bg-white/95 border-gray-200 text-gray-900"
             )}
           >
             {/* Header Navbar */}
-            <div className="bg-gradient-to-r from-[#00388c] via-[#0052cc] to-[#0066ff] p-4 text-white flex items-center justify-between shadow-md shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-white p-1 flex items-center justify-center shadow-inner">
+            <div
+              className={cn(
+                "bg-gradient-to-r from-[#00388c] via-[#0052cc] to-[#0066ff] text-white flex items-center justify-between shadow-md shrink-0",
+                isMobile ? "p-2.5 px-3" : "p-4"
+              )}
+            >
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div
+                  className={cn(
+                    "rounded-full bg-white flex items-center justify-center shadow-inner shrink-0",
+                    isMobile ? "w-7 h-7 p-0.5" : "w-10 h-10 p-1"
+                  )}
+                >
                   <img
                     src="/chatbotlog.png"
                     alt="AI Logo"
@@ -572,11 +681,16 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                   />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold tracking-tight flex items-center gap-1.5">
-                    BSMR AI Chatbot <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                  <h4
+                    className={cn(
+                      "font-bold tracking-tight flex items-center gap-1",
+                      isMobile ? "text-xs" : "text-sm"
+                    )}
+                  >
+                    BSMR AI Chatbot <Sparkles className="w-3 h-3 text-amber-300 fill-amber-300" />
                   </h4>
-                  <p className="text-[11px] text-blue-100/90 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <p className="text-[10px] sm:text-[11px] text-blue-100/90 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse" />
                     {isEscalatedToAdmin || messages.some((m) => m.isEscalation || m.sender === "admin" || m.text.includes("Mengobrol Dengan Admin"))
                       ? "Terhubung CS Admin BSMR"
                       : "Online • Respon Cepat RAG"}
@@ -586,26 +700,39 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
 
               <button
                 onClick={() => setIsOpen(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer text-white"
+                className={cn(
+                  "rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer text-white shrink-0",
+                  isMobile ? "w-6 h-6" : "w-8 h-8"
+                )}
               >
-                <X className="w-5 h-5" />
+                <X className={isMobile ? "w-3.5 h-3.5" : "w-5 h-5"} />
               </button>
             </div>
 
             {/* Tab Body: CHAT */}
             {activeTab === "chat" && (
-              <div className={cn(
-                "flex-1 p-4 overflow-y-auto space-y-4 flex flex-col justify-start min-h-0",
-                darkMode ? "bg-gray-900/90" : "bg-[#f8fafc]"
-              )}>
+              <div
+                ref={chatContainerRef}
+                onScroll={handleChatScroll}
+                className={cn(
+                  "flex-1 overflow-y-auto overscroll-contain touch-pan-y flex flex-col justify-start min-h-0",
+                  isMobile ? "p-3 space-y-3" : "p-4 space-y-4",
+                  darkMode ? "bg-gray-900/90" : "bg-[#f8fafc]"
+                )}
+                style={{ WebkitOverflowScrolling: "touch" }}
+              >
                 {messages.map((msg) => (
                   <div key={msg.id} className="space-y-1">
                     <div className={cn(
-                      "flex gap-2.5 items-start",
+                      "flex items-start",
+                      isMobile ? "gap-2" : "gap-2.5",
                       msg.sender === "user" ? "flex-row-reverse" : "flex-row"
                     )}>
                       {msg.sender === "bot" && (
-                        <div className="w-7 h-7 rounded-full bg-white border border-gray-200 shrink-0 overflow-hidden mt-0.5 shadow-xs p-0.5 flex items-center justify-center">
+                        <div className={cn(
+                          "rounded-full bg-white border border-gray-200 shrink-0 overflow-hidden mt-0.5 shadow-xs p-0.5 flex items-center justify-center",
+                          isMobile ? "w-6 h-6" : "w-7 h-7"
+                        )}>
                           <img
                             src="/chatbotlog.png"
                             alt="AI"
@@ -615,14 +742,18 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                       )}
 
                       {msg.sender === "admin" && (
-                        <div className="w-7 h-7 rounded-full bg-indigo-600 text-white shrink-0 mt-0.5 shadow-xs flex items-center justify-center text-xs font-bold">
+                        <div className={cn(
+                          "rounded-full bg-indigo-600 text-white shrink-0 mt-0.5 shadow-xs flex items-center justify-center font-bold",
+                          isMobile ? "w-6 h-6 text-[10px]" : "w-7 h-7 text-xs"
+                        )}>
                           CS
                         </div>
                       )}
 
                       <div
                         className={cn(
-                          "max-w-[82%] p-3.5 rounded-2xl text-xs leading-relaxed shadow-xs whitespace-pre-line",
+                          "max-w-[84%] leading-relaxed shadow-xs whitespace-pre-line",
+                          isMobile ? "p-2.5 text-[11px] rounded-xl" : "p-3.5 text-xs rounded-2xl",
                           msg.sender === "user"
                             ? "bg-[#0052cc] text-white rounded-tr-none font-medium"
                             : msg.sender === "admin"
@@ -638,7 +769,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                         <div>{msg.text}</div>
 
                         {(msg.isContactInfo || msg.text.includes("WhatsApp CS:") || msg.text.includes("Email Admin:")) && (
-                          <div className="mt-3 pt-2 border-t border-gray-200/60 dark:border-gray-700/60 space-y-1.5 pointer-events-auto">
+                          <div className="mt-2.5 pt-2 border-t border-gray-200/60 dark:border-gray-700/60 space-y-1.5 pointer-events-auto">
                             <a
                               href={`https://wa.me/${(msg.waNumber || settings.waNumber || '').replace(/\D/g, '')}`}
                               target="_blank"
@@ -660,29 +791,29 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
 
                     {/* KPI 2 & KPI 3 Feedback & Escalation Prompt for Bot Messages */}
                     {msg.sender === "bot" && msg.id !== "welcome-1" && (
-                      <div className="pl-9 pt-0.5 space-y-1.5">
+                      <div className={cn("pt-0.5 space-y-1.5", isMobile ? "pl-8" : "pl-9")}>
                         {!msg.feedback ? (
-                          <div className="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 flex-wrap">
                             <span>Apakah Jawaban Ini Membantu?</span>
                             <button
                               onClick={() => handleFeedback(msg.id, true)}
-                              className="px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-semibold transition-all text-[11px] border border-emerald-200/70 flex items-center gap-1 cursor-pointer active:scale-95"
+                              className="px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-semibold transition-all text-[10px] sm:text-[11px] border border-emerald-200/70 flex items-center gap-1 cursor-pointer active:scale-95"
                             >
                               👍 Ya
                             </button>
                             <button
                               onClick={() => handleFeedback(msg.id, false)}
-                              className="px-2 py-0.5 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-semibold transition-all text-[11px] border border-rose-200/70 flex items-center gap-1 cursor-pointer active:scale-95"
+                              className="px-2 py-0.5 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-semibold transition-all text-[10px] sm:text-[11px] border border-rose-200/70 flex items-center gap-1 cursor-pointer active:scale-95"
                             >
                               👎 Tidak
                             </button>
                           </div>
                         ) : msg.feedback === "HELPFUL" ? (
-                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                          <p className="text-[10px] sm:text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                             ✓ Terimakasih atas feedback Anda! (Ditandai Solved)
                           </p>
                         ) : (
-                          <p className="text-[11px] text-rose-500 font-semibold">
+                          <p className="text-[10px] sm:text-[11px] text-rose-500 font-semibold">
                             Maaf atas ketidaknyamanannya. Anda dapat memilih "Mengobrol Dengan Admin" di bawah.
                           </p>
                         )}
@@ -691,7 +822,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
 
                     <span className={cn(
                       "text-[10px] block px-1 text-gray-400 font-mono",
-                      msg.sender === "user" ? "text-right" : "text-left pl-9"
+                      msg.sender === "user" ? "text-right" : isMobile ? "text-left pl-8" : "text-left pl-9"
                     )}>
                       {msg.time}
                     </span>
@@ -699,8 +830,8 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                 ))}
 
                 {isTyping && (
-                  <div className="flex gap-2 items-center pl-9">
-                    <div className={cn("p-3 rounded-2xl text-xs flex gap-1 items-center", darkMode ? "bg-gray-800" : "bg-white border")}>
+                  <div className={cn("flex gap-2 items-center", isMobile ? "pl-8" : "pl-9")}>
+                    <div className={cn("p-2.5 rounded-xl text-xs flex gap-1 items-center", darkMode ? "bg-gray-800" : "bg-white border")}>
                       <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
                       <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce delay-100" />
                       <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce delay-200" />
@@ -709,17 +840,18 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                 )}
 
                 {/* Quick Action Prompts (Opsi 'Mengobrol Dengan Admin' HANYA muncul jika userMessageCount >= 2) */}
-                <div className="pt-2 space-y-2">
-                  <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 px-1">
+                <div className="pt-1.5 space-y-1.5">
+                  <p className="text-[10px] sm:text-[11px] font-semibold text-gray-400 dark:text-gray-500 px-1">
                     Pilihan Cepat Pertanyaan Populer:
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {availableQuickPrompts.map((prompt) => (
                       <button
                         key={prompt.id}
                         onClick={() => handleSend(prompt.label)}
                         className={cn(
-                          "inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border transition-all cursor-pointer shadow-2xs hover:scale-[1.02] active:scale-95 text-left",
+                          "inline-flex items-center font-semibold border transition-all cursor-pointer shadow-2xs hover:scale-[1.02] active:scale-95 text-left",
+                          isMobile ? "px-2.5 py-1 text-[11px] gap-1 rounded-full" : "px-3 py-2 text-xs gap-1.5 rounded-full",
                           prompt.id === "hubungi-admin"
                             ? "bg-blue-600 text-white border-blue-700 hover:bg-blue-700 animate-pulse"
                             : darkMode
@@ -733,20 +865,19 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                     ))}
                   </div>
                 </div>
-
-                <div ref={messagesEndRef} />
               </div>
             )}
 
             {/* Tab Body: MESSAGES / HISTORY */}
             {activeTab === "messages" && (
               <div className={cn(
-                "flex-1 p-4 overflow-y-auto space-y-4",
+                "flex-1 overflow-y-auto space-y-3",
+                isMobile ? "p-3" : "p-4",
                 darkMode ? "bg-gray-900/90" : "bg-[#f8fafc]"
               )}>
                 {/* Start A New Chat Card */}
                 <div className="space-y-1.5">
-                  <p className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                  <p className="text-[11px] sm:text-xs font-bold text-gray-500 dark:text-gray-400">
                     Start A New Chat
                   </p>
                   <div
@@ -762,48 +893,56 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                       ]);
                     }}
                     className={cn(
-                      "p-3.5 rounded-2xl border-2 border-emerald-500/80 bg-emerald-50/30 dark:bg-emerald-950/20 flex items-center justify-between cursor-pointer hover:bg-emerald-50 transition-colors shadow-2xs"
+                      "rounded-2xl border-2 border-emerald-500/80 bg-emerald-50/30 dark:bg-emerald-950/20 flex items-center justify-between cursor-pointer hover:bg-emerald-50 transition-colors shadow-2xs",
+                      isMobile ? "p-2.5" : "p-3.5"
                     )}
                   >
                     <div>
                       <h5 className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
                         New Conversation
                       </h5>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                      <p className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
                         Kami biasanya membalas dalam beberapa menit
                       </p>
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center text-emerald-600 dark:text-emerald-300">
-                      <Send className="w-4 h-4" />
+                    <div className={cn(
+                      "rounded-full bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center text-emerald-600 dark:text-emerald-300 shrink-0",
+                      isMobile ? "w-7 h-7" : "w-8 h-8"
+                    )}>
+                      <Send className={isMobile ? "w-3.5 h-3.5" : "w-4 h-4"} />
                     </div>
                   </div>
                 </div>
 
                 {/* Recent History */}
-                <div className="space-y-2 pt-2">
-                  <p className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                <div className="space-y-1.5 pt-1">
+                  <p className="text-[11px] sm:text-xs font-bold text-gray-500 dark:text-gray-400">
                     Recent
                   </p>
                   <div
                     onClick={() => setActiveTab("chat")}
                     className={cn(
-                      "p-3 rounded-2xl border flex items-center gap-3 cursor-pointer transition-colors shadow-2xs",
+                      "rounded-2xl border flex items-center cursor-pointer transition-colors shadow-2xs",
+                      isMobile ? "p-2.5 gap-2.5" : "p-3 gap-3",
                       darkMode ? "bg-gray-800 border-gray-700 hover:bg-gray-750" : "bg-white border-gray-200 hover:bg-gray-50"
                     )}
                   >
-                    <div className="w-9 h-9 rounded-full bg-white overflow-hidden shrink-0 border border-gray-200 p-0.5 flex items-center justify-center">
+                    <div className={cn(
+                      "rounded-full bg-white overflow-hidden shrink-0 border border-gray-200 p-0.5 flex items-center justify-center",
+                      isMobile ? "w-7 h-7" : "w-9 h-9"
+                    )}>
                       <img src="/chatbotlog.png" alt="BSMR AI" className="w-full h-full object-contain" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center">
                         <h5 className="text-xs font-bold truncate">BSMR AI Assistant</h5>
-                        <span className="text-[10px] text-gray-400">12:22 PM</span>
+                        <span className="text-[9px] sm:text-[10px] text-gray-400">12:22 PM</span>
                       </div>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                      <p className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
                         {messages[messages.length - 1]?.text || "Terima kasih atas pertanyaan Anda..."}
                       </p>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                   </div>
                 </div>
               </div>
@@ -812,7 +951,8 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
             {/* Input Bar (Only in Chat tab) */}
             {activeTab === "chat" && (
               <div className={cn(
-                "p-3 border-t flex items-center gap-2 shrink-0 transition-colors",
+                "border-t flex items-center shrink-0 transition-colors",
+                isMobile ? "p-2 gap-1.5" : "p-3 gap-2",
                 darkMode ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
               )}>
                 <input
@@ -822,7 +962,8 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   className={cn(
-                    "flex-1 px-4 py-2.5 text-xs rounded-full border outline-none transition-colors",
+                    "flex-1 text-xs rounded-full border outline-none transition-colors",
+                    isMobile ? "px-3 py-1.5 text-xs" : "px-4 py-2.5 text-xs",
                     darkMode
                       ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:border-blue-500"
                       : "bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:bg-white"
@@ -832,45 +973,49 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                   onClick={() => handleSend()}
                   disabled={!inputValue.trim()}
                   className={cn(
-                    "w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all cursor-pointer shadow-md",
+                    "rounded-full flex items-center justify-center shrink-0 transition-all cursor-pointer shadow-md",
+                    isMobile ? "w-7 h-7" : "w-9 h-9",
                     inputValue.trim()
                       ? "bg-[#0052cc] text-white hover:bg-blue-700 active:scale-95"
                       : "bg-blue-600/70 text-white/70 cursor-not-allowed"
                   )}
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className={isMobile ? "w-3 h-3" : "w-4 h-4"} />
                 </button>
               </div>
             )}
 
             {/* Bottom Tab Navigation Bar */}
             <div className={cn(
-              "border-t flex items-center justify-around py-2 shrink-0 transition-colors",
+              "border-t flex items-center justify-around shrink-0 transition-colors",
+              isMobile ? "py-1.5" : "py-2",
               darkMode ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
             )}>
               <button
                 onClick={() => setActiveTab("chat")}
                 className={cn(
-                  "flex flex-col items-center gap-1 text-[11px] font-semibold py-1 px-6 rounded-xl transition-all cursor-pointer",
+                  "flex flex-col items-center rounded-xl transition-all cursor-pointer",
+                  isMobile ? "gap-0.5 text-[10px] py-0.5 px-4" : "gap-1 text-[11px] font-semibold py-1 px-6",
                   activeTab === "chat"
-                    ? "text-[#0052cc] dark:text-blue-400"
-                    : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    ? "text-[#0052cc] dark:text-blue-400 font-bold"
+                    : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 font-medium"
                 )}
               >
-                <Home className="w-4 h-4" />
+                <Home className={isMobile ? "w-3.5 h-3.5" : "w-4 h-4"} />
                 <span>Chat</span>
               </button>
 
               <button
                 onClick={() => setActiveTab("messages")}
                 className={cn(
-                  "flex flex-col items-center gap-1 text-[11px] font-semibold py-1 px-6 rounded-xl transition-all cursor-pointer",
+                  "flex flex-col items-center rounded-xl transition-all cursor-pointer",
+                  isMobile ? "gap-0.5 text-[10px] py-0.5 px-4" : "gap-1 text-[11px] font-semibold py-1 px-6",
                   activeTab === "messages"
-                    ? "text-[#0052cc] dark:text-blue-400"
-                    : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    ? "text-[#0052cc] dark:text-blue-400 font-bold"
+                    : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 font-medium"
                 )}
               >
-                <MessageSquare className="w-4 h-4" />
+                <MessageSquare className={isMobile ? "w-3.5 h-3.5" : "w-4 h-4"} />
                 <span>Messages</span>
               </button>
             </div>

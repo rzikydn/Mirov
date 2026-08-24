@@ -48,11 +48,11 @@ export async function embedText(text: string, overrideKey?: string): Promise<num
  * Embed multiple texts in a single batch API call.
  * Gemini supports up to 100 texts per batch request.
  */
-export async function embedBatch(texts: string[]): Promise<number[][]> {
+export async function embedBatch(texts: string[], overrideKey?: string): Promise<number[][]> {
   if (texts.length === 0) return [];
-  if (texts.length === 1) return [await embedText(texts[0])];
+  if (texts.length === 1) return [await embedText(texts[0], overrideKey)];
 
-  const key = getApiKey();
+  const key = getApiKey(overrideKey);
   const BATCH_SIZE = 100;
   const allEmbeddings: number[][] = [];
 
