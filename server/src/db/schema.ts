@@ -162,3 +162,88 @@ export type RagDocument = typeof ragDocuments.$inferSelect;
 export type NewRagDocument = typeof ragDocuments.$inferInsert;
 export type RagChunk = typeof ragChunks.$inferSelect;
 export type NewRagChunk = typeof ragChunks.$inferInsert;
+
+// ==========================================
+// AI CHATBOT TABLES (BSMR PRODUCTION)
+// ==========================================
+
+// Chatbot FAQs Table (Daftar FAQ & Jawaban Resmi)
+export const chatbotFaqs = mysqlTable('chatbot_faqs', {
+  id: varchar('id', { length: 100 }).primaryKey(),
+  label: varchar('label', { length: 255 }).notNull(),
+  icon: varchar('icon', { length: 20 }).default(''),
+  answer: text('answer').notNull(),
+  category: varchar('category', { length: 100 }).default('Umum'),
+  sortOrder: int('sortOrder').default(0),
+  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+});
+
+export type ChatbotFaq = typeof chatbotFaqs.$inferSelect;
+export type NewChatbotFaq = typeof chatbotFaqs.$inferInsert;
+
+// Chatbot Settings Table (System Prompt & Kontak Admin)
+export const chatbotSettings = mysqlTable('chatbot_settings', {
+  id: varchar('id', { length: 50 }).primaryKey().default('default'),
+  botName: varchar('botName', { length: 255 }).notNull().default('AI Assistant BSMR'),
+  welcomeMsg: text('welcomeMsg').notNull(),
+  systemPrompt: text('systemPrompt').notNull(),
+  waNumber: varchar('waNumber', { length: 50 }).notNull().default('6281299008899'),
+  adminEmail: varchar('adminEmail', { length: 255 }).notNull().default('cs@bsmr.org'),
+  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+});
+
+export type ChatbotSetting = typeof chatbotSettings.$inferSelect;
+export type NewChatbotSetting = typeof chatbotSettings.$inferInsert;
+
+// Chatbot Visitor Sessions Table (Sesi Pengunjung)
+export const chatbotSessions = mysqlTable('chatbot_sessions', {
+  id: varchar('id', { length: 100 }).primaryKey(),
+  visitorId: varchar('visitorId', { length: 100 }).notNull(),
+  title: varchar('title', { length: 500 }).notNull().default('Sesi Pengunjung Baru'),
+  isEscalated: boolean('isEscalated').notNull().default(false),
+  isUnread: boolean('isUnread').notNull().default(true),
+  lastSender: varchar('lastSender', { length: 50 }).default('user'),
+  preview: text('preview'),
+  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+}, (table) => ({
+  visitorIdx: index('chatbot_sessions_visitorId_idx').on(table.visitorId),
+  updatedAtIdx: index('chatbot_sessions_updatedAt_idx').on(table.updatedAt),
+}));
+
+export type ChatbotSession = typeof chatbotSessions.$inferSelect;
+export type NewChatbotSession = typeof chatbotSessions.$inferInsert;
+
+// Chatbot Messages Table (Riwayat Pesan Per Sesi)
+export const chatbotMessages = mysqlTable('chatbot_messages', {
+  id: varchar('id', { length: 100 }).primaryKey(),
+  sessionId: varchar('sessionId', { length: 100 }).notNull().references(() => chatbotSessions.id, { onDelete: 'cascade' }),
+  sender: mysqlEnum('sender', ['user', 'bot', 'admin']).notNull(),
+  text: text('text').notNull(),
+  time: varchar('time', { length: 50 }).notNull(),
+  feedback: mysqlEnum('feedback', ['HELPFUL', 'NOT_HELPFUL']),
+  isContactInfo: boolean('isContactInfo').default(false),
+  isEscalation: boolean('isEscalation').default(false),
+  waNumber: varchar('waNumber', { length: 50 }),
+  adminEmail: varchar('adminEmail', { length: 255 }),
+  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+}, (table) => ({
+  sessionIdx: index('chatbot_messages_sessionId_idx').on(table.sessionId),
+  createdAtIdx: index('chatbot_messages_createdAt_idx').on(table.createdAt),
+}));
+
+export type ChatbotMessage = typeof chatbotMessages.$inferSelect;
+export type NewChatbotMessage = typeof chatbotMessages.$inferInsert;
+
+// Chatbot Analytics Table (Statistik Agregasi)
+export const chatbotAnalytics = mysqlTable('chatbot_analytics', {
+  id: varchar('id', { length: 100 }).primaryKey(),
+  metricType: varchar('metricType', { length: 100 }).notNull(), // 'interaction_count' | 'peak_hours' | 'top_questions'
+  dataJson: json('dataJson').notNull(),
+  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+});
+
+export type ChatbotAnalytic = typeof chatbotAnalytics.$inferSelect;
+export type NewChatbotAnalytic = typeof chatbotAnalytics.$inferInsert;
+

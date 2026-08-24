@@ -12,6 +12,7 @@ import databaseRoutes from './routes/databaseRoutes';
 import setupRoutes from './routes/setupRoutes';
 import historyRoutes from './routes/historyRoutes';
 import ragRoutes from './routes/ragRoutes';
+import chatbotRoutes from './routes/chatbotRoutes';
 
 dotenv.config();
 
@@ -65,19 +66,30 @@ app.use(helmet({
   }
 }));
 
-// CORS configuration - allow multiple origins in development
+// CORS configuration - allow multiple origins in development and production
 const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:5173',
+  process.env.CLIENT_URL,
+  'https://planner.bsmr.org',
+  'http://planner.bsmr.org',
+  'https://api1.mirovtest.my.id',
   'http://localhost:5173',
   'http://localhost:5174',
-];
+  'http://127.0.0.1:8080',
+  'http://localhost:8080',
+].filter(Boolean) as string[];
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps, curl, or iframe embed)
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+    const isAllowed =
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.bsmr.org') ||
+      origin.endsWith('.mirovtest.my.id') ||
+      process.env.NODE_ENV === 'development';
+
+    if (isAllowed) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -101,6 +113,7 @@ app.use('/api/databases', databaseRoutes);
 app.use('/api/setup', generalLimiter, setupRoutes); // Setup gets general limit for safety
 app.use('/api/history', historyRoutes);
 app.use('/api/rag', ragRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 // Health check (checks both Express server and MySQL database connection)
 app.get(['/health', '/api/health'], async (_req: Request, res: Response) => {
