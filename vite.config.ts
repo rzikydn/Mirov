@@ -9,6 +9,7 @@ function chatSyncPlugin(): Plugin {
   let serverDeletedIds = new Set<string>();
   let serverSettings: any = null;
   let serverAiConfig: any = null;
+  let serverFaqs: any = null;
 
   let serverPeakHours: any[] = Array.from({ length: 24 }, (_, i) => ({
     hour: `${String(i).padStart(2, '0')}:00`,
@@ -312,6 +313,29 @@ function chatSyncPlugin(): Plugin {
               } catch (e) { }
               res.setHeader('Content-Type', 'application/json');
               return res.end(JSON.stringify({ success: true, settings: serverSettings }));
+            });
+            return;
+          }
+        }
+
+        if (req.url && req.url.startsWith('/api/chatbot-faqs')) {
+          if (req.method === 'GET') {
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            return res.end(JSON.stringify(serverFaqs || []));
+          }
+          if (req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk) => { body += chunk; });
+            req.on('end', () => {
+              try {
+                const parsed = JSON.parse(body);
+                if (Array.isArray(parsed)) {
+                  serverFaqs = parsed;
+                }
+              } catch (e) { }
+              res.setHeader('Content-Type', 'application/json');
+              return res.end(JSON.stringify({ success: true, faqs: serverFaqs }));
             });
             return;
           }

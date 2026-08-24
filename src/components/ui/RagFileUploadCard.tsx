@@ -39,12 +39,13 @@ export default function RagFileUploadCard({ darkMode, className }: RagFileUpload
     return () => clearInterval(interval);
   }, []);
 
-  // Map RagDocument[] to UploadedFile[] UI format
-  const files: UploadedFile[] = ragItems.map((item) => {
+  // Map RagDocument[] to UploadedFile[] UI format — exclude FAQ (sudah punya panel sendiri)
+  const files: UploadedFile[] = ragItems
+    .filter((item) => item.type !== 'FAQ')
+    .map((item) => {
     let fileType = "application/pdf";
     if (item.type === "DOCX") fileType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     if (item.type === "PPTX") fileType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-    if (item.type === "FAQ") fileType = "text/plain";
 
     return {
       id: String(item.id),

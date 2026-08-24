@@ -364,6 +364,9 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
                         handleToggleSelectSession(session.id);
                       } else {
                         setSelectedSessionId(session.id);
+                        setSessions((prev) =>
+                          prev.map((s) => (s.id === session.id || s.visitorId === session.visitorId ? { ...s, isUnread: false } : s))
+                        );
                         markSessionAsRead(session.id);
                       }
                     }}
@@ -389,8 +392,8 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
                             className="w-3.5 h-3.5 accent-red-600 rounded cursor-pointer shrink-0 mr-1"
                           />
                         ) : (
-                          session.isUnread && (
-                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" title="Chat Baru" />
+                          session.isUnread && !isActive && (
+                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 animate-pulse" title="Chat Baru" />
                           )
                         )}
                         <span className={cn("text-xs font-bold truncate", darkMode ? "text-gray-100" : "text-gray-900")}>

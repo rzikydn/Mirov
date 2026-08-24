@@ -1,4 +1,5 @@
 import { ChatbotSettings, getChatbotSettings } from './chatbotSettingsService';
+import { getFaqList, FaqItem } from './faqSettingsService';
 import { queryRagKnowledgeBase } from './ragKnowledgeBase';
 
 export interface AiEngineOptions {
@@ -108,7 +109,8 @@ export async function generateAiChatResponse(options: AiEngineOptions): Promise<
   }
 
   // 3. Priority 1: Instant Quick Prompts / Direct FAQ Match (<10ms)
-  const matchedPrompt = quickPrompts.find(
+  const effectivePrompts = (quickPrompts && quickPrompts.length > 0) ? quickPrompts : getFaqList();
+  const matchedPrompt = effectivePrompts.find(
     (p) => queryLower.includes(p.label.toLowerCase()) || p.id === customText || (p.label && userQuery.toLowerCase() === p.label.toLowerCase())
   );
   if (matchedPrompt && matchedPrompt.id !== 'hubungi-bsmr') {

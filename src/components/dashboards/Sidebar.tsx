@@ -20,6 +20,7 @@ import {
   MoreVertical,
   Code,
   Cpu,
+  HelpCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Database } from '../../types/database';
@@ -30,6 +31,7 @@ import AvatarPickerModal from './modals/AvatarPickerModal';
 import ApiIntegrationModal from './modals/ApiIntegrationModal';
 import SettingPromptDialog from './modals/SettingPromptDialog';
 import InstallationDialog from './modals/InstallationDialog';
+import InputFaqModal from './modals/InputFaqModal';
 import BsmrLogo from '../BsmrLogo';
 import { useHistory } from '../../context/HistoryContext';
 import { getVisitorChatSessions, getUnreadVisitorChatSessionsCount, fetchVisitorChatSessionsAsync } from '../../services/visitorChatLogsService';
@@ -90,6 +92,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showApiModal, setShowApiModal] = useState(false);
   const [showSettingPromptDialog, setShowSettingPromptDialog] = useState(false);
   const [showInstallationDialog, setShowInstallationDialog] = useState(false);
+  const [showFaqModal, setShowFaqModal] = useState(false);
   
   // User Avatar state synchronized with user record and event listener
   const [userAvatar, setUserAvatar] = useState<string>('');
@@ -114,9 +117,14 @@ const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [syncUserAvatar]);
 
-  // Track unread chat logs count in real-time to show notification number badge on AI Chatbot sidebar button
+  // Track chat logs count in real-time to show notification number badge on AI Chatbot sidebar button (like History button)
   const [chatLogsCount, setChatLogsCount] = useState<number>(() => {
-    return getUnreadVisitorChatSessionsCount();
+    const sessions = getVisitorChatSessions();
+    return Array.isArray(sessions) ? sessions.length : 0;
+  });
+  const [hasUnreadChats, setHasUnreadChats] = useState<boolean>(() => {
+    const sessions = getVisitorChatSessions();
+    return Array.isArray(sessions) ? sessions.some((s) => s && s.isUnread !== false) : false;
   });
 
   React.useEffect(() => {
@@ -124,12 +132,16 @@ const Sidebar: React.FC<SidebarProps> = ({
       try {
         const fresh = await fetchVisitorChatSessionsAsync();
         if (Array.isArray(fresh)) {
-          const unreadCount = fresh.filter((s) => s && s.isUnread !== false).length;
-          setChatLogsCount(unreadCount);
+          setChatLogsCount(fresh.length);
+          setHasUnreadChats(fresh.some((s) => s && s.isUnread !== false));
           return;
         }
       } catch (e) {}
-      setChatLogsCount(getUnreadVisitorChatSessionsCount());
+      const current = getVisitorChatSessions();
+      if (Array.isArray(current)) {
+        setChatLogsCount(current.length);
+        setHasUnreadChats(current.some((s) => s && s.isUnread !== false));
+      }
     };
 
     syncLogsCount();
@@ -316,6 +328,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                         <span className="whitespace-nowrap flex items-center gap-2 min-w-0">
                           <div className="relative flex items-center justify-center shrink-0">
                             <BotIcon size={20} className="w-[20px] h-[20px] text-current shrink-0" />
+                            {hasUnreadChats && (
+                              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-blue-500 animate-pulse ring-2 ring-white dark:ring-gray-800" />
+                            )}
                           </div>
                           <span className="overflow-hidden font-medium">AI Chatbot</span>
                         </span>
@@ -356,6 +371,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 >
                                   <Settings className="w-4 h-4 mr-2 text-blue-500" />
                                   Setting & Prompt
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowFaqModal(true);
+                                  }}
+                                  className="cursor-pointer font-medium"
+                                >
+                                  <HelpCircle className="w-4 h-4 mr-2 text-violet-500" />
+                                  Manajemen FAQ
                                 </DropdownMenuItem>
 
                                 <DropdownMenuItem
@@ -771,6 +797,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         show={showInstallationDialog}
         darkMode={darkMode}
         onClose={() => setShowInstallationDialog(false)}
+      />
+
+      {/* FAQ Management Dialog */}
+      <InputFaqModal
+        show={showFaqModal}
+        darkMode={darkMode}
+        onClose={() => setShowFaqModal(false)}
       />
     </>
   );

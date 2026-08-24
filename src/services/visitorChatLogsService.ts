@@ -25,6 +25,7 @@ export interface ChatSession {
 
 const STORAGE_KEY = 'bsmr_visitor_chat_sessions';
 const DELETED_IDS_KEY = 'bsmr_deleted_visitor_session_ids';
+const READ_IDS_KEY = 'bsmr_read_visitor_session_ids';
 
 export const INITIAL_CHAT_SESSIONS: ChatSession[] = [];
 
@@ -40,6 +41,36 @@ const LEGACY_TEST_IDS = [
 ];
 
 const EXACT_LEGACY_IDS = new Set(["session-1", "session-2", "session-3", "session-esc-1", "session-esc-2"]);
+
+export function getReadSessionIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const data = localStorage.getItem(READ_IDS_KEY);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return new Set(parsed);
+    }
+  } catch (e) {}
+  return new Set();
+}
+
+export function markSessionIdAsRead(id: string): void {
+  if (typeof window === 'undefined' || !id) return;
+  try {
+    const set = getReadSessionIds();
+    set.add(id);
+    localStorage.setItem(READ_IDS_KEY, JSON.stringify(Array.from(set)));
+  } catch (e) {}
+}
+
+export function unmarkSessionIdAsRead(id: string): void {
+  if (typeof window === 'undefined' || !id) return;
+  try {
+    const set = getReadSessionIds();
+    set.delete(id);
+    localStorage.setItem(READ_IDS_KEY, JSON.stringify(Array.from(set)));
+  } catch (e) {}
+}
 
 export function getDeletedSessionIds(): Set<string> {
   if (typeof window === 'undefined') return new Set();
@@ -75,15 +106,24 @@ export function markSessionsAsDeleted(ids: string[]): void {
 function filterOutLegacySessions(sessions: ChatSession[]): ChatSession[] {
   if (!Array.isArray(sessions)) return [];
   const deletedSet = getDeletedSessionIds();
-  return sessions.filter(
-    (s) =>
-      s &&
-      s.id &&
-      !LEGACY_TEST_IDS.includes(s.visitorId) &&
-      !EXACT_LEGACY_IDS.has(s.id) &&
-      !deletedSet.has(s.id) &&
-      !deletedSet.has(s.visitorId)
-  );
+  const readSet = getReadSessionIds();
+  return sessions
+    .filter(
+      (s) =>
+        s &&
+        s.id &&
+        !LEGACY_TEST_IDS.includes(s.visitorId) &&
+        !EXACT_LEGACY_IDS.has(s.id) &&
+        !deletedSet.has(s.id) &&
+        !deletedSet.has(s.visitorId)
+    )
+    .map((s) => {
+      const isRead = s && (readSet.has(s.id) || readSet.has(s.visitorId));
+      return {
+        ...s,
+        isUnread: isRead ? false : (s.isUnread !== false),
+      };
+    });
 }
 
 export function extractTimestampFromSession(s: ChatSession): number {
@@ -309,6 +349,31 @@ export function saveOrUpdateUserSession(
     ? "Pengguna meminta terhubung dengan admin"
     : "";
 
+  const previousMsgCount = existingSession
+    ? (existingSession.messages || []).length
+    : 0;
+  const currentMsgCount = formattedMessages.length;
+  const isNewMessageArrived = currentMsgCount > previousMsgCount;
+
+  if (isNewMessageArrived && existingSession) {
+    unmarkSessionIdAsRead(sessionId);
+    if (existingSession.visitorId) unmarkSessionIdAsRead(existingSession.visitorId);
+  }
+
+  const readSet = getReadSessionIds();
+  const isMarkedRead = readSet.has(sessionId) || (existingSession && readSet.has(existingSession.visitorId));
+
+  let finalIsUnread = true;
+  if (existingSession) {
+    if (isNewMessageArrived) {
+      finalIsUnread = true;
+    } else {
+      finalIsUnread = isMarkedRead ? false : (existingSession.isUnread !== false);
+    }
+  } else {
+    finalIsUnread = !isMarkedRead;
+  }
+
   const sessionObj: ChatSession = {
     id: sessionId,
     visitorId: existingSession ? existingSession.visitorId : `#${randomNum}`,
@@ -322,7 +387,7 @@ export function saveOrUpdateUserSession(
     summary: currentlyEscalated
       ? "Pengguna meminta terhubung dengan admin"
       : `Pengunjung sedang berinteraksi dengan AI Chatbot (${finalMessages.length} pesan)`,
-    isUnread: true,
+    isUnread: finalIsUnread,
     timestamp: Date.now(),
     messages: finalMessages,
   };
@@ -445,15 +510,24 @@ export function addVisitorMessageToEscalatedSession(sessionId: string, messageTe
  * Menandai sesi obrolan sebagai sudah dibaca (isUnread: false) dan menyimpannya secara terpusat
  */
 export function markSessionAsReadInService(sessionId: string): ChatSession[] {
+  if (!sessionId) return getVisitorChatSessions();
+  markSessionIdAsRead(sessionId);
+
   const sessions = getVisitorChatSessions();
   let hasChanged = false;
   const updated = sessions.map((session) => {
-    if (session.id === sessionId && session.isUnread !== false) {
-      hasChanged = true;
-      return {
-        ...session,
-        isUnread: false,
-      };
+    if (
+      (session.id === sessionId || session.visitorId === sessionId || sessionId === 'all')
+    ) {
+      if (session.id) markSessionIdAsRead(session.id);
+      if (session.visitorId) markSessionIdAsRead(session.visitorId);
+      if (session.isUnread !== false) {
+        hasChanged = true;
+        return {
+          ...session,
+          isUnread: false,
+        };
+      }
     }
     return session;
   });

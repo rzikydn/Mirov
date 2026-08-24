@@ -20,6 +20,7 @@ import { classifyAndRecordQuestion } from "../../services/topQuestionsAnalytics"
 import { recordPeakHourChat } from "../../services/peakHoursAnalytics";
 import { escalateSessionToAdmin, saveOrUpdateUserSession, fetchVisitorChatSessionsAsync, cacheServerAdminMessages, ChatSession } from "../../services/visitorChatLogsService";
 import { getChatbotSettings, fetchChatbotSettingsAsync, ChatbotSettings } from "../../services/chatbotSettingsService";
+import { getFaqList, fetchFaqListAsync, FaqItem } from "../../services/faqSettingsService";
 import { generateAiChatResponse } from "../../services/aiChatEngine";
 
 interface BsmrChatWidgetProps {
@@ -38,18 +39,9 @@ interface ChatMessage {
   adminEmail?: string;
 }
 
-const quickPrompts = [
-  { id: "cek-sertifikat", label: "Cek Masa Berlaku Sertifikat", icon: "🔍", answer: "Untuk mengecek masa berlaku Sertifikat BSMR Anda, silakan ketikkan Nomor Sertifikat atau Tanggal/Tahun diterbitkannya sertifikat Anda (Contoh: 12/05/2023)." },
-  { id: "apa-bsmr", label: "Apa itu BSMR?", icon: "📜", answer: "LSP BSMR (Badan Sertifikasi Manajemen Risiko) adalah lembaga sertifikasi profesi resmi di Indonesia yang menguji dan menerbitkan sertifikasi kompetensi manajemen risiko perbankan sesuai standar OJK dan BNSP." },
-  { id: "level-sertifikasi", label: "Level Sertifikasi", icon: "📊", answer: "BSMR menyelenggarakan sertifikasi Manajemen Risiko dari Level 1 (Tingkat Dasar/Staff) hingga Level 5 (Tingkat Eksekutif/Direksi)." },
-  { id: "cara-daftar", label: "Cara Pendaftaran", icon: "📝", answer: "Pendaftaran ujian dapat dilakukan secara online melalui portal bsmr.org pada menu 'Pendaftaran Ujian' atau melalui PIC Bank pengirim." },
-  { id: "jadwal-lokasi", label: "Jadwal & Lokasi", icon: "📅", answer: "Jadwal Asesmen BSMR terdekat dilaksanakan pada 12-14 September 2026 secara Hybrid (Online via Computer Based Test & Offline di Kampus BSMR Jakarta)." },
-  { id: "hubungi-admin", label: "Mengobrol Dengan Admin", icon: "💬", answer: "Permintaan Anda telah diproses. Sesi ini telah terhubung dan diekskalasi ke CS Admin BSMR." },
-  { id: "hubungi-bsmr", label: "Hubungi BSMR", icon: "📞", answer: "Anda dapat menghubungi Admin CS BSMR via WhatsApp atau Email resmi." },
-];
-
 export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
   const [settings, setSettings] = useState<ChatbotSettings>(getChatbotSettings);
+  const [faqList, setFaqList] = useState<FaqItem[]>(() => getFaqList());
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"chat" | "messages">("chat");
   const [showCurvedTooltip, setShowCurvedTooltip] = useState(true);
@@ -207,6 +199,13 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
   }, [isOpen, messages, sessionId]);
 
   useEffect(() => {
+    const handleFaqSync = () => {
+      const fresh = getFaqList();
+      if (Array.isArray(fresh)) {
+        setFaqList(fresh);
+      }
+    };
+
     if (isOpen) {
       fetchChatbotSettingsAsync().then((fresh) => {
         setSettings(fresh);
@@ -218,19 +217,49 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
           )
         );
       });
+
+      fetchFaqListAsync().then((freshFaqs) => {
+        if (Array.isArray(freshFaqs)) {
+          setFaqList(freshFaqs);
+        }
+      });
     }
+
+    window.addEventListener("bsmr_faqs_updated", handleFaqSync);
+    window.addEventListener("storage", handleFaqSync);
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "BSMR_FAQS_UPDATED" && Array.isArray(event.data.faqs)) {
+        setFaqList(event.data.faqs);
+      }
+    };
+    window.addEventListener("message", handleMessage);
+
+    return () => {
+      window.removeEventListener("bsmr_faqs_updated", handleFaqSync);
+      window.removeEventListener("storage", handleFaqSync);
+      window.removeEventListener("message", handleMessage);
+    };
   }, [isOpen]);
 
   // Hitung jumlah pertanyaan yang sudah dikirim oleh pengguna dalam sesi ini
   const userMessageCount = messages.filter((m) => m.sender === "user").length;
 
   // Filter Quick Prompts: "Mengobrol Dengan Admin" HANYA muncul jika pengguna sudah mengajukan minimal 2 pertanyaan
-  const availableQuickPrompts = quickPrompts.filter((prompt) => {
-    if (prompt.id === "hubungi-admin") {
-      return userMessageCount >= 2;
-    }
-    return true;
-  });
+  const availableQuickPrompts = [
+    ...faqList,
+    ...(userMessageCount >= 2
+      ? [
+          {
+            id: "hubungi-admin",
+            label: "Mengobrol Dengan Admin",
+            icon: "💬",
+            answer: "Permintaan Anda telah diproses. Sesi ini telah terhubung dan diekskalasi ke CS Admin BSMR.",
+            category: "Eskalasi",
+          },
+        ]
+      : []),
+  ];
 
   // Handler Auto Scroll Ke Bawah (Hanya jika user tidak sedang scroll ke atas)
   const handleChatScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -522,7 +551,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
       userQuery: textToSend,
       settings,
       customText,
-      quickPrompts,
+      quickPrompts: availableQuickPrompts,
     });
 
     const botMsg: ChatMessage = {
@@ -715,7 +744,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                 ref={chatContainerRef}
                 onScroll={handleChatScroll}
                 className={cn(
-                  "flex-1 overflow-y-auto overscroll-contain touch-pan-y flex flex-col justify-start min-h-0",
+                  "flex-1 overflow-y-auto overscroll-contain touch-pan-y flex flex-col justify-start min-h-0 hide-scrollbar",
                   isMobile ? "p-3 space-y-3" : "p-4 space-y-4",
                   darkMode ? "bg-gray-900/90" : "bg-[#f8fafc]"
                 )}
@@ -840,18 +869,18 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                 )}
 
                 {/* Quick Action Prompts (Opsi 'Mengobrol Dengan Admin' HANYA muncul jika userMessageCount >= 2) */}
-                <div className="pt-1.5 space-y-1.5">
-                  <p className="text-[10px] sm:text-[11px] font-semibold text-gray-400 dark:text-gray-500 px-1">
+                <div className={cn("pt-1.5", isMobile ? "space-y-1" : "space-y-1.5")}>
+                  <p className={cn("font-semibold text-gray-400 dark:text-gray-500 px-1", isMobile ? "text-[9px]" : "text-[11px]")}>
                     Pilihan Cepat Pertanyaan Populer:
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className={cn("flex flex-wrap", isMobile ? "gap-1" : "gap-1.5")}>
                     {availableQuickPrompts.map((prompt) => (
                       <button
                         key={prompt.id}
                         onClick={() => handleSend(prompt.label)}
                         className={cn(
                           "inline-flex items-center font-semibold border transition-all cursor-pointer shadow-2xs hover:scale-[1.02] active:scale-95 text-left",
-                          isMobile ? "px-2.5 py-1 text-[11px] gap-1 rounded-full" : "px-3 py-2 text-xs gap-1.5 rounded-full",
+                          isMobile ? "px-2 py-0.5 text-[10px] gap-0.5 rounded-full" : "px-3 py-2 text-xs gap-1.5 rounded-full",
                           prompt.id === "hubungi-admin"
                             ? "bg-blue-600 text-white border-blue-700 hover:bg-blue-700 animate-pulse"
                             : darkMode
@@ -859,7 +888,9 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                               : "bg-blue-50/70 border-blue-200/80 text-blue-700 hover:bg-blue-100/80"
                         )}
                       >
-                        <span>{prompt.icon}</span>
+                        {prompt.icon && prompt.icon.trim() !== "" && (
+                          <span className="shrink-0">{prompt.icon}</span>
+                        )}
                         <span>{prompt.label}</span>
                       </button>
                     ))}

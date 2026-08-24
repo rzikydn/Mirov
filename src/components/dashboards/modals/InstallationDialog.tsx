@@ -32,7 +32,10 @@ export default function InstallationDialog({ show, darkMode, onClose }: Installa
 
   return (
     <Dialog open={show} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent 
+        className="sm:max-w-md"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <Code className="w-5 h-5 text-emerald-500" />
@@ -50,7 +53,7 @@ export default function InstallationDialog({ show, darkMode, onClose }: Installa
               <Input
                 readOnly
                 value={embedCode}
-                className="font-mono text-xs text-black dark:text-black font-semibold bg-gray-50 border-gray-200 dark:border-gray-700"
+                className="font-mono text-xs text-black dark:text-black font-semibold bg-gray-50 border-gray-200 dark:border-gray-700 select-all"
               />
             </div>
             <Button
@@ -62,16 +65,6 @@ export default function InstallationDialog({ show, darkMode, onClose }: Installa
             >
               {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </Button>
-          </div>
-
-          <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs ${
-            darkMode ? 'bg-blue-950/30 border-blue-800/40 text-blue-300' : 'bg-blue-50/60 border-blue-100 text-blue-700'
-          }`}>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-semibold">Status: planner.bsmr.org/chatbot.js Active & Ready</span>
-            </div>
-            <ExternalLink className="w-4 h-4 opacity-70" />
           </div>
         </div>
       </DialogContent>
