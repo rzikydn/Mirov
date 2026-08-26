@@ -43,6 +43,11 @@ const DonutChart = React.forwardRef<HTMLDivElement, DonutChartProps>(
     const [hoveredSegment, setHoveredSegment] =
       React.useState<DonutChartSegment | null>(null);
 
+    const isFirstRender = React.useRef(true);
+    React.useEffect(() => {
+      isFirstRender.current = false;
+    }, []);
+
     const internalTotalValue = React.useMemo(
       () =>
         propTotalValue || data.reduce((sum, segment) => sum + segment.value, 0),
@@ -112,16 +117,16 @@ const DonutChart = React.forwardRef<HTMLDivElement, DonutChartProps>(
                   strokeDasharray={strokeDasharray}
                   strokeDashoffset={-strokeDashoffset}
                   strokeLinecap="round"
-                  initial={{ opacity: 0, strokeDashoffset: circumference }}
+                  initial={isFirstRender.current ? { opacity: 0, strokeDashoffset: circumference } : false}
                   animate={{ 
                     opacity: 1, 
                     strokeDashoffset: -strokeDashoffset,
                   }}
                   transition={{
-                    opacity: { duration: 0.3, delay: index * animationDelayPerSegment },
+                    opacity: { duration: 0.3, delay: isFirstRender.current ? index * animationDelayPerSegment : 0 },
                     strokeDashoffset: {
-                      duration: animationDuration,
-                      delay: index * animationDelayPerSegment,
+                      duration: isFirstRender.current ? animationDuration : 0.4,
+                      delay: isFirstRender.current ? index * animationDelayPerSegment : 0,
                       ease: "easeOut",
                     },
                   }}

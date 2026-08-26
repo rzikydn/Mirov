@@ -3,13 +3,36 @@ import {
   int,
   varchar,
   text,
-  datetime,
   boolean,
   json,
   mysqlEnum,
-  index
+  index,
+  customType
 } from 'drizzle-orm/mysql-core';
 import { sql } from 'drizzle-orm';
+
+// Timezone-safe datetime helper for WIB (UTC+7)
+export const wibDatetime = (name: string) => customType<{ data: Date; driverData: string }>({
+  dataType() {
+    return 'datetime(3)';
+  },
+  fromDriver(value: string | Date): Date {
+    if (!value) return new Date();
+    if (value instanceof Date) return value;
+    const str = String(value);
+    const isoString = str.includes('T') || str.includes('Z') || str.includes('+')
+      ? str
+      : str.replace(' ', 'T') + '+07:00';
+    const d = new Date(isoString);
+    return isNaN(d.getTime()) ? new Date() : d;
+  },
+  toDriver(value: Date | string): string {
+    const d = typeof value === 'string' ? new Date(value) : value;
+    if (!d || isNaN(d.getTime())) return new Date().toISOString().replace('T', ' ').replace('Z', '').slice(0, 23);
+    const wibDate = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+    return wibDate.toISOString().replace('T', ' ').replace('Z', '').slice(0, 23);
+  },
+})(name);
 
 // Enums
 export const roleEnum = mysqlEnum('role', ['SUPERUSER', 'ADMIN', 'UMUM']);
@@ -24,8 +47,8 @@ export const users = mysqlTable('users', {
   name: varchar('name', { length: 255 }).notNull(),
   role: roleEnum.notNull().default('UMUM'),
   avatar: text('avatar'),
-  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
-  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+  createdAt: wibDatetime('createdAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: wibDatetime('updatedAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
 });
 
 // Schedules table
@@ -33,14 +56,14 @@ export const schedules = mysqlTable('schedules', {
   id: int('id').primaryKey().autoincrement(),
   title: varchar('title', { length: 255 }).notNull(),
   description: text('description'),
-  startDate: datetime('startDate', { mode: 'date', fsp: 3 }).notNull(),
-  endDate: datetime('endDate', { mode: 'date', fsp: 3 }).notNull(),
+  startDate: wibDatetime('startDate').notNull(),
+  endDate: wibDatetime('endDate').notNull(),
   location: varchar('location', { length: 255 }),
   status: varchar('status', { length: 50 }).notNull().default('planned'),
   createdBy: int('createdBy').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
-  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
-  deletedAt: datetime('deletedAt', { mode: 'date', fsp: 3 }),
+  createdAt: wibDatetime('createdAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: wibDatetime('updatedAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+  deletedAt: wibDatetime('deletedAt'),
 });
 
 // Notes table
@@ -50,10 +73,10 @@ export const notes = mysqlTable('notes', {
   content: text('content').notNull(),
   color: varchar('color', { length: 50 }),
   userId: int('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
-  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+  createdAt: wibDatetime('createdAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: wibDatetime('updatedAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
   favorite: boolean('favorite').notNull().default(false),
-  deletedAt: datetime('deletedAt', { mode: 'date', fsp: 3 }),
+  deletedAt: wibDatetime('deletedAt'),
 });
 
 // Databases table
@@ -66,9 +89,9 @@ export const databases = mysqlTable('databases', {
   rows: json('rows').notNull(),
   columnWidths: json('columnWidths'),
   createdBy: int('createdBy').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
-  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
-  deletedAt: datetime('deletedAt', { mode: 'date', fsp: 3 }),
+  createdAt: wibDatetime('createdAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: wibDatetime('updatedAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+  deletedAt: wibDatetime('deletedAt'),
 });
 
 // History table
@@ -81,7 +104,7 @@ export const history = mysqlTable('history', {
   target: mysqlEnum('target', ['NOTE', 'DATABASE', 'SCHEDULE']).notNull(),
   targetName: varchar('targetName', { length: 255 }),
   description: text('description').notNull(),
-  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  createdAt: wibDatetime('createdAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
 }, (table) => ({
   createdAtIdx: index('history_createdAt_idx').on(table.createdAt),
 }));
@@ -111,7 +134,7 @@ export const databaseRowTrash = mysqlTable('database_row_trash', {
   rowData: json('rowData').notNull(),
   previewText: varchar('previewText', { length: 255 }).notNull(),
   deletedBy: int('deletedBy'),
-  deletedAt: datetime('deletedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  deletedAt: wibDatetime('deletedAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
 });
 
 export type DatabaseRowTrash = typeof databaseRowTrash.$inferSelect;
@@ -139,8 +162,8 @@ export const ragDocuments = mysqlTable('rag_documents', {
   question: text('question'),
   answer: text('answer'),
   uploadedBy: int('uploadedBy'),
-  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
-  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+  createdAt: wibDatetime('createdAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: wibDatetime('updatedAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
 });
 
 // RAG Chunks table — chunked text with embedding vectors
@@ -153,7 +176,7 @@ export const ragChunks = mysqlTable('rag_chunks', {
   pageOrSlide: int('pageOrSlide'),
   tokenCount: int('tokenCount'),
   embedding: json('embedding'), // float[] stored as JSON
-  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  createdAt: wibDatetime('createdAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
 }, (table) => ({
   documentIdx: index('rag_chunks_documentId_idx').on(table.documentId),
 }));
@@ -175,8 +198,8 @@ export const chatbotFaqs = mysqlTable('chatbot_faqs', {
   answer: text('answer').notNull(),
   category: varchar('category', { length: 100 }).default('Umum'),
   sortOrder: int('sortOrder').default(0),
-  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
-  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+  createdAt: wibDatetime('createdAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: wibDatetime('updatedAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
 });
 
 export type ChatbotFaq = typeof chatbotFaqs.$inferSelect;
@@ -190,7 +213,7 @@ export const chatbotSettings = mysqlTable('chatbot_settings', {
   systemPrompt: text('systemPrompt').notNull(),
   waNumber: varchar('waNumber', { length: 50 }).notNull().default('6281299008899'),
   adminEmail: varchar('adminEmail', { length: 255 }).notNull().default('cs@bsmr.org'),
-  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+  updatedAt: wibDatetime('updatedAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
 });
 
 export type ChatbotSetting = typeof chatbotSettings.$inferSelect;
@@ -205,8 +228,8 @@ export const chatbotSessions = mysqlTable('chatbot_sessions', {
   isUnread: boolean('isUnread').notNull().default(true),
   lastSender: varchar('lastSender', { length: 50 }).default('user'),
   preview: text('preview'),
-  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
-  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+  createdAt: wibDatetime('createdAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: wibDatetime('updatedAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
 }, (table) => ({
   visitorIdx: index('chatbot_sessions_visitorId_idx').on(table.visitorId),
   updatedAtIdx: index('chatbot_sessions_updatedAt_idx').on(table.updatedAt),
@@ -227,7 +250,7 @@ export const chatbotMessages = mysqlTable('chatbot_messages', {
   isEscalation: boolean('isEscalation').default(false),
   waNumber: varchar('waNumber', { length: 50 }),
   adminEmail: varchar('adminEmail', { length: 255 }),
-  createdAt: datetime('createdAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  createdAt: wibDatetime('createdAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
 }, (table) => ({
   sessionIdx: index('chatbot_messages_sessionId_idx').on(table.sessionId),
   createdAtIdx: index('chatbot_messages_createdAt_idx').on(table.createdAt),
@@ -241,7 +264,7 @@ export const chatbotAnalytics = mysqlTable('chatbot_analytics', {
   id: varchar('id', { length: 100 }).primaryKey(),
   metricType: varchar('metricType', { length: 100 }).notNull(), // 'interaction_count' | 'peak_hours' | 'top_questions'
   dataJson: json('dataJson').notNull(),
-  updatedAt: datetime('updatedAt', { mode: 'date', fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+  updatedAt: wibDatetime('updatedAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
 });
 
 export type ChatbotAnalytic = typeof chatbotAnalytics.$inferSelect;

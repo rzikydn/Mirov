@@ -3,7 +3,9 @@
 
   // Mendapatkan URL script induk (Support Localhost dev & Production domain planner.bsmr.org)
   var scriptTag = document.currentScript;
-  var baseUrl = 'http://localhost:5173';
+  var baseUrl = typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null'
+    ? window.location.origin
+    : 'https://planner.bsmr.org';
 
   if (scriptTag && scriptTag.src) {
     try {

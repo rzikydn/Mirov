@@ -1,11 +1,9 @@
 import React, { useState, useMemo } from "react"
-import { Search, FileText, CalendarDays, X, CheckSquare, Trash2 } from "lucide-react"
+import { Search, FileText, CalendarDays, X, Trash2 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { useHistory, HistoryEntry } from "../../context/HistoryContext"
 import { useAuth } from "../../context/AuthContext"
-
-const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
-const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+import { getUserAvatar } from "../../services/avatarService"
 
 type FilterType = 'all' | 'created' | 'edited' | 'deleted'
 
@@ -19,30 +17,36 @@ function categorize(entry: HistoryEntry): 'created' | 'edited' | 'deleted' | 'ot
 }
 
 function formatDateTime(date: Date | string | number) {
-  const d = new Date(date)
-  if (isNaN(d.getTime())) {
+  let d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date
+  if (!d || isNaN(d.getTime())) {
+    if (typeof date === 'string') {
+      const sanitized = date.includes('T') || date.includes('Z') || date.includes('+')
+        ? date
+        : date.replace(' ', 'T') + '+07:00'
+      d = new Date(sanitized)
+    }
+  }
+  if (!d || isNaN(d.getTime())) {
     return { line1: 'Hari ini', line2: '--.-- WIB' }
   }
-  const hari = HARI[d.getDay()] || 'Hari'
-  const tgl = d.getDate()
-  const bulan = BULAN[d.getMonth()] || 'Bulan'
-  const tahun = d.getFullYear()
-  const jam = String(d.getHours()).padStart(2, '0')
-  const menit = String(d.getMinutes()).padStart(2, '0')
-  return { line1: `${hari}, ${tgl} ${bulan} ${tahun}`, line2: `${jam}.${menit} WIB` }
-}
 
-const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:5000';
+  const formatterLine1 = new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  })
+  const formatterTime = new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
 
-function getUserAvatarUrl(userName?: string, userAvatarsMap: Record<string, string> = {}): string {
-  if (!userName) return 'https://api.dicebear.com/7.x/avataaars/svg?seed=User&backgroundColor=b6e3f4&mouth=default,smile,twinkle&eyes=default,happy,wink';
-
-  if (userAvatarsMap[userName]) {
-    return userAvatarsMap[userName];
-  }
-
-  const safeParams = '&mouth=default,smile,twinkle&eyes=default,happy,wink';
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userName)}&backgroundColor=b6e3f4${safeParams}`;
+  const line1 = formatterLine1.format(d)
+  const timeStr = formatterTime.format(d).replace(':', '.')
+  return { line1, line2: `${timeStr} WIB` }
 }
 
 function ActionBadge({ category, darkMode }: { category: string; darkMode?: boolean }) {
@@ -289,7 +293,7 @@ function RecentActivity({
               {visibleEntries.map((entry) => {
                 const cat = categorize(entry)
                 const dt = formatDateTime(entry.createdAt)
-                const avatarUrl = getUserAvatarUrl(entry.userName)
+                const avatarUrl = getUserAvatar(entry.userName, entry.userAvatar || entry.user?.avatar)
                 const isSelected = selectedIds.has(entry.id)
 
                 return (
@@ -397,7 +401,7 @@ function RecentActivity({
               visibleEntries.map((entry) => {
                 const cat = categorize(entry)
                 const dt = formatDateTime(entry.createdAt)
-                const avatarUrl = getUserAvatarUrl(entry.userName)
+                const avatarUrl = getUserAvatar(entry.userName, entry.userAvatar || entry.user?.avatar)
                 const isSelected = selectedIds.has(entry.id)
 
                 return (
@@ -537,7 +541,7 @@ function RecentActivity({
                   <span className="text-[10px] text-gray-400 font-medium block mb-1">User</span>
                   <div className="flex items-center gap-2">
                     <img
-                      src={getUserAvatarUrl(selectedEntry.userName)}
+                      src={getUserAvatar(selectedEntry.userName, selectedEntry.userAvatar || selectedEntry.user?.avatar)}
                       alt={selectedEntry.userName}
                       className="w-5 h-5 rounded-full bg-sky-100 object-cover border border-sky-200"
                     />

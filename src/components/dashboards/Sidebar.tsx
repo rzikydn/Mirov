@@ -32,6 +32,7 @@ import ApiIntegrationModal from './modals/ApiIntegrationModal';
 import SettingPromptDialog from './modals/SettingPromptDialog';
 import InstallationDialog from './modals/InstallationDialog';
 import InputFaqModal from './modals/InputFaqModal';
+import { getUserAvatar } from '../../services/avatarService';
 import BsmrLogo from '../BsmrLogo';
 import { useHistory } from '../../context/HistoryContext';
 import { getVisitorChatSessions, getUnreadVisitorChatSessionsCount, fetchVisitorChatSessionsAsync } from '../../services/visitorChatLogsService';
@@ -98,15 +99,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [userAvatar, setUserAvatar] = useState<string>('');
 
   const syncUserAvatar = React.useCallback(() => {
-    const safeParams = '&mouth=default,smile,twinkle&eyes=default,happy,wink';
     const storedUserStr = localStorage.getItem('user');
     const storedUser = storedUserStr ? JSON.parse(storedUserStr) : user;
-    if (!storedUser) {
-      setUserAvatar(`https://api.dicebear.com/7.x/avataaars/svg?seed=User&backgroundColor=b6e3f4${safeParams}`);
-      return;
-    }
-    const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${storedUser.name || 'User'}&backgroundColor=b6e3f4${safeParams}`;
-    setUserAvatar(storedUser.avatar || defaultAvatar);
+    setUserAvatar(getUserAvatar(storedUser?.name, storedUser?.avatar));
   }, [user]);
 
   React.useEffect(() => {

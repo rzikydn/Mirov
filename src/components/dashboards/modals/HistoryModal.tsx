@@ -6,6 +6,7 @@ import { HistoryEntry, useHistory } from '../../../context/HistoryContext';
 import { useAuth } from '../../../context/AuthContext';
 import DeleteModal from './DeleteModal';
 import { ContributionGraph } from '../ContributionGraph';
+import { getUserAvatar } from '../../../services/avatarService';
 
 interface HistoryModalProps {
   show: boolean;
@@ -18,31 +19,50 @@ interface HistoryModalProps {
 const ITEMS_PER_PAGE = 30;
 
 // ── Helper: format time (24-hour Indonesian format) ──
-const formatTime = (date: Date): string => {
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  return `${hours.toString().padStart(2, '0')}.${minutes.toString().padStart(2, '0')} WIB`;
+const formatTime = (date: Date | string): string => {
+  let d = typeof date === 'string' ? new Date(date) : date;
+  if (!d || isNaN(d.getTime())) {
+    if (typeof date === 'string') {
+      const sanitized = date.includes('T') || date.includes('Z') || date.includes('+')
+        ? date
+        : date.replace(' ', 'T') + '+07:00';
+      d = new Date(sanitized);
+    }
+  }
+  if (!d || isNaN(d.getTime())) return '--.-- WIB';
+  const formatter = new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  return `${formatter.format(d).replace(':', '.')} WIB`;
 };
 
 // ── Helper: format date label ──
 const formatDateLabel = (date: Date): string => {
-  const MONTH_NAMES = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  return `${MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jakarta',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(date);
 };
 
-// ── Helper: get date key (YYYY-MM-DD) ──
+// ── Helper: get date key (YYYY-MM-DD) in Asia/Jakarta ──
 const getDateKey = (date: Date): string => {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date);
+  return parts;
 };
 
 // ── Helper: check if same day ──
 const isSameDay = (a: Date, b: Date): boolean => {
-  return a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
+  return getDateKey(a) === getDateKey(b);
 };
 
 // ── Helper: truncate long description ──
@@ -114,6 +134,7 @@ const TimelineEntry = React.memo(({
   const time = formatTime(new Date(entry.createdAt));
   const actionLabel = getActionLabel();
   const displayDescription = isExpanded ? entry.description : truncateDescription(entry.description);
+  const avatarUrl = getUserAvatar(entry.userName, entry.userAvatar || entry.user?.avatar);
 
   return (
     <div className={`group flex items-start gap-3 py-3.5 px-4 rounded-xl transition-colors duration-100 mb-1.5
@@ -143,6 +164,12 @@ const TimelineEntry = React.memo(({
       <div className="flex-1 min-w-0">
         {/* First line: User + Action + Time */}
         <div className="flex items-center gap-2 flex-wrap mb-1.5">
+          <img
+            src={avatarUrl}
+            alt={entry.userName}
+            className="w-4 h-4 rounded-full bg-sky-100 object-cover border border-sky-200 shrink-0"
+            onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+          />
           <span className={`text-sm font-semibold ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
             {entry.userName}
           </span>

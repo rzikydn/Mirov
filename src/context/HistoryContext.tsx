@@ -14,6 +14,14 @@ export interface HistoryEntry {
   createdAt: Date;
   description: string;
   userId: number;
+  userAvatar?: string;
+  user?: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    avatar?: string;
+  };
 }
 
 interface HistoryContextType {
@@ -32,7 +40,18 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
     const cached = getCache<any[]>('history_logs', []);
     return cached.map((entry) => ({
       ...entry,
-      createdAt: entry.createdAt ? new Date(entry.createdAt) : new Date(),
+      userAvatar: entry.userAvatar || entry.user?.avatar || undefined,
+      createdAt: (() => {
+        const raw = entry.createdAt;
+        if (!raw) return new Date();
+        if (raw instanceof Date) return raw;
+        const str = String(raw);
+        const iso = str.includes('T') || str.includes('Z') || str.includes('+')
+          ? str
+          : str.replace(' ', 'T') + '+07:00';
+        const d = new Date(iso);
+        return isNaN(d.getTime()) ? new Date() : d;
+      })(),
     }));
   });
   const { isAuthenticated } = useAuth();
@@ -45,12 +64,18 @@ export const HistoryProvider = ({ children }: { children: ReactNode }) => {
       if (ok && data && data.data && Array.isArray(data.data)) {
         const historyWithDates = data.data.map((entry: any) => ({
           ...entry,
+          userAvatar: entry.userAvatar || entry.user?.avatar || undefined,
           action: (entry.action || 'edit').toLowerCase(),
           target: (entry.target || 'database').toLowerCase(),
           createdAt: (() => {
             const raw = entry.createdAt;
             if (!raw) return new Date();
-            const d = new Date(raw);
+            if (raw instanceof Date) return raw;
+            const str = String(raw);
+            const iso = str.includes('T') || str.includes('Z') || str.includes('+')
+              ? str
+              : str.replace(' ', 'T') + '+07:00';
+            const d = new Date(iso);
             return isNaN(d.getTime()) ? new Date() : d;
           })()
         }));

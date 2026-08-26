@@ -21,11 +21,13 @@ export const getAllHistory = async (req: Request, res: Response): Promise<void> 
         targetName: history.targetName,
         description: history.description,
         createdAt: history.createdAt,
+        userAvatar: users.avatar,
         user: {
           id: users.id,
           name: users.name,
           email: users.email,
-          role: users.role
+          role: users.role,
+          avatar: users.avatar
         }
       })
       .from(history)

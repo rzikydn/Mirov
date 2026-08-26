@@ -27,12 +27,18 @@ export interface NotificationItem {
 export const rawNotifications: NotificationItem[] = [
   {
     id: 1,
-    title: 'Offline-First Architecture',
-    subtitle: 'Work offline & background auto-sync',
-    releasedAt: new Date().toISOString(), // Released today
+    title: 'AI Chatbot Dashboard',
+    subtitle: 'Visitor logs, RAG knowledge, custom FAQ & analytics',
+    releasedAt: new Date().toISOString(), // Released today (Just now)
   },
   {
     id: 2,
+    title: 'Offline-First Architecture',
+    subtitle: 'Work offline & background auto-sync',
+    releasedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
+  },
+  {
+    id: 3,
     title: 'New User Activity Log UI',
     subtitle: 'Sleek layout & 60 FPS performance',
     releasedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago

@@ -148,11 +148,15 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
     localStorage.setItem('mirov_ai_config', JSON.stringify(finalConfig));
 
     // HTTP POST Sync to Vite Server API
-    fetch('http://localhost:5173/api/ai-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(finalConfig),
-    }).catch(() => {});
+    const apiBase = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : '';
+    const aiConfigUrl = import.meta.env.DEV ? '/api/ai-config' : (apiBase ? `${apiBase}/api/ai-config` : '');
+    if (aiConfigUrl) {
+      fetch(aiConfigUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalConfig),
+      }).catch(() => {});
+    }
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('bsmr_ai_config_updated', { detail: finalConfig }));

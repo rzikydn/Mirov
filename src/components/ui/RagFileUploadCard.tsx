@@ -43,17 +43,17 @@ export default function RagFileUploadCard({ darkMode, className }: RagFileUpload
   const files: UploadedFile[] = ragItems
     .filter((item) => item.type !== 'FAQ')
     .map((item) => {
-    let fileType = "application/pdf";
-    if (item.type === "DOCX") fileType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    if (item.type === "PPTX") fileType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+      let fileType = "application/pdf";
+      if (item.type === "DOCX") fileType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      if (item.type === "PPTX") fileType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
-    return {
-      id: String(item.id),
-      file: createMockFile(item.title, item.fileSize || 1024, fileType),
-      progress: item.status === 'INDEXED' ? 100 : item.status === 'ERROR' ? 0 : 50,
-      status: item.status === 'INDEXED' ? 'completed' : item.status === 'ERROR' ? 'failed' : 'uploading',
-    };
-  });
+      return {
+        id: String(item.id),
+        file: createMockFile(item.title, item.fileSize || 1024, fileType),
+        progress: item.status === 'INDEXED' ? 100 : item.status === 'ERROR' ? 0 : 50,
+        status: item.status === 'INDEXED' ? 'completed' : item.status === 'ERROR' ? 'failed' : 'uploading',
+      };
+    });
 
   const handleFilesChange = async (newFiles: File[]) => {
     for (const file of newFiles) {

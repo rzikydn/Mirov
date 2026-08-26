@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check, Lock, AlertCircle } from 'lucide-react';
+import { checkAvatarMatch, fetchAndCacheUserAvatars } from '../../../services/avatarService';
 
 interface TakenAvatar {
   userId: number;
@@ -57,20 +58,6 @@ const avatarOptions = [
   { id: 32, url: `https://api.dicebear.com/7.x/avataaars/svg?seed=Isaac&backgroundColor=c0aede${safeParams}` },
 ];
 
-const checkAvatarMatch = (optionUrl: string, targetAvatarUrl?: string | null): boolean => {
-  if (!targetAvatarUrl) return false;
-  if (optionUrl === targetAvatarUrl) return true;
-  try {
-    const u1 = new URL(optionUrl);
-    const u2 = new URL(targetAvatarUrl);
-    const seed1 = u1.searchParams.get('seed');
-    const seed2 = u2.searchParams.get('seed');
-    return Boolean(seed1 && seed2 && seed1.toLowerCase() === seed2.toLowerCase());
-  } catch {
-    return false;
-  }
-};
-
 const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({
   show,
   darkMode,
@@ -103,6 +90,8 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({
         const result = await res.json();
         if (result.success && result.data) {
           setTakenAvatars(result.data);
+          // Sync with local storage cache
+          fetchAndCacheUserAvatars();
         }
       }
     } catch (err) {
@@ -143,6 +132,7 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({
           localStorage.setItem('user', JSON.stringify(result.data.user));
         }
 
+        await fetchAndCacheUserAvatars();
         onSelect(selectedUrl);
         window.dispatchEvent(new Event('userAvatarUpdated'));
         onClose();

@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { cn } from "../../lib/utils";
-import { ThumbsUp, AlertCircle, RefreshCw, Send, Trash2, CheckSquare, Square } from "lucide-react";
+import { AlertCircle, RefreshCw, Send, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
+import { useAuth } from "../../context/AuthContext";
 import {
   getVisitorChatSessions,
   fetchVisitorChatSessionsAsync,
@@ -14,8 +15,7 @@ import {
   clearAllVisitorChatSessions,
   sortSessionsDescending,
   markSessionAsReadInService,
-  ChatSession,
-  ChatMessage
+  ChatSession
 } from "../../services/visitorChatLogsService";
 
 interface VisitorChatLogsWidgetProps {
@@ -24,6 +24,9 @@ interface VisitorChatLogsWidgetProps {
 }
 
 export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: VisitorChatLogsWidgetProps) {
+  const { user, hasRole } = useAuth();
+  const isSuperUser = user?.role === "SUPERUSER" || (hasRole ? hasRole(["SUPERUSER"]) : false);
+
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const loaded = getVisitorChatSessions();
     return Array.isArray(loaded) ? loaded : [];
@@ -39,16 +42,6 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-
-  const userRole = (() => {
-    try {
-      const u = localStorage.getItem("user");
-      return u ? JSON.parse(u)?.role : "SUPERUSER";
-    } catch (e) {
-      return "SUPERUSER";
-    }
-  })();
-  const canManage = userRole === "SUPERUSER" || userRole === "ADMIN" || !userRole;
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -193,6 +186,10 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
   };
 
   const handleExecuteBulkDelete = () => {
+    if (!isSuperUser) {
+      toast.error("Hanya SUPERUSER yang dapat menghapus sesi chat logs");
+      return;
+    }
     if (selectedSessionIds.length === 0) return;
     const count = selectedSessionIds.length;
     const updated = deleteBulkVisitorChatSessions(selectedSessionIds);
@@ -209,6 +206,10 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
   };
 
   const handleExecuteResetAll = () => {
+    if (!isSuperUser) {
+      toast.error("Hanya SUPERUSER yang dapat menghapus seluruh sesi chat logs");
+      return;
+    }
     const updated = clearAllVisitorChatSessions();
     setSessions(updated);
     setSelectedSessionId("");
@@ -220,6 +221,10 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
 
   const handleExecuteSingleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isSuperUser) {
+      toast.error("Hanya SUPERUSER yang dapat menghapus sesi chat");
+      return;
+    }
     const updated = deleteVisitorChatSession(id);
     setSessions(updated);
     if (updated.length > 0 && id === selectedSessionId) {
@@ -289,7 +294,7 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
               {isSelectMode ? `SESI (${safeSessions.length})` : `SESI CHAT TERBARU (${safeSessions.length})`}
             </h3>
 
-            {canManage && safeSessions.length > 0 && (
+            {isSuperUser && safeSessions.length > 0 && (
               <div className="flex items-center gap-1 shrink-0 whitespace-nowrap">
                 {isSelectMode ? (
                   <div className="flex items-center gap-1 whitespace-nowrap">
@@ -405,7 +410,7 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
                         <span className={cn("text-[10px]", darkMode ? "text-gray-400" : "text-gray-400")}>
                           {session.time}
                         </span>
-                        {canManage && !isSelectMode && (
+                        {isSuperUser && !isSelectMode && (
                           <button
                             type="button"
                             onClick={(e) => handleExecuteSingleDelete(session.id, e)}
@@ -422,7 +427,7 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
                       {session.topic}
                     </p>
 
-                    {(!session.satisfied || session.statusText.includes("terhubung dengan admin")) && (
+                    {Boolean(session.isEscalated) && (
                       <div className="flex items-center gap-1.5 pt-0.5">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 text-[10px] font-bold border border-amber-300 dark:border-amber-700/60">
                           <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" /> Pengguna meminta terhubung dengan admin
@@ -473,7 +478,7 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
         </div>
 
         {/* Escalation Alert Banner */}
-        {(!selectedSession.satisfied || selectedSession.statusText.includes("terhubung dengan admin")) && (
+        {Boolean(selectedSession.isEscalated) && (
           <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700/80 flex items-center justify-between gap-2 text-xs font-semibold text-amber-900 dark:text-amber-200 shadow-2xs shrink-0">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
@@ -499,40 +504,48 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
               transition={{ duration: 0.2 }}
               className="space-y-3.5 w-full"
             >
-              {selectedSession.messages && selectedSession.messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    "flex flex-col space-y-1 max-w-[85%]",
-                    msg.sender === "admin"
-                      ? "ml-auto items-end"
-                      : msg.sender === "bot"
-                      ? "ml-auto items-end"
-                      : "mr-auto items-start"
-                  )}
-                >
+              {selectedSession.messages && selectedSession.messages.length > 0 ? (
+                selectedSession.messages.map((msg) => (
                   <div
+                    key={msg.id}
                     className={cn(
-                      "p-3.5 rounded-2xl text-xs leading-relaxed shadow-xs",
+                      "flex flex-col space-y-1 max-w-[85%]",
                       msg.sender === "admin"
-                        ? "bg-indigo-600 text-white rounded-br-none"
+                        ? "ml-auto items-end"
                         : msg.sender === "bot"
-                        ? "bg-blue-600 text-white rounded-br-none"
-                        : darkMode
-                        ? "bg-gray-700 text-gray-100 border border-gray-600 rounded-bl-none"
-                        : "bg-gray-100 text-gray-800 border border-gray-200/80 rounded-bl-none"
+                        ? "ml-auto items-end"
+                        : "mr-auto items-start"
                     )}
                   >
-                    {msg.sender === "admin" && (
-                      <span className="block text-[10px] font-bold text-indigo-200 mb-0.5">Balasan Admin</span>
-                    )}
-                    {msg.text}
+                    <div
+                      className={cn(
+                        "p-3.5 rounded-2xl text-xs leading-relaxed shadow-xs",
+                        msg.sender === "admin"
+                          ? "bg-indigo-600 text-white rounded-br-none"
+                          : msg.sender === "bot"
+                          ? "bg-blue-600 text-white rounded-br-none"
+                          : darkMode
+                          ? "bg-gray-700 text-gray-100 border border-gray-600 rounded-bl-none"
+                          : "bg-gray-100 text-gray-800 border border-gray-200/80 rounded-bl-none"
+                      )}
+                    >
+                      {msg.sender === "admin" && (
+                        <span className="block text-[10px] font-bold text-indigo-200 mb-0.5">Balasan Admin</span>
+                      )}
+                      {msg.text}
+                    </div>
+                    <span className={cn("text-[10px] px-1", darkMode ? "text-gray-400" : "text-gray-400")}>
+                      {msg.time}
+                    </span>
                   </div>
-                  <span className={cn("text-[10px] px-1", darkMode ? "text-gray-400" : "text-gray-400")}>
-                    {msg.time}
-                  </span>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <p className={cn("text-xs font-medium", darkMode ? "text-gray-400" : "text-gray-500")}>
+                    {selectedSession.topic || selectedSession.summary || "Belum ada pesan dalam sesi ini"}
+                  </p>
                 </div>
-              ))}
+              )}
             </motion.div>
           </AnimatePresence>
         </div>

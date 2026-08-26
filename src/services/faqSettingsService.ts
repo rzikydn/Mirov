@@ -9,7 +9,9 @@ export interface FaqItem {
 }
 
 const STORAGE_KEY = 'mirov_chatbot_faqs';
-const FAQ_API_URL = 'http://localhost:5173/api/chatbot-faqs';
+const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:5000';
+const BACKEND_FAQ_API_URL = `${API_BASE}/api/chatbot/faqs`;
+const VITE_FAQ_API_URL = import.meta.env.DEV ? '/api/chatbot-faqs' : '';
 
 export const DEFAULT_FAQS: FaqItem[] = [
   {
@@ -75,24 +77,42 @@ export function getFaqList(): FaqItem[] {
 }
 
 /**
- * Fetch daftar FAQ dari Vite API server secara asinkron (untuk cross-domain / iframe)
+ * Fetch daftar FAQ dari Backend Express MySQL API / Vite server secara asinkron
  */
 export async function fetchFaqListAsync(): Promise<FaqItem[]> {
+  // 1. Coba ambil dari Backend Express MySQL API
   try {
-    const res = await fetch(`${FAQ_API_URL}?_t=${Date.now()}`);
+    const res = await fetch(`${BACKEND_FAQ_API_URL}?_t=${Date.now()}`);
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
+      const json = await res.json();
+      const list = Array.isArray(json.data) ? json.data : (Array.isArray(json) ? json : null);
+      if (list && list.length > 0) {
         if (typeof window !== 'undefined') {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
           window.dispatchEvent(new Event('bsmr_faqs_updated'));
         }
-        return data;
+        return list;
       }
     }
-  } catch (e) {
-    // Fallback silent
+  } catch (e) {}
+
+  // 2. Fallback ke Vite Dev Server API
+  if (VITE_FAQ_API_URL) {
+    try {
+      const res = await fetch(`${VITE_FAQ_API_URL}?_t=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            window.dispatchEvent(new Event('bsmr_faqs_updated'));
+          }
+          return data;
+        }
+      }
+    } catch (e) {}
   }
+
   return getFaqList();
 }
 
@@ -127,12 +147,23 @@ export function saveFaqList(faqs: FaqItem[]): void {
       }
     }
 
-    // HTTP POST Sync ke server Vite API
-    fetch(FAQ_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(cleaned),
-    }).catch(() => {});
+    // HTTP POST Sync ke Backend Express MySQL API (per item atau reset)
+    for (const faq of cleaned) {
+      fetch(BACKEND_FAQ_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(faq),
+      }).catch(() => {});
+    }
+
+    // HTTP POST Sync ke Vite API fallback
+    if (VITE_FAQ_API_URL) {
+      fetch(VITE_FAQ_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cleaned),
+      }).catch(() => {});
+    }
   } catch (e) {
     console.error('Failed to save FAQs:', e);
   }

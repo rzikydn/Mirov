@@ -219,6 +219,38 @@ CREATE TABLE IF NOT EXISTS `chatbot_analytics` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- Table: rag_documents
+CREATE TABLE IF NOT EXISTS `rag_documents` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `title` VARCHAR(500) NOT NULL,
+    `type` ENUM('PDF', 'DOCX', 'PPTX', 'FAQ') NOT NULL,
+    `category` VARCHAR(255),
+    `fileSize` INT,
+    `totalChunks` INT DEFAULT 0,
+    `status` ENUM('UPLOADING', 'PROCESSING', 'INDEXED', 'ERROR') NOT NULL DEFAULT 'UPLOADING',
+    `errorMessage` TEXT,
+    `question` TEXT,
+    `answer` TEXT,
+    `uploadedBy` INT,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Table: rag_chunks
+CREATE TABLE IF NOT EXISTS `rag_chunks` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `documentId` INT NOT NULL,
+    `chunkIndex` INT NOT NULL,
+    `content` TEXT NOT NULL,
+    `heading` VARCHAR(500),
+    `pageOrSlide` INT,
+    `tokenCount` INT,
+    `embedding` JSON,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    INDEX `rag_chunks_documentId_idx` (`documentId`),
+    FOREIGN KEY (`documentId`) REFERENCES `rag_documents`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- Seed Default FAQs & Settings
 INSERT INTO `chatbot_settings` (`id`, `botName`, `welcomeMsg`, `systemPrompt`, `waNumber`, `adminEmail`, `updatedAt`)
 VALUES ('default', 'AI Assistant BSMR', 'Halo! Selamat datang di Layanan AI BSMR (Badan Sertifikasi Manajemen Risiko). Ada yang bisa saya bantu terkait sertifikasi kompetensi kerja Anda?', 'Anda adalah AI Assistant Resmi untuk BSMR (Badan Sertifikasi Manajemen Risiko). Tugas utama Anda adalah memberikan informasi yang akurat, profesional, dan ramah seputar sertifikasi manajemen risiko perbankan di Indonesia. Gunakan bahasa Indonesia yang baku dan santun.', '6281299008899', 'cs@bsmr.org', NOW())

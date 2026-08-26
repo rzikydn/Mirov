@@ -8,7 +8,9 @@ export interface ChatbotSettings {
 }
 
 const STORAGE_KEY = 'mirov_chatbot_settings';
-const SETTINGS_API_URL = 'http://localhost:5173/api/chatbot-settings';
+const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:5000';
+const BACKEND_SETTINGS_API_URL = `${API_BASE}/api/chatbot/settings`;
+const VITE_SETTINGS_API_URL = import.meta.env.DEV ? '/api/chatbot-settings' : '';
 
 export const DEFAULT_SETTINGS: ChatbotSettings = {
   welcomeMsg: "Halo! 👋 Selamat datang di LSP BSMR (Badan Sertifikasi Manajemen Risiko). Saya AI Assistant yang siap membantu Anda terkait Skema Sertifikasi, Tips Lulus Kompeten, Jadwal Ujian, atau Cek Masa Berlaku Sertifikat.",
@@ -42,10 +44,12 @@ export function getChatbotSettings(): ChatbotSettings {
  * Fetch pengaturan chatbot dari server API (Async) untuk dukungan multi-origin / pengguna baru
  */
 export async function fetchChatbotSettingsAsync(): Promise<ChatbotSettings> {
+  // 1. Coba dari Backend Express MySQL
   try {
-    const res = await fetch(SETTINGS_API_URL);
+    const res = await fetch(`${BACKEND_SETTINGS_API_URL}?_t=${Date.now()}`);
     if (res.ok) {
-      const data = await res.json();
+      const json = await res.json();
+      const data = json.data || json;
       if (data && typeof data === 'object' && data.welcomeMsg) {
         const merged: ChatbotSettings = {
           welcomeMsg: data.welcomeMsg || DEFAULT_SETTINGS.welcomeMsg,
@@ -60,9 +64,31 @@ export async function fetchChatbotSettingsAsync(): Promise<ChatbotSettings> {
         return merged;
       }
     }
-  } catch (e) {
-    // Fallback ke localStorage jika server offline
+  } catch (e) {}
+
+  // 2. Fallback ke Vite Dev Server API
+  if (VITE_SETTINGS_API_URL) {
+    try {
+      const res = await fetch(VITE_SETTINGS_API_URL);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data === 'object' && data.welcomeMsg) {
+          const merged: ChatbotSettings = {
+            welcomeMsg: data.welcomeMsg || DEFAULT_SETTINGS.welcomeMsg,
+            waNumber: data.waNumber || DEFAULT_SETTINGS.waNumber,
+            adminEmail: data.adminEmail || DEFAULT_SETTINGS.adminEmail,
+            systemPrompt: data.systemPrompt || DEFAULT_SETTINGS.systemPrompt,
+          };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('bsmr_settings_updated'));
+          }
+          return merged;
+        }
+      }
+    } catch (e) {}
   }
+
   return getChatbotSettings();
 }
 
@@ -74,12 +100,21 @@ export function saveChatbotSettings(newSettings: ChatbotSettings): void {
     // 1. Simpan di localStorage lokal
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
 
-    // 2. HTTP Sync POST ke Vite API Server agar pengunjung baru & iframe lintas domain mendapatkan setting ini
-    fetch(SETTINGS_API_URL, {
+    // 2. HTTP POST Sync ke Backend Express MySQL API
+    fetch(BACKEND_SETTINGS_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newSettings),
     }).catch(() => {});
+
+    // 3. HTTP Sync POST ke Vite API Server
+    if (VITE_SETTINGS_API_URL) {
+      fetch(VITE_SETTINGS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings),
+      }).catch(() => {});
+    }
 
     if (typeof window !== 'undefined') {
       // 3. Pemicu DOM Event lokal

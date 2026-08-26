@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { eq, isNotNull, and, ne } from 'drizzle-orm';
+import { eq, isNotNull, ne } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { db } from '../db';
 import { users } from '../db/schema';
@@ -216,12 +216,31 @@ export const updateUserAvatar = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    // Check if another user is already using this avatar
-    const [existing] = await db
-      .select({ id: users.id, name: users.name })
+    // Check if another user is already using this avatar (both exact URL and seed matching)
+    let requestedSeed = '';
+    try {
+      const u = new URL(avatarUrl);
+      requestedSeed = (u.searchParams.get('seed') || '').toLowerCase();
+    } catch {
+      requestedSeed = avatarUrl.toLowerCase();
+    }
+
+    const otherUsers = await db
+      .select({ id: users.id, name: users.name, avatar: users.avatar })
       .from(users)
-      .where(and(eq(users.avatar, avatarUrl), ne(users.id, userId)))
-      .limit(1);
+      .where(ne(users.id, userId));
+
+    const existing = otherUsers.find(u => {
+      if (!u.avatar) return false;
+      if (u.avatar === avatarUrl) return true;
+      try {
+        const uUrl = new URL(u.avatar);
+        const uSeed = (uUrl.searchParams.get('seed') || '').toLowerCase();
+        return Boolean(requestedSeed && uSeed && requestedSeed === uSeed);
+      } catch {
+        return false;
+      }
+    });
 
     if (existing) {
       res.status(400).json({

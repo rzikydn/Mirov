@@ -5,9 +5,7 @@ import {
   Send,
   Home,
   ChevronRight,
-  Clock,
-  Sparkles,
-  Bot
+  Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../../lib/utils";
@@ -66,10 +64,10 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
     const s = getChatbotSettings();
     return [
       {
-        id: "welcome-1",
+        id: `welcome-${Date.now()}`,
         sender: "bot",
         text: s.welcomeMsg,
-        time: "01:19 AM",
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ];
   });
@@ -436,9 +434,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
     };
   }, [sessionId]);
 
-  const [isEscalatedToAdmin, setIsEscalatedToAdmin] = useState<boolean>(() => {
-    return messages.some((m) => m.isEscalation || m.sender === "admin" || m.text.includes("Mengobrol Dengan Admin"));
-  });
+  const [isEscalatedToAdmin, setIsEscalatedToAdmin] = useState<boolean>(false);
 
   // KPI 2: Handler Feedback "Apakah Jawaban Ini Membantu?" (Ya = Solved AI)
   const handleFeedback = (msgId: string, isHelpful: boolean) => {
@@ -522,7 +518,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
     // JIKA SESI TERHUBUNG DENGAN CS ADMIN (TAKEOVER MODE): AI & RAG TIDAK JAWAB LAGI
     const isCurrentlyEscalated =
       isEscalatedToAdmin ||
-      messages.some((m) => m.isEscalation || m.sender === "admin" || m.text.includes("Mengobrol Dengan Admin"));
+      messages.some((m) => m.isEscalation || (m.sender === "user" && m.text.toLowerCase().includes("mengobrol dengan admin")));
 
     if (isCurrentlyEscalated) {
       saveOrUpdateUserSession(sessionId, currentWithUser, "Eskalasi Pertanyaan CS Admin", true);

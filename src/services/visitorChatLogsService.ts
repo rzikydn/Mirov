@@ -19,6 +19,7 @@ export interface ChatSession {
   accuracy: number;
   summary: string;
   messages: ChatMessage[];
+  isEscalated?: boolean;
   isUnread?: boolean;
   timestamp?: number;
 }
@@ -29,7 +30,10 @@ const READ_IDS_KEY = 'bsmr_read_visitor_session_ids';
 
 export const INITIAL_CHAT_SESSIONS: ChatSession[] = [];
 
-const SYNC_API_URL = 'http://localhost:5173/api/visitor-chat-sessions';
+const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:5000';
+const BACKEND_SESSIONS_API_URL = `${API_BASE}/api/chatbot/sessions`;
+const VITE_SESSIONS_API_URL = import.meta.env.DEV ? '/api/visitor-chat-sessions' : '';
+const SYNC_API_URL = VITE_SESSIONS_API_URL;
 let cachedSessions: ChatSession[] = [];
 let hasInitialized = false;
 
@@ -95,11 +99,13 @@ export function markSessionsAsDeleted(ids: string[]): void {
     localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(arr));
 
     // Send to server deleted sync
-    fetch(SYNC_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'DELETE', deletedIds: arr }),
-    }).catch(() => {});
+    if (SYNC_API_URL) {
+      fetch(SYNC_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'DELETE', deletedIds: arr }),
+      }).catch(() => {});
+    }
   } catch (e) {}
 }
 
@@ -193,22 +199,34 @@ export function getVisitorChatSessions(): ChatSession[] {
 }
 
 export async function fetchVisitorChatSessionsAsync(): Promise<ChatSession[]> {
+  // 1. Coba dari Backend Express MySQL
   try {
-    const cacheBustUrl = `${SYNC_API_URL}?_t=${Date.now()}`;
-    const res = await fetch(cacheBustUrl, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-      },
-    });
+    const res = await fetch(`${BACKEND_SESSIONS_API_URL}?_t=${Date.now()}`);
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        const cleaned = sortSessionsDescending(data);
+      const json = await res.json();
+      const data = Array.isArray(json.data) ? json.data : (Array.isArray(json) ? json : null);
+      if (data && Array.isArray(data) && data.length > 0) {
+        const normalized: ChatSession[] = data.map((s: any) => {
+          const hasEscMsg = Array.isArray(s.messages) && s.messages.some((m: any) => m.isEscalation || m.sender === 'admin');
+          const isEsc = Boolean(s.isEscalated === true || hasEscMsg);
+          return {
+            ...s,
+            isEscalated: isEsc,
+            satisfied: !isEsc,
+            statusText: isEsc ? "Pengguna meminta terhubung dengan admin" : "",
+            summary: isEsc
+              ? "Pengguna meminta terhubung dengan admin"
+              : `Pengunjung sedang berinteraksi dengan AI Chatbot (${(s.messages || []).length} pesan)`,
+            topic: s.topic || s.title || "Pengunjung Membuka Widget AI",
+            location: s.location || "Jakarta",
+            time: s.time || (s.createdAt ? new Date(s.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Hari ini"),
+            dateStr: s.dateStr || (s.createdAt ? new Date(s.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : "-"),
+            messages: Array.isArray(s.messages) ? s.messages : [],
+          };
+        });
+        const cleaned = sortSessionsDescending(normalized);
         cachedSessions = cleaned;
         hasInitialized = true;
-        // Cache admin messages from server for cross-origin preservation
         for (const s of cleaned) {
           if (s && s.id && Array.isArray(s.messages)) {
             const adminMsgs = s.messages.filter((m) => m.sender === "admin");
@@ -223,8 +241,59 @@ export async function fetchVisitorChatSessionsAsync(): Promise<ChatSession[]> {
         return cleaned;
       }
     }
-  } catch (e) {
-    // Silently fallback
+  } catch (e) {}
+
+  // 2. Fallback ke Vite Dev Server API
+  if (VITE_SESSIONS_API_URL) {
+    try {
+      const cacheBustUrl = `${VITE_SESSIONS_API_URL}?_t=${Date.now()}`;
+      const res = await fetch(cacheBustUrl, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const normalized: ChatSession[] = data.map((s: any) => {
+            const hasEscMsg = Array.isArray(s.messages) && s.messages.some((m: any) => m.isEscalation || m.sender === 'admin');
+            const isEsc = Boolean(s.isEscalated === true || hasEscMsg);
+            return {
+              ...s,
+              isEscalated: isEsc,
+              satisfied: !isEsc,
+              statusText: isEsc ? "Pengguna meminta terhubung dengan admin" : "",
+              summary: isEsc
+                ? "Pengguna meminta terhubung dengan admin"
+                : `Pengunjung sedang berinteraksi dengan AI Chatbot (${(s.messages || []).length} pesan)`,
+              topic: s.topic || s.title || "Pengunjung Membuka Widget AI",
+              location: s.location || "Jakarta",
+              time: s.time || (s.createdAt ? new Date(s.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Hari ini"),
+              dateStr: s.dateStr || (s.createdAt ? new Date(s.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : "-"),
+              messages: Array.isArray(s.messages) ? s.messages : [],
+            };
+          });
+          const cleaned = sortSessionsDescending(normalized);
+          cachedSessions = cleaned;
+          hasInitialized = true;
+          // Cache admin messages from server for cross-origin preservation
+          for (const s of cleaned) {
+            if (s && s.id && Array.isArray(s.messages)) {
+              const adminMsgs = s.messages.filter((m) => m.sender === "admin");
+              if (adminMsgs.length > 0) {
+                _serverAdminMsgCache.set(s.id, adminMsgs);
+              }
+            }
+          }
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+          }
+          return cleaned;
+        }
+      }
+    } catch (e) {}
   }
   return getVisitorChatSessions();
 }
@@ -261,12 +330,23 @@ export function saveVisitorChatSessions(sessions: ChatSession[]): void {
       window.parent.postMessage({ type: 'BSMR_CHAT_LOGS_UPDATED', sessions: cleaned }, '*');
     }
 
-    // HTTP Sync POST to Vite API for cross-domain / cross-port support (127.0.0.1:8080 <-> localhost:5173)
-    fetch(SYNC_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(cleaned),
-    }).catch(() => {});
+    // HTTP Sync POST ke Backend Express MySQL API
+    for (const session of cleaned) {
+      fetch(BACKEND_SESSIONS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(session),
+      }).catch(() => {});
+    }
+
+    // HTTP Sync POST to Vite API fallback
+    if (VITE_SESSIONS_API_URL) {
+      fetch(VITE_SESSIONS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cleaned),
+      }).catch(() => {});
+    }
   } catch (e) {
     console.error('Failed to save visitor chat sessions:', e);
   }
@@ -311,7 +391,8 @@ export function saveOrUpdateUserSession(
   }));
 
   const existingSession = existingIdx >= 0 ? sessions[existingIdx] : null;
-  const currentlyEscalated = existingSession ? (!existingSession.satisfied || isEscalated) : isEscalated;
+  const hasEscMsg = userMessages.some((m) => m.isEscalation || m.sender === "admin");
+  const currentlyEscalated = Boolean(isEscalated || hasEscMsg || (existingSession && existingSession.isEscalated === true));
 
   // Preserve existing admin messages from ALL sources: localStorage + server cache
   let finalMessages = formattedMessages;
@@ -383,6 +464,7 @@ export function saveOrUpdateUserSession(
     dateStr: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
     satisfied: !currentlyEscalated,
     statusText: statusText,
+    isEscalated: currentlyEscalated,
     accuracy: 98,
     summary: currentlyEscalated
       ? "Pengguna meminta terhubung dengan admin"

@@ -37,18 +37,22 @@ export function formatWaNumber(rawWa: string): { clean: string; display: string 
  */
 export async function fetchAiConfigAsync(): Promise<any> {
   // Always attempt to fetch the latest server-synced AI config first
-  try {
-    const res = await fetch('http://localhost:5173/api/ai-config');
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.apiKey) {
-        try {
-          localStorage.setItem('mirov_ai_config', JSON.stringify(data));
-        } catch (e) {}
-        return data;
+  const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : '';
+  const AI_CONFIG_URL = import.meta.env.DEV ? '/api/ai-config' : (API_BASE ? `${API_BASE}/api/ai-config` : '');
+  if (AI_CONFIG_URL) {
+    try {
+      const res = await fetch(AI_CONFIG_URL);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.apiKey) {
+          try {
+            localStorage.setItem('mirov_ai_config', JSON.stringify(data));
+          } catch (e) {}
+          return data;
+        }
       }
-    }
-  } catch (e) {}
+    } catch (e) {}
+  }
 
   try {
     const saved = localStorage.getItem('mirov_ai_config');

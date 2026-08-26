@@ -216,11 +216,18 @@ export const getSessions = async (_req: Request, res: Response): Promise<void> =
           .from(chatbotMessages)
           .where(eq(chatbotMessages.sessionId, sess.id))
           .orderBy(asc(chatbotMessages.createdAt));
+        const isEsc = Boolean(sess.isEscalated);
         return {
           id: sess.id,
           visitorId: sess.visitorId,
           title: sess.title,
-          isEscalated: sess.isEscalated,
+          topic: sess.title || 'Pengunjung Membuka Widget AI',
+          isEscalated: isEsc,
+          satisfied: !isEsc,
+          statusText: isEsc ? 'Pengguna meminta terhubung dengan admin' : '',
+          summary: isEsc
+            ? 'Pengguna meminta terhubung dengan admin'
+            : `Pengunjung sedang berinteraksi dengan AI Chatbot (${messages.length} pesan)`,
           isUnread: sess.isUnread,
           lastSender: sess.lastSender,
           messages,
@@ -238,7 +245,7 @@ export const getSessions = async (_req: Request, res: Response): Promise<void> =
 
 export const saveSession = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id, visitorId, title, isEscalated, isUnread, messages = [] } = req.body;
+    const { id, visitorId, title, topic, isEscalated, isUnread, messages = [] } = req.body;
     if (!id || !visitorId) {
       res.status(400).json({ success: false, message: 'id dan visitorId wajib diisi' });
       return;
@@ -247,18 +254,19 @@ export const saveSession = async (req: Request, res: Response): Promise<void> =>
     const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
     const preview = lastMsg ? (lastMsg.text || '').slice(0, 100) : 'Sesi chat baru';
     const lastSender = lastMsg ? lastMsg.sender : 'user';
+    const sessionTitle = topic || title || preview;
 
     await db.insert(chatbotSessions).values({
       id,
       visitorId,
-      title: title || preview,
+      title: sessionTitle,
       isEscalated: Boolean(isEscalated),
       isUnread: isUnread !== undefined ? Boolean(isUnread) : true,
       lastSender,
       preview,
     }).onDuplicateKeyUpdate({
       set: {
-        title: title || preview,
+        title: sessionTitle,
         isEscalated: Boolean(isEscalated),
         isUnread: isUnread !== undefined ? Boolean(isUnread) : false,
         lastSender,
@@ -283,8 +291,10 @@ export const saveSession = async (req: Request, res: Response): Promise<void> =>
         adminEmail: msg.adminEmail || null,
       }).onDuplicateKeyUpdate({
         set: {
+          sessionId: id,
           feedback: msg.feedback || null,
           text: msg.text,
+          time: msg.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       });
     }

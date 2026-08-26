@@ -68,12 +68,16 @@ export function getPeakHoursData(): PeakHourBucket[] {
   return computePeakHoursFromSessions(sessions);
 }
 
-const SYNC_API_URL = 'http://localhost:5173/api/peak-hours';
+const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : '';
+const SYNC_API_URL = import.meta.env.DEV ? '/api/peak-hours' : (API_BASE ? `${API_BASE}/api/peak-hours` : '');
 
 /**
  * Fetch data peak hours dari API Server secara async
  */
 export async function fetchPeakHoursAsync(): Promise<PeakHourBucket[]> {
+  if (!SYNC_API_URL) {
+    return getPeakHoursData();
+  }
   try {
     const cacheBustUrl = `${SYNC_API_URL}?_t=${Date.now()}`;
     const res = await fetch(cacheBustUrl, {

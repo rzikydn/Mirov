@@ -19,7 +19,10 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
     const handleUpdate = () => {
       const fresh = getTopQuestionsData();
       if (Array.isArray(fresh)) {
-        setCategories(fresh);
+        setCategories((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
+          return fresh;
+        });
       }
     };
 
@@ -27,7 +30,10 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
       handleUpdate();
       const freshApi = await fetchTopQuestionsAsync();
       if (Array.isArray(freshApi)) {
-        setCategories(freshApi);
+        setCategories((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(freshApi)) return prev;
+          return freshApi;
+        });
       }
     };
 
@@ -38,7 +44,10 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
 
     const handleMessage = (e: MessageEvent) => {
       if (e.data?.type === "BSMR_TOP_QUESTIONS_UPDATED" && Array.isArray(e.data.categories)) {
-        setCategories(e.data.categories);
+        setCategories((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(e.data.categories)) return prev;
+          return e.data.categories;
+        });
       } else {
         handleAsyncUpdate();
       }
@@ -51,7 +60,10 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
         channel = new BroadcastChannel("bsmr_top_questions_sync");
         channel.onmessage = (event) => {
           if (event.data?.type === "TOP_QUESTIONS_UPDATED" && Array.isArray(event.data.categories)) {
-            setCategories(event.data.categories);
+            setCategories((prev) => {
+              if (JSON.stringify(prev) === JSON.stringify(event.data.categories)) return prev;
+              return event.data.categories;
+            });
           } else {
             handleAsyncUpdate();
           }
@@ -59,7 +71,7 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
       } catch (e) {}
     }
 
-    const interval = setInterval(handleAsyncUpdate, 1500);
+    const interval = setInterval(handleAsyncUpdate, 15000);
 
     return () => {
       window.removeEventListener("bsmr_top_questions_updated", handleUpdate);
@@ -150,12 +162,9 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
 
       <div className={`flex flex-col space-y-1.5 w-full pt-3 border-t text-xs ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
         {chartData.length > 0 ? (
-          chartData.map((segment, index) => (
-            <motion.div
+          chartData.map((segment) => (
+            <div
               key={segment.label}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 + index * 0.05, duration: 0.3 }}
               className={cn(
                 "flex items-center justify-between p-1.5 rounded-md transition-all duration-150 cursor-pointer",
                 hoveredSegment === segment.label
@@ -179,7 +188,7 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
               <span className={`text-[11px] font-bold shrink-0 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                 {segment.value.toLocaleString('id-ID')}
               </span>
-            </motion.div>
+            </div>
           ))
         ) : (
           <div className="text-center py-3 text-gray-400 dark:text-gray-500 text-[11px]">

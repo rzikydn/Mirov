@@ -7,6 +7,7 @@ import { Note } from '../../types/database';
 import { useAuth } from '../../context/AuthContext';
 import { useHistory } from '../../context/HistoryContext';
 import DeleteModal from './modals/DeleteModal';
+import { getUserAvatar } from '../../services/avatarService';
 import {
   Expandable,
   ExpandableCard,
@@ -101,22 +102,11 @@ const renderStatusBadge = (color: string, darkMode: boolean) => {
   );
 };
 
-// Helper to get DiceBear avatar URL for note creator based on global registry or fallback
+// Helper to get avatar URL for note creator based on centralized avatarService
 const getCreatorAvatar = (note: any, currentUser: any): string => {
   const creatorName = note.user?.name || note.createdBy?.name || note.userName || currentUser?.name || 'Unknown';
-  const safeParams = '&mouth=default,smile,twinkle&eyes=default,happy,wink';
-
-  try {
-    const globalMapStr = localStorage.getItem('global_used_avatars');
-    const globalMap = globalMapStr ? JSON.parse(globalMapStr) : {};
-    if (globalMap[creatorName]) {
-      return globalMap[creatorName];
-    }
-  } catch (e) {
-    console.error('Error reading global_used_avatars:', e);
-  }
-
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${creatorName}&backgroundColor=b6e3f4${safeParams}`;
+  const directAvatar = note.user?.avatar || note.createdBy?.avatar || (currentUser?.name === creatorName ? currentUser?.avatar : undefined);
+  return getUserAvatar(creatorName, directAvatar);
 };
 
 const TeamNotes: React.FC<TeamNotesProps> = ({ darkMode }) => {
