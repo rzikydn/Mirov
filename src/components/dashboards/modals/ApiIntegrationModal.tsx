@@ -7,15 +7,10 @@ import {
   EyeOff,
   Save,
   RefreshCw,
-  Plus,
   X,
   Database,
   ChevronDown,
-  Sparkles,
-  Bot,
   Activity,
-  Zap,
-  Flame
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -36,7 +31,7 @@ interface ApiIntegrationModalProps {
   onClose: () => void;
 }
 
-export type AiProvider = 'gemini';
+export type AiProvider = 'groq';
 
 export interface AiConfig {
   provider: AiProvider;
@@ -55,11 +50,11 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const prov: AiProvider = 'gemini';
+        const prov: AiProvider = 'groq';
         return {
           provider: prov,
           apiKey: parsed.apiKey || '',
-          model: parsed.model || 'gemini-2.5-flash',
+          model: parsed.model && (parsed.model.includes('llama') || parsed.model.includes('qwen')) ? parsed.model : 'llama-3.3-70b-versatile',
           temperature: typeof parsed.temperature === 'number' ? parsed.temperature : 0.7,
           maxTokens: parsed.maxTokens || 2048,
           status: parsed.status || 'disconnected',
@@ -69,9 +64,9 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
       } catch (e) {}
     }
     return {
-      provider: 'gemini',
+      provider: 'groq',
       apiKey: '',
-      model: 'gemini-2.5-flash',
+      model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
       maxTokens: 2048,
       status: 'disconnected',
@@ -90,12 +85,12 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const prov: AiProvider = 'gemini';
+        const prov: AiProvider = 'groq';
         setConfig((prev) => ({
           ...prev,
           ...parsed,
           provider: prov,
-          model: parsed.model || 'gemini-2.5-flash',
+          model: parsed.model && (parsed.model.includes('llama') || parsed.model.includes('qwen')) ? parsed.model : 'llama-3.3-70b-versatile',
           filterWords: Array.isArray(parsed.filterWords) ? parsed.filterWords : prev.filterWords,
         }));
       } catch (e) {}
@@ -109,14 +104,6 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
     window.addEventListener('mirov_ai_usage_updated', handleUsageUpdated);
     return () => window.removeEventListener('mirov_ai_usage_updated', handleUsageUpdated);
   }, [show]);
-
-  const handleProviderChange = (_newProvider: AiProvider) => {
-    setConfig((prev) => ({
-      ...prev,
-      provider: 'gemini',
-      model: 'gemini-2.5-flash',
-    }));
-  };
 
   const handleAddFilterWord = () => {
     const trimmed = newFilterWord.trim();
@@ -148,122 +135,66 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
   const handleTestConnection = async () => {
     const rawKey = config.apiKey.trim();
     if (!rawKey) {
-      toast.error('Masukkan API Key terlebih dahulu!');
+      toast.error('Masukkan API Key Groq terlebih dahulu!');
       return;
     }
     const cleanKey = rawKey.replace(/["'\s]/g, '').trim();
     setTesting(true);
 
     try {
-      if (config.provider === 'gemini') {
-        const candidateModels = Array.from(
-          new Set([
-            config.model || 'gemini-3.5-flash',
-            'gemini-3.5-flash',
-            'gemini-3.7-flash',
-            'gemini-2.5-flash',
-          ])
-        );
-        let connectedModel = '';
-        let lastMsg = '';
+      const candidateModels = [
+        config.model || 'llama-3.3-70b-versatile',
+        'llama-3.3-70b-versatile',
+        'llama-3.1-8b-instant',
+        'qwen/qwen3.6-27b',
+      ];
+      let connectedModel = '';
+      let lastMsg = '';
 
-        for (const m of candidateModels) {
-          try {
-            const res = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${cleanKey}`,
-              {
-                method: 'POST',
-                headers: { 
-                  'Content-Type': 'application/json',
-                  'x-goog-api-key': cleanKey
-                },
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: 'Ping' }] }],
-                }),
-              }
-            );
+      for (const m of candidateModels) {
+        try {
+          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${cleanKey}`,
+            },
+            body: JSON.stringify({
+              model: m,
+              messages: [{ role: 'user', content: 'Ping' }],
+              max_tokens: 10,
+            }),
+          });
 
-            if (res.ok) {
-              connectedModel = m;
-              break;
-            } else {
-              const errData = await res.json().catch(() => ({}));
-              lastMsg = errData?.error?.message || `HTTP ${res.status}`;
-            }
-          } catch (e: any) {
-            lastMsg = e.message || 'Fetch error';
+          if (res.ok) {
+            connectedModel = m;
+            break;
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            lastMsg = errData?.error?.message || `HTTP ${res.status}`;
           }
+        } catch (e: any) {
+          lastMsg = e.message || 'Fetch error';
         }
+      }
 
-        if (connectedModel) {
-          const autoConfig: AiConfig = {
-            ...config,
-            apiKey: cleanKey,
-            model: connectedModel,
-            status: 'connected',
-          };
-          setConfig(autoConfig);
-          broadcastConfig(autoConfig);
-          toast.success(`Koneksi API Google Gemini (${connectedModel}) 100% terhubung & aktif!`);
-        } else {
-          setConfig((prev) => ({ ...prev, status: 'disconnected' }));
-          toast.error(`Koneksi Gagal: ${lastMsg}`);
-        }
-      } else if (config.provider === 'groq') {
-        const candidateModels = [
-          config.model || 'llama-3.3-70b-versatile',
-          'llama-3.3-70b-versatile',
-          'llama-3.1-8b-instant',
-          'qwen/qwen3.6-27b',
-        ];
-        let connectedModel = '';
-        let lastMsg = '';
-
-        for (const m of candidateModels) {
-          try {
-            const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${cleanKey}`,
-              },
-              body: JSON.stringify({
-                model: m,
-                messages: [{ role: 'user', content: 'Ping' }],
-                max_tokens: 10,
-              }),
-            });
-
-            if (res.ok) {
-              connectedModel = m;
-              break;
-            } else {
-              const errData = await res.json().catch(() => ({}));
-              lastMsg = errData?.error?.message || `HTTP ${res.status}`;
-            }
-          } catch (e: any) {
-            lastMsg = e.message || 'Fetch error';
-          }
-        }
-
-        if (connectedModel) {
-          const autoConfig: AiConfig = {
-            ...config,
-            apiKey: cleanKey,
-            model: connectedModel,
-            status: 'connected',
-          };
-          setConfig(autoConfig);
-          broadcastConfig(autoConfig);
-          toast.success(`Koneksi API Groq LPU (${connectedModel}) 100% terhubung & aktif!`);
-        } else {
-          setConfig((prev) => ({ ...prev, status: 'disconnected' }));
-          toast.error(`Koneksi Gagal: ${lastMsg}`);
-        }
+      if (connectedModel) {
+        const autoConfig: AiConfig = {
+          ...config,
+          apiKey: cleanKey,
+          model: connectedModel,
+          status: 'connected',
+        };
+        setConfig(autoConfig);
+        broadcastConfig(autoConfig);
+        toast.success(`Koneksi API Groq LPU (${connectedModel}) 100% terhubung & aktif!`);
+      } else {
+        setConfig((prev) => ({ ...prev, status: 'disconnected' }));
+        toast.error(`Koneksi Gagal: ${lastMsg}`);
       }
     } catch (e: any) {
       setConfig((prev) => ({ ...prev, status: 'disconnected' }));
-      toast.error(`Gagal menghubungi server AI: ${e.message || 'Network error'}`);
+      toast.error(`Gagal menghubungi server Groq: ${e.message || 'Network error'}`);
     } finally {
       setTesting(false);
     }
@@ -315,9 +246,8 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
 
     broadcastConfig(finalConfig);
 
-    const providerName = finalConfig.provider === 'groq' ? 'Groq LPU' : 'Google Gemini';
     toast.success(
-      `Integrasi API ${providerName} (${finalConfig.model}) berhasil disimpan & aktif!`
+      `Integrasi API Groq LPU (${finalConfig.model}) berhasil disimpan & aktif!`
     );
     onClose();
   };
@@ -328,7 +258,15 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
     return `${tokens} Tokens`;
   };
 
-  const usedPercent = Math.min(100, Math.max(0, (usageStats.totalTokensUsed / (usageStats.dataPlanTokens || 1000000)) * 100));
+  const isConnected = config.status === 'connected' && Boolean(config.apiKey && config.apiKey.trim());
+
+  const displayPlanTokens = isConnected ? (usageStats.dataPlanTokens || 1000000) : 0;
+  const displayUsedTokens = isConnected ? (usageStats.byProvider?.groq || usageStats.totalTokensUsed || 0) : 0;
+  const displayLeftTokens = isConnected ? Math.max(0, displayPlanTokens - displayUsedTokens) : 0;
+
+  const usedPercent = isConnected && displayPlanTokens > 0
+    ? Math.min(100, Math.max(0, (displayUsedTokens / displayPlanTokens) * 100))
+    : 0;
 
   return (
     <Dialog open={show} onOpenChange={(open) => !open && onClose()}>
@@ -351,18 +289,18 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
           <div className="p-4 rounded-xl border bg-white dark:bg-gray-800/90 border-gray-200/90 dark:border-gray-700 shadow-2xs">
             <div className="flex items-center justify-between pb-1">
               <div className="flex items-center gap-1.5">
-                <Activity className="w-4 h-4 text-sky-500" />
+                <Activity className={`w-4 h-4 ${isConnected ? 'text-sky-500' : 'text-gray-400'}`} />
                 <h4 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-gray-100">
                   Data Usage Overview <span className="text-[11px] font-normal text-gray-400">as of {usageStats.currentPeriodStart}</span>
                 </h4>
               </div>
-              <button
-                type="button"
-                onClick={() => toast('Usage Meter memantau total token prompt & completion LLM pada Chatbot Widget BSMR.', { icon: 'ℹ️' })}
-                className="text-xs font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-400 hover:underline cursor-pointer"
-              >
-                What is this?
-              </button>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                isConnected
+                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200/60'
+                  : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700'
+              }`}>
+                {isConnected ? 'Groq Connected' : 'Belum Terhubung'}
+              </span>
             </div>
 
             {/* Progress Bar Container with Interactive Tooltip Pin */}
@@ -370,22 +308,28 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
               {/* Pin Tooltip */}
               <div
                 className="absolute top-0 -translate-x-1/2 flex flex-col items-center pointer-events-none transition-all duration-300"
-                style={{ left: `${Math.min(94, Math.max(8, usedPercent))}%` }}
+                style={{ left: isConnected ? `${Math.min(94, Math.max(8, usedPercent))}%` : '8%' }}
               >
-                <span className="px-2 py-0.5 rounded bg-sky-500 text-white text-[10px] font-bold shadow-xs whitespace-nowrap">
-                  {formatTokens(usageStats.totalTokensUsed)} Used
+                <span className={`px-2 py-0.5 rounded text-white text-[10px] font-bold shadow-xs whitespace-nowrap ${
+                  isConnected ? 'bg-sky-500' : 'bg-gray-400 dark:bg-gray-600'
+                }`}>
+                  {formatTokens(displayUsedTokens)} Used
                 </span>
-                <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-sky-500" />
+                <div className={`w-0 h-0 border-x-4 border-x-transparent border-t-4 ${
+                  isConnected ? 'border-t-sky-500' : 'border-t-gray-400 dark:border-t-gray-600'
+                }`} />
               </div>
 
               {/* Progress Bar Track */}
               <div className="w-full h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex">
                 <div
-                  className="h-full bg-sky-500 transition-all duration-500 rounded-l-full"
-                  style={{ width: `${Math.min(100, Math.max(2, usedPercent))}%` }}
+                  className={`h-full transition-all duration-500 rounded-l-full ${
+                    isConnected ? 'bg-sky-500' : 'bg-transparent'
+                  }`}
+                  style={{ width: isConnected ? `${Math.min(100, Math.max(2, usedPercent))}%` : '0%' }}
                 />
                 <div className="flex-1 bg-gray-200 dark:bg-gray-700" />
-                <div className="w-3 h-full bg-rose-300 dark:bg-rose-900/60 rounded-r-full" />
+                {isConnected && <div className="w-3 h-full bg-rose-300 dark:bg-rose-900/60 rounded-r-full" />}
               </div>
             </div>
 
@@ -401,15 +345,21 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
               </div>
               <div className="sm:border-l sm:pl-3 border-gray-200 dark:border-gray-700">
                 <span className="block text-[10px] text-gray-500 dark:text-gray-400 font-medium">Data Plan</span>
-                <span className="font-bold text-gray-800 dark:text-gray-200">{formatTokens(usageStats.dataPlanTokens)}</span>
+                <span className="font-bold text-gray-800 dark:text-gray-200">
+                  {isConnected ? formatTokens(displayPlanTokens) : '0 Tokens'}
+                </span>
               </div>
               <div>
                 <span className="block text-[10px] text-gray-500 dark:text-gray-400 font-medium">Data Used</span>
-                <span className="font-bold text-sky-600 dark:text-sky-400">{formatTokens(usageStats.totalTokensUsed)}</span>
+                <span className={`font-bold ${isConnected ? 'text-sky-600 dark:text-sky-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                  {formatTokens(displayUsedTokens)}
+                </span>
               </div>
               <div>
                 <span className="block text-[10px] text-gray-500 dark:text-gray-400 font-medium">Data Left</span>
-                <span className="font-bold text-gray-800 dark:text-gray-200">{formatTokens(Math.max(0, usageStats.dataPlanTokens - usageStats.totalTokensUsed))}</span>
+                <span className={`font-bold ${isConnected ? 'text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>
+                  {isConnected ? formatTokens(displayLeftTokens) : '0 Tokens'}
+                </span>
               </div>
             </div>
           </div>
@@ -428,40 +378,10 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() =>
-                    setConfig({
-                      ...config,
-                      provider: 'gemini',
-                      model: 'gemini-3.7-flash',
-                    })
-                  }
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                    config.provider === 'gemini'
-                      ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300 shadow-2xs'
-                      : 'bg-white/60 border-gray-200 text-gray-600 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-blue-500" />
-                  <span>Google Gemini</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setConfig({
-                      ...config,
-                      provider: 'groq',
-                      model: 'llama-3.3-70b-versatile',
-                    })
-                  }
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                    config.provider === 'groq'
-                      ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-300 shadow-2xs'
-                      : 'bg-white/60 border-gray-200 text-gray-600 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400'
-                  }`}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-300 shadow-2xs cursor-default"
                 >
                   <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span>Groq LPU (Gratis & Cepat)</span>
+                  <span>Groq LPU</span>
                 </button>
               </div>
 
@@ -476,19 +396,9 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
                       : 'bg-white border-gray-200 text-gray-900 focus:border-gray-400 shadow-2xs'
                   }`}
                 >
-                  {config.provider === 'groq' ? (
-                    <>
-                      <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (Cerdas & Akurat) - Groq</option>
-                      <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (Ultra Cepat) - Groq</option>
-                      <option value="qwen/qwen3.6-27b">Qwen 3.6 27B - Groq</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Cepat & Efisien) - Google AI</option>
-                      <option value="gemini-3.5-flash">Gemini 3.5 Flash (Stabil & Akurat) - Google AI</option>
-                      <option value="gemini-3.7-flash">Gemini 3.7 Flash (Terbaru & Terbaik) - Google AI</option>
-                    </>
-                  )}
+                  <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (Cerdas & Akurat) - Groq</option>
+                  <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (Ultra Cepat) - Groq</option>
+                  <option value="qwen/qwen3.6-27b">Qwen 3.6 27B - Groq</option>
                 </select>
                 <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -500,9 +410,7 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
             <div className="sm:w-[35%] shrink-0">
               <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">API Key</h4>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
-                {config.provider === 'groq'
-                  ? 'Kunci autentikasi Groq (gsk_...) dari console.groq.com/keys'
-                  : 'Kunci autentikasi Google AI Studio (AIzaSy... / AQ...)'}
+                Kunci autentikasi Groq (gsk_...) dari console.groq.com/keys
               </p>
             </div>
 
@@ -510,7 +418,7 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
               <div className="relative">
                 <input
                   type={showKey ? 'text' : 'password'}
-                  placeholder={config.provider === 'groq' ? 'gsk_...' : 'AIzaSy... atau AQ...'}
+                  placeholder="gsk_..."
                   value={config.apiKey}
                   onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
                   className={`w-full h-10 pl-3.5 pr-10 text-xs font-mono rounded-xl border outline-none transition-colors ${

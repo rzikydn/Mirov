@@ -31,35 +31,41 @@ export function getAiUsageStats(): AiUsageStats {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      return {
-        totalTokensUsed: parsed.totalTokensUsed || 0,
-        totalRequests: parsed.totalRequests || 0,
-        dataPlanTokens: parsed.dataPlanTokens || DEFAULT_QUOTA,
-        currentPeriodStart: parsed.currentPeriodStart || startStr,
-        currentPeriodEnd: parsed.currentPeriodEnd || endStr,
-        daysLeft: typeof parsed.daysLeft === 'number' ? parsed.daysLeft : daysLeft,
-        byProvider: {
-          gemini: parsed.byProvider?.gemini || 0,
-          deepseek: parsed.byProvider?.deepseek || 0,
-          groq: parsed.byProvider?.groq || 0,
-          openai: parsed.byProvider?.openai || 0,
-        },
-      };
+      // Clean up legacy mock data
+      if (parsed.totalTokensUsed === 12450 && parsed.byProvider?.gemini === 8200) {
+        localStorage.removeItem(STORAGE_KEY);
+      } else {
+        const groqTokens = parsed.byProvider?.groq || 0;
+        return {
+          totalTokensUsed: groqTokens,
+          totalRequests: parsed.totalRequests || 0,
+          dataPlanTokens: parsed.dataPlanTokens || DEFAULT_QUOTA,
+          currentPeriodStart: parsed.currentPeriodStart || startStr,
+          currentPeriodEnd: parsed.currentPeriodEnd || endStr,
+          daysLeft: typeof parsed.daysLeft === 'number' ? parsed.daysLeft : daysLeft,
+          byProvider: {
+            gemini: 0,
+            deepseek: 0,
+            groq: groqTokens,
+            openai: 0,
+          },
+        };
+      }
     }
   } catch (e) {}
 
-  // Initialize with healthy starter usage baseline
+  // Initialize with 0 usage
   return {
-    totalTokensUsed: 12450,
-    totalRequests: 28,
+    totalTokensUsed: 0,
+    totalRequests: 0,
     dataPlanTokens: DEFAULT_QUOTA,
     currentPeriodStart: startStr,
     currentPeriodEnd: endStr,
     daysLeft,
     byProvider: {
-      gemini: 8200,
-      deepseek: 2400,
-      groq: 1850,
+      gemini: 0,
+      deepseek: 0,
+      groq: 0,
       openai: 0,
     },
   };

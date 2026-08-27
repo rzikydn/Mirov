@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './dashboards/Sidebar';
 import Header from './dashboards/Header';
@@ -12,6 +12,7 @@ import TopQuestionsDonutChart from './ui/TopQuestionsDonutChart';
 import RagFileUploadCard from './ui/RagFileUploadCard';
 import PeakHoursLineChart from './ui/PeakHoursLineChart';
 import VisitorChatLogsWidget from './ui/VisitorChatLogsWidget';
+import LoginTransitionOverlay from './LoginTransitionOverlay';
 
 import { Database } from '../types/database';
 import { menuItems } from '../constants/dashboard';
@@ -23,6 +24,17 @@ const API_URL = `${import.meta.env.VITE_API_URL}/api/databases`;
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [showLoginTransition, setShowLoginTransition] = useState(() => {
+    return Boolean(location.state?.fromAuthTransition);
+  });
+
+  useEffect(() => {
+    if (location.state?.fromAuthTransition) {
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
   const { addHistory } = useHistory();
   const [databases, setDatabases] = useState<Database[]>(() => getCache<Database[]>('databases', []));
   const [selectedDatabase, setSelectedDatabase] = useState<string | null>(null);
@@ -199,7 +211,18 @@ export default function DashboardPage() {
   const currentDb = databases.find((d) => d.id.toString() === selectedDatabase) || null;
 
   return (
-    <div className={`flex h-screen relative overflow-hidden ${darkMode ? 'bg-gray-900' : ''}`}>
+    <>
+      {showLoginTransition && (
+        <LoginTransitionOverlay
+          username={location.state?.username}
+          isOffline={location.state?.offline}
+          onComplete={() => {
+            setShowLoginTransition(false);
+          }}
+        />
+      )}
+
+      <div className={`flex h-screen relative overflow-hidden ${darkMode ? 'bg-gray-900' : ''}`}>
 
       <Sidebar
         databases={databases}
@@ -292,6 +315,7 @@ export default function DashboardPage() {
       </div>
       
       {/* Floating AI Chatbot Widget removed from planner dashboard view per user request */}
-    </div>
+      </div>
+    </>
   );
 }

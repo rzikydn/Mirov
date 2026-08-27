@@ -1,4 +1,5 @@
 // Visitor Chat Logs Service for Admin Escalation & Real-Time Sync
+import { censorProfanityAndFilterWords } from "./aiChatEngine";
 
 export interface ChatMessage {
   id: string;
@@ -393,12 +394,13 @@ export function saveOrUpdateUserSession(
   const randomCity = cities[Math.floor(Math.random() * cities.length)];
 
   const firstUserMsg = userMessages.find((m) => m.sender === "user");
-  const inferredTopic = customTopic || (firstUserMsg ? (firstUserMsg.text.length > 35 ? firstUserMsg.text.slice(0, 35) + "..." : firstUserMsg.text) : "Pengunjung Membuka Widget AI");
+  const rawTopic = customTopic || (firstUserMsg ? (firstUserMsg.text.length > 35 ? firstUserMsg.text.slice(0, 35) + "..." : firstUserMsg.text) : "Pengunjung Membuka Widget AI");
+  const inferredTopic = censorProfanityAndFilterWords(rawTopic);
 
   const formattedMessages: ChatMessage[] = userMessages.map((m) => ({
     id: m.id,
     sender: m.sender as "user" | "bot" | "admin",
-    text: m.text,
+    text: censorProfanityAndFilterWords(m.text),
     time: m.time,
   }));
 

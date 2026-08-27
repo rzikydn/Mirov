@@ -17,6 +17,7 @@ import {
   markSessionAsReadInService,
   ChatSession
 } from "../../services/visitorChatLogsService";
+import { censorProfanityAndFilterWords } from "../../services/aiChatEngine";
 
 interface VisitorChatLogsWidgetProps {
   darkMode?: boolean;
@@ -424,7 +425,7 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
                     </div>
 
                     <p className={`text-xs font-semibold ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                      {session.topic}
+                      {censorProfanityAndFilterWords(session.topic)}
                     </p>
 
                     {Boolean(session.isEscalated) && (
@@ -532,7 +533,7 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
                       {msg.sender === "admin" && (
                         <span className="block text-[10px] font-bold text-indigo-200 mb-0.5">Balasan Admin</span>
                       )}
-                      {msg.text}
+                      {censorProfanityAndFilterWords(msg.text)}
                     </div>
                     <span className={cn("text-[10px] px-1", darkMode ? "text-gray-400" : "text-gray-400")}>
                       {msg.time}
@@ -542,7 +543,7 @@ export default function VisitorChatLogsWidget({ darkMode, fullHeight = false }: 
               ) : (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
                   <p className={cn("text-xs font-medium", darkMode ? "text-gray-400" : "text-gray-500")}>
-                    {selectedSession.topic || selectedSession.summary || "Belum ada pesan dalam sesi ini"}
+                    {censorProfanityAndFilterWords(selectedSession.topic || selectedSession.summary || "Belum ada pesan dalam sesi ini")}
                   </p>
                 </div>
               )}

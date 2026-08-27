@@ -288,21 +288,21 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, user }) => {
 
         {/* Content Overlay */}
         <div className="relative z-10 px-4 sm:px-6 lg:px-12 h-full flex items-center">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <button
-              className="lg:hidden p-2 rounded bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors"
+              className="lg:hidden p-2 rounded bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors flex-shrink-0"
               onClick={onMenuClick}
               aria-label="Open menu"
             >
-              <Menu className="w-6 h-6 text-white" />
+              <Menu className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </button>
-            <div>
+            <div className="min-w-0">
               <HyperText
                 key={config.greeting}
                 as="h1"
                 duration={800}
                 animateInterval={8000}
-                className="text-2xl sm:text-3xl font-bold text-white mb-0 leading-tight space-mono-bold"
+                className="text-[19px] sm:text-2xl lg:text-3xl font-bold text-white mb-0 leading-tight space-mono-bold tracking-tight whitespace-nowrap py-1 sm:py-2"
                 style={{
                   textShadow: '0 2px 10px rgba(0,0,0,0.3)',
                 }}
@@ -312,7 +312,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, darkMode, user }) => {
               {/* Only show last edited for ADMIN and SUPERUSER */}
               {user && user.role !== 'UMUM' && (
                 <p
-                  className="text-xs sm:text-sm text-white/90 mt-0.5"
+                  className="text-xs sm:text-sm text-white/90 mt-0.5 truncate"
                   style={{
                     textShadow: '0 1px 5px rgba(0,0,0,0.3)',
                   }}

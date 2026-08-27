@@ -78,22 +78,139 @@ export async function fetchAiConfigAsync(): Promise<any> {
   return null;
 }
 
+export const DEFAULT_PROFANITY_WORDS = [
+  'anjing',
+  'bego',
+  'kontol',
+  'tolol',
+  'dongo',
+  'dungu',
+  'babi',
+  'monyet',
+  'ngentot',
+  'ngentod',
+  'su',
+  'asu',
+  'pantek',
+  'bajingan',
+  'bangsat',
+  'memek',
+  'itil',
+  'kampret',
+  'tai',
+  'taek',
+  'setan',
+  'perek',
+  'lonte',
+  'brengsek',
+  'idiot',
+  'keparat',
+  'pepek',
+  'jembut',
+  'bangke',
+  'jancuk',
+  'jancok',
+  'cuk',
+  'cok',
+  'bodo',
+];
+
+export const PROFANITY_REFUSAL_MESSAGE =
+  'Mohon maaf, pesan Anda mengandung kata-kata yang tidak diperkenankan dalam layanan kami. Mohon gunakan bahasa yang sopan dan profesional.\n\nApakah ada informasi seputar sertifikasi atau program BSMR yang dapat kami bantu?';
+
+/**
+ * Detect if text contains profane/prohibited words
+ */
+export function containsProfanityOrFilterWords(
+  text: string,
+  customFilterWords?: string[]
+): { hasProfanity: boolean; matchedWord?: string } {
+  if (!text || typeof text !== 'string') {
+    return { hasProfanity: false };
+  }
+
+  const normalized = text.toLowerCase().trim();
+  if (!normalized) return { hasProfanity: false };
+
+  // 1. Check built-in profanity words (with flexible character repetition, e.g. 'anjiiing', 'begooo', 'tooolol')
+  for (const word of DEFAULT_PROFANITY_WORDS) {
+    const chars = word.split('');
+    const flexiblePattern = chars.map((c) => `${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}+`).join('');
+    const regex = new RegExp(`\\b${flexiblePattern}\\b`, 'i');
+    if (regex.test(normalized)) {
+      return { hasProfanity: true, matchedWord: word };
+    }
+  }
+
+  // 2. Check custom filter words from admin configuration
+  if (Array.isArray(customFilterWords) && customFilterWords.length > 0) {
+    for (const customWord of customFilterWords) {
+      const cleanCustom = customWord.trim().toLowerCase();
+      if (!cleanCustom || cleanCustom === 'kata-kasar' || cleanCustom === 'promosi-ilegal') {
+        continue;
+      }
+
+      const regex = new RegExp(`\\b${cleanCustom.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (regex.test(normalized) || (cleanCustom.length > 3 && normalized.includes(cleanCustom))) {
+        return { hasProfanity: true, matchedWord: cleanCustom };
+      }
+    }
+  }
+
+  return { hasProfanity: false };
+}
+
+/**
+ * Censor profane words and filter words from any text (replaces with ***)
+ */
+export function censorProfanityAndFilterWords(text: string, customFilterWords?: string[]): string {
+  if (!text || typeof text !== 'string') return text || '';
+
+  let extraWords = customFilterWords;
+  if (!extraWords) {
+    try {
+      const saved = localStorage.getItem('mirov_ai_config');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.filterWords)) {
+          extraWords = parsed.filterWords;
+        }
+      }
+    } catch (e) {}
+  }
+
+  const combined = Array.from(
+    new Set([
+      ...DEFAULT_PROFANITY_WORDS,
+      ...(Array.isArray(extraWords) ? extraWords : []),
+    ])
+  ).filter((w) => Boolean(w && w.trim() && w !== 'kata-kasar' && w !== 'promosi-ilegal' && w !== 'kata kasar'));
+
+  let sanitized = text;
+
+  for (const word of combined) {
+    const cleanWord = word.trim();
+    if (!cleanWord) continue;
+
+    if (cleanWord.includes(' ') || cleanWord.includes('-')) {
+      const regex = new RegExp(cleanWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      sanitized = sanitized.replace(regex, '***');
+    } else {
+      const chars = cleanWord.toLowerCase().split('');
+      const flexible = chars.map((c) => `${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}+`).join('');
+      const regex = new RegExp(`\\b${flexible}\\b`, 'gi');
+      sanitized = sanitized.replace(regex, '***');
+    }
+  }
+
+  return sanitized;
+}
+
 /**
  * Apply word filtering (restricted words) to the generated output
  */
 function applyFilterWords(text: string, filterWords?: string[]): string {
-  if (!text || !Array.isArray(filterWords) || filterWords.length === 0) {
-    return text;
-  }
-  let sanitized = text;
-  for (const word of filterWords) {
-    const trimmed = word.trim();
-    if (trimmed) {
-      const regex = new RegExp(`\\b${trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-      sanitized = sanitized.replace(regex, '***');
-    }
-  }
-  return sanitized;
+  return censorProfanityAndFilterWords(text, filterWords);
 }
 
 /**
@@ -175,6 +292,18 @@ export async function generateAiChatResponse(options: AiEngineOptions): Promise<
   const { userQuery, customText, quickPrompts = [], history = [] } = options;
   const queryLower = userQuery.toLowerCase().trim();
 
+  const aiConfig = await fetchAiConfigAsync();
+  const filterWordsList = Array.isArray(aiConfig?.filterWords) ? aiConfig.filterWords : ['kata-kasar', 'promosi-ilegal'];
+
+  // 0. Profanity & Restricted Words Guard (Input Moderation)
+  const profanityCheck = containsProfanityOrFilterWords(userQuery, filterWordsList);
+  if (profanityCheck.hasProfanity) {
+    return {
+      text: PROFANITY_REFUSAL_MESSAGE,
+      source: 'prompt',
+    };
+  }
+
   // 1. Direct Contact Query Handler (Fast Routing for CS / WhatsApp / Email)
   const isContactQuery =
     queryLower.includes('hubungi bsmr') ||
@@ -245,7 +374,6 @@ export async function generateAiChatResponse(options: AiEngineOptions): Promise<
   // =========================================================================
   // LAPISAN 2: RAG VECTOR DATABASE RETRIEVAL
   // =========================================================================
-  const aiConfig = await fetchAiConfigAsync();
   const apiKey = aiConfig?.apiKey ? (aiConfig.apiKey || '').replace(/["'\s]/g, '').trim() : undefined;
 
   let ragContextText = '';
@@ -271,7 +399,6 @@ export async function generateAiChatResponse(options: AiEngineOptions): Promise<
     hasRagContext ? `[SUMBER DOKUMEN RESMI (RAG KNOWLEDGE BASE)]:\n${ragContextText}` : '',
   ].filter(Boolean).join('\n\n');
 
-  const filterWordsList = Array.isArray(aiConfig?.filterWords) ? aiConfig.filterWords : ['kata-kasar', 'promosi-ilegal'];
   const filterWordsNotice = filterWordsList.length > 0
     ? `\n\n[FILTER KATA TERLARANG]: DILARANG menggunakan atau menyebutkan kata-kata berikut: ${filterWordsList.join(', ')}.`
     : '';

@@ -18,7 +18,7 @@ import { recordPeakHourChat } from "../../services/peakHoursAnalytics";
 import { escalateSessionToAdmin, saveOrUpdateUserSession, fetchVisitorChatSessionsAsync, cacheServerAdminMessages, ChatSession } from "../../services/visitorChatLogsService";
 import { getChatbotSettings, fetchChatbotSettingsAsync, ChatbotSettings } from "../../services/chatbotSettingsService";
 import { getFaqList, fetchFaqListAsync, FaqItem } from "../../services/faqSettingsService";
-import { generateAiChatResponse } from "../../services/aiChatEngine";
+import { generateAiChatResponse, censorProfanityAndFilterWords } from "../../services/aiChatEngine";
 
 interface BsmrChatWidgetProps {
   darkMode?: boolean;
@@ -493,7 +493,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       sender: "user",
-      text: textToSend,
+      text: censorProfanityAndFilterWords(textToSend),
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 

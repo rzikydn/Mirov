@@ -336,8 +336,15 @@ export default function AuthPage() {
 
               setMessage({ type: 'success', text: 'Offline Login successful! (Offline Mode)' });
               setTimeout(() => {
-                navigate("/dashboard", { replace: true });
-              }, 1200);
+                navigate("/dashboard", {
+                  replace: true,
+                  state: {
+                    fromAuthTransition: true,
+                    username: formData.email,
+                    offline: true,
+                  }
+                });
+              }, 700);
               return;
             }
           }
@@ -385,8 +392,15 @@ export default function AuthPage() {
       setMessage({ type: 'success', text: 'Login successful!' });
 
       setTimeout(() => {
-        navigate("/dashboard", { replace: true });
-      }, 1500);
+        navigate("/dashboard", {
+          replace: true,
+          state: {
+            fromAuthTransition: true,
+            username: formData.email,
+            offline: false,
+          }
+        });
+      }, 700);
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "An error occurred";
