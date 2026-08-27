@@ -106,18 +106,23 @@ export async function retrieveRagContext(query: string, topK = 5, faqOnly = fals
  * Extract concise relevant snippet from chunk content for offline fallback
  */
 function extractConciseSnippet(content: string, userQuery: string): string {
+  if (content.includes('DATA OPERASIONAL UMUM')) return '';
   const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
-  const queryWords = userQuery.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const stopWords = ['sertifikasi', 'bsmr', 'ada', 'apa', 'yang', 'dan', 'di', 'ke', 'dari', 'untuk', 'ini', 'itu', 'saya', 'bisa', 'bagaimana', 'apakah'];
+  const rawWords = userQuery.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const queryWords = rawWords.filter(w => !stopWords.includes(w));
+  const effectiveWords = queryWords.length > 0 ? queryWords : rawWords;
 
   const matchingLines: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     const lineLower = lines[i].toLowerCase();
-    const isMatch = queryWords.some(w =>
+    const isMatch = effectiveWords.some(w =>
       lineLower.includes(w) ||
       (w.includes('kantor') && (lineLower.includes('alamat') || lineLower.includes('office') || lineLower.includes('gedung') || lineLower.includes('lokasi'))) ||
       (w.includes('letak') && (lineLower.includes('alamat') || lineLower.includes('posisi') || lineLower.includes('terletak'))) ||
       (w.includes('biaya') && (lineLower.includes('biaya') || lineLower.includes('rp') || lineLower.includes('tarif'))) ||
-      (w.includes('jadwal') && (lineLower.includes('jadwal') || lineLower.includes('tanggal') || lineLower.includes('periode')))
+      (w.includes('jadwal') && (lineLower.includes('jadwal') || lineLower.includes('tanggal') || lineLower.includes('periode'))) ||
+      (w.includes('siap') && (lineLower.includes('syarat') || lineLower.includes('tahap') || lineLower.includes('dokumen') || lineLower.includes('persyaratan')))
     );
 
     if (isMatch) {
@@ -132,7 +137,7 @@ function extractConciseSnippet(content: string, userQuery: string): string {
     return matchingLines.join('\n');
   }
 
-  return lines.slice(0, 4).join('\n');
+  return '';
 }
 
 /**
@@ -180,9 +185,9 @@ export async function queryRagKnowledgeBase(userQuery: string, apiKey?: string):
 
     const contextForLlm = contextParts.join('\n\n');
 
-    // Concise fallback for offline mode (only top-1 chunk snippet)
-    const topChunk = finalDocs[0];
-    const conciseFallback = extractConciseSnippet(topChunk.content, userQuery);
+    // Concise fallback for offline mode (skip cover/header chunks, find real content)
+    const contentChunk = finalDocs.find(d => !d.content.includes('DATA OPERASIONAL UMUM') && d.content.length > 50) || finalDocs[0];
+    const conciseFallback = extractConciseSnippet(contentChunk.content, userQuery);
 
     return {
       contextForLlm,

@@ -59,6 +59,13 @@ export const DEFAULT_TOP_QUESTIONS: QuestionCategory[] = [
     color: "hsl(340 82% 52%)", // Rose
     keywords: ["admin", "cs", "obrol", "mengobrol", "hubungi", "operator", "bantuan", "pesan"],
   },
+  {
+    id: "di-luar-konteks",
+    label: "Di Luar Konteks / Lainnya",
+    count: 0,
+    color: "hsl(215 16% 47%)", // Slate Gray
+    keywords: [],
+  },
 ];
 
 /**
@@ -83,6 +90,7 @@ export function computeTopQuestionsFromSessions(sessions: ChatSession[]): Questi
         let highestScore = 0;
 
         categories.forEach((cat, idx) => {
+          if (cat.keywords.length === 0) return;
           let score = 0;
           cat.keywords.forEach((kw) => {
             if (text.includes(kw.toLowerCase())) {
@@ -98,8 +106,8 @@ export function computeTopQuestionsFromSessions(sessions: ChatSession[]): Questi
         if (bestIdx !== -1 && highestScore > 0) {
           categories[bestIdx].count += 1;
         } else {
-          const fallbackIdx = categories.findIndex((c) => c.id === "informasi-bsmr");
-          if (fallbackIdx >= 0) categories[fallbackIdx].count += 1;
+          const outOfContextIdx = categories.findIndex((c) => c.id === "di-luar-konteks");
+          if (outOfContextIdx >= 0) categories[outOfContextIdx].count += 1;
           else categories[0].count += 1;
         }
       }
@@ -141,14 +149,42 @@ export async function fetchTopQuestionsAsync(): Promise<QuestionCategory[]> {
   return getTopQuestionsData();
 }
 
-export function saveTopQuestionsData(categories: QuestionCategory[]): void {
+export function saveTopQuestionsData(categories?: QuestionCategory[]): void {
+  const data = categories || getTopQuestionsData();
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("bsmr_top_questions_updated"));
+    try {
+      window.dispatchEvent(new CustomEvent("bsmr_top_questions_updated", { detail: data }));
+      window.dispatchEvent(new Event("bsmr_top_questions_updated"));
+    } catch (e) {}
+
+    try {
+      window.postMessage({ type: "BSMR_TOP_QUESTIONS_UPDATED", categories: data }, "*");
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: "BSMR_TOP_QUESTIONS_UPDATED", categories: data }, "*");
+      }
+      const iframes = document.querySelectorAll("iframe");
+      iframes.forEach((iframe) => {
+        try {
+          iframe.contentWindow?.postMessage({ type: "BSMR_TOP_QUESTIONS_UPDATED", categories: data }, "*");
+        } catch (e) {}
+      });
+    } catch (e) {}
+
+    if ("BroadcastChannel" in window) {
+      try {
+        const c1 = new BroadcastChannel("bsmr_chat_sync_channel");
+        c1.postMessage({ type: "TOP_QUESTIONS_UPDATED", categories: data });
+        c1.close();
+
+        const c2 = new BroadcastChannel("bsmr_top_questions_sync");
+        c2.postMessage({ type: "TOP_QUESTIONS_UPDATED", categories: data });
+        c2.close();
+      } catch (e) {}
+    }
   }
 }
 
-export function classifyAndRecordQuestion(userQuestion: string): void {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("bsmr_top_questions_updated"));
-  }
+export function classifyAndRecordQuestion(userQuestion?: string): void {
+  const fresh = getTopQuestionsData();
+  saveTopQuestionsData(fresh);
 }

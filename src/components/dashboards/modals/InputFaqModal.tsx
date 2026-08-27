@@ -121,7 +121,7 @@ export default function InputFaqModal({ show, darkMode, onClose, onSuccess }: In
         <DialogHeader className="shrink-0">
           <div className="flex items-center justify-between pr-6">
             <DialogTitle className="flex items-center gap-2 text-base font-bold">
-              <HelpCircle className="w-5 h-5 text-blue-500" />
+              <HelpCircle className="w-5 h-5 text-gray-900 dark:text-gray-100" />
               {viewMode === 'list' ? 'Manajemen FAQ & Pertanyaan Populer' : viewMode === 'edit' ? 'Edit FAQ Chatbot' : 'Tambah FAQ Baru'}
             </DialogTitle>
           </div>
@@ -199,11 +199,6 @@ export default function InputFaqModal({ show, darkMode, onClose, onSuccess }: In
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      {item.icon && item.icon.trim() !== '' && (
-                        <span className="text-base shrink-0 p-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-900/40">
-                          {item.icon}
-                        </span>
-                      )}
                       <span className="font-bold text-xs truncate text-gray-900 dark:text-gray-100">
                         {item.label}
                       </span>
@@ -234,7 +229,7 @@ export default function InputFaqModal({ show, darkMode, onClose, onSuccess }: In
                     </div>
                   </div>
 
-                  <p className={`text-[11px] leading-relaxed line-clamp-2 text-gray-600 dark:text-gray-400 ${item.icon && item.icon.trim() !== '' ? 'pl-8' : 'pl-1'}`}>
+                  <p className="text-[11px] leading-relaxed line-clamp-2 text-gray-600 dark:text-gray-400 pl-0.5">
                     {item.answer}
                   </p>
                 </div>

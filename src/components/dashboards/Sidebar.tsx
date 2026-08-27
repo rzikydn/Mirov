@@ -364,7 +364,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                   }}
                                   className="cursor-pointer font-medium"
                                 >
-                                  <Settings className="w-4 h-4 mr-2 text-blue-500" />
+                                  <Settings className="w-4 h-4 mr-2 text-gray-900 dark:text-gray-100" />
                                   Setting & Prompt
                                 </DropdownMenuItem>
 
@@ -375,7 +375,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                   }}
                                   className="cursor-pointer font-medium"
                                 >
-                                  <HelpCircle className="w-4 h-4 mr-2 text-violet-500" />
+                                  <HelpCircle className="w-4 h-4 mr-2 text-gray-900 dark:text-gray-100" />
                                   Manajemen FAQ
                                 </DropdownMenuItem>
 
@@ -386,7 +386,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                   }}
                                   className="cursor-pointer font-medium"
                                 >
-                                  <Code className="w-4 h-4 mr-2 text-emerald-500" />
+                                  <Code className="w-4 h-4 mr-2 text-gray-900 dark:text-gray-100" />
                                   Installation
                                 </DropdownMenuItem>
 
@@ -397,7 +397,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                   }}
                                   className="cursor-pointer font-medium"
                                 >
-                                  <Cpu className="w-4 h-4 mr-2 text-amber-500" />
+                                  <Cpu className="w-4 h-4 mr-2 text-gray-900 dark:text-gray-100" />
                                   API Integration
                                 </DropdownMenuItem>
                               </DropdownMenuGroup>

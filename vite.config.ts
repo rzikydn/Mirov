@@ -170,6 +170,13 @@ function chatSyncPlugin(): Plugin {
         color: "hsl(340 82% 52%)",
         keywords: ["admin", "cs", "obrol", "mengobrol", "hubungi", "operator", "bantuan", "pesan"],
       },
+      {
+        id: "di-luar-konteks",
+        label: "Di Luar Konteks / Lainnya",
+        count: 0,
+        color: "hsl(215 16% 47%)",
+        keywords: [],
+      },
     ];
 
     const categories = defaultCats.map(c => ({ ...c, count: 0 }));
@@ -184,6 +191,7 @@ function chatSyncPlugin(): Plugin {
           let highestScore = 0;
 
           categories.forEach((cat, idx) => {
+            if (cat.keywords.length === 0) return;
             let score = 0;
             cat.keywords.forEach((kw) => {
               if (text.includes(kw.toLowerCase())) score += 1;
@@ -197,8 +205,8 @@ function chatSyncPlugin(): Plugin {
           if (bestIdx !== -1 && highestScore > 0) {
             categories[bestIdx].count += 1;
           } else {
-            const fallbackIdx = categories.findIndex((c) => c.id === "informasi-bsmr");
-            if (fallbackIdx >= 0) categories[fallbackIdx].count += 1;
+            const outOfContextIdx = categories.findIndex((c) => c.id === "di-luar-konteks");
+            if (outOfContextIdx >= 0) categories[outOfContextIdx].count += 1;
             else categories[0].count += 1;
           }
         }
@@ -221,6 +229,8 @@ function chatSyncPlugin(): Plugin {
           res.statusCode = 204;
           return res.end();
         }
+
+
 
         if (req.url && req.url.startsWith('/api/top-questions')) {
           if (req.method === 'GET') {

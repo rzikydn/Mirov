@@ -5,7 +5,6 @@ import {
   Send,
   Home,
   ChevronRight,
-  Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../../lib/utils";
@@ -251,7 +250,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
           {
             id: "hubungi-admin",
             label: "Mengobrol Dengan Admin",
-            icon: "💬",
+            icon: "",
             answer: "Permintaan Anda telah diproses. Sesi ini telah terhubung dan diekskalasi ke CS Admin BSMR.",
             category: "Eskalasi",
           },
@@ -491,20 +490,6 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
     const textToSend = customText || inputValue;
     if (!textToSend.trim()) return;
 
-    // Klasifikasikan intent pertanyaan pengguna & perbarui Top 5 Donut Chart
-    classifyAndRecordQuestion(textToSend);
-
-    // Catat aktivitas pesan berdasarkan jam pengguna saat ini (Peak Hours 24 Jam)
-    recordPeakHourChat();
-
-    // Jika user memilih "Mengobrol Dengan Admin"
-    if (textToSend.toLowerCase().includes("mengobrol dengan admin")) {
-      setIsEscalatedToAdmin(true);
-      handleAdminEscalation();
-      if (!customText) setInputValue("");
-      return;
-    }
-
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       sender: "user",
@@ -514,6 +499,23 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
 
     const currentWithUser = [...messages, userMsg];
     setMessages(currentWithUser);
+
+    // 1. Simpan sesi obrolan secara instan ke localStorage & Server
+    saveOrUpdateUserSession(sessionId, currentWithUser);
+
+    // 2. Klasifikasikan intent pertanyaan pengguna & perbarui Top 5 Donut Chart secara real-time (0ms delay)
+    classifyAndRecordQuestion(textToSend);
+
+    // 3. Catat aktivitas pesan berdasarkan jam pengguna saat ini (Peak Hours 24 Jam)
+    recordPeakHourChat();
+
+    // Jika user memilih "Mengobrol Dengan Admin"
+    if (textToSend.toLowerCase().includes("mengobrol dengan admin")) {
+      setIsEscalatedToAdmin(true);
+      handleAdminEscalation();
+      if (!customText) setInputValue("");
+      return;
+    }
 
     // JIKA SESI TERHUBUNG DENGAN CS ADMIN (TAKEOVER MODE): AI & RAG TIDAK JAWAB LAGI
     const isCurrentlyEscalated =
@@ -536,18 +538,18 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
       return; // STOP! AI Gemini & RAG tidak akan merespons
     }
 
-    saveOrUpdateUserSession(sessionId, currentWithUser);
     if (!customText) setInputValue("");
     isUserScrolledUpRef.current = false;
     setTimeout(() => scrollToBottom(true), 50);
     setIsTyping(true);
 
-    // Generate AI response using active System Prompt, RAG context & contact settings
+    // Generate AI response using layered architecture (FAQ + RAG context + LLM Engine)
     const result = await generateAiChatResponse({
       userQuery: textToSend,
       settings,
       customText,
       quickPrompts: availableQuickPrompts,
+      history: currentWithUser.map((m) => ({ sender: m.sender, text: m.text })),
     });
 
     const botMsg: ChatMessage = {
@@ -712,7 +714,7 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                       isMobile ? "text-xs" : "text-sm"
                     )}
                   >
-                    BSMR AI Chatbot <Sparkles className="w-3 h-3 text-amber-300 fill-amber-300" />
+                    BSMR AI Chatbot
                   </h4>
                   <p className="text-[10px] sm:text-[11px] text-blue-100/90 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -791,7 +793,32 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                         {msg.sender === "admin" && (
                           <span className="block text-[10px] font-bold text-indigo-200 mb-0.5">Balasan Live CS Admin</span>
                         )}
-                        <div>{msg.text}</div>
+                        <div className="space-y-2.5">
+                          {msg.text.split(/\n{2,}/).map((paragraph, pIdx) => {
+                            const trimmed = paragraph.trim();
+                            if (!trimmed) return null;
+                            const lines = trimmed.split('\n');
+                            return (
+                              <div key={pIdx} className="space-y-1">
+                                {lines.map((line, lIdx) => {
+                                  const cleanLine = line.trim();
+                                  const isBullet = cleanLine.startsWith('•') || /^\d+\.\s/.test(cleanLine);
+                                  return (
+                                    <p
+                                      key={lIdx}
+                                      className={cn(
+                                        "leading-relaxed m-0",
+                                        isBullet ? "pl-2 font-normal" : ""
+                                      )}
+                                    >
+                                      {line}
+                                    </p>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
 
                         {(msg.isContactInfo || msg.text.includes("WhatsApp CS:") || msg.text.includes("Email Admin:")) && (
                           <div className="mt-2.5 pt-2 border-t border-gray-200/60 dark:border-gray-700/60 space-y-1.5 pointer-events-auto">
@@ -814,8 +841,8 @@ export default function BsmrChatWidget({ darkMode }: BsmrChatWidgetProps) {
                       </div>
                     </div>
 
-                    {/* KPI 2 & KPI 3 Feedback & Escalation Prompt for Bot Messages */}
-                    {msg.sender === "bot" && msg.id !== "welcome-1" && (
+                    {/* KPI 2 & KPI 3 Feedback & Escalation Prompt for Bot Messages (Hanya Muncul Setelah Percakapan Cukup Panjang: Minimal 3 Pertanyaan User) */}
+                    {msg.sender === "bot" && msg.id !== "welcome-1" && (messages.filter(m => m.sender === "user").length >= 3 || msg.feedback) && (
                       <div className={cn("pt-0.5 space-y-1.5", isMobile ? "pl-8" : "pl-9")}>
                         {!msg.feedback ? (
                           <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 flex-wrap">

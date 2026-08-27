@@ -316,6 +316,8 @@ export function saveVisitorChatSessions(sessions: ChatSession[]): void {
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
       window.dispatchEvent(new Event('bsmr_chat_logs_updated'));
+      window.dispatchEvent(new CustomEvent('bsmr_chat_logs_updated_detail', { detail: cleaned }));
+      window.dispatchEvent(new Event('bsmr_top_questions_updated'));
     }
     
     // Broadcast via BroadcastChannel across same-origin tabs/windows
@@ -326,8 +328,18 @@ export function saveVisitorChatSessions(sessions: ChatSession[]): void {
     }
 
     // Broadcast via postMessage if running inside iframe to parent window
-    if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-      window.parent.postMessage({ type: 'BSMR_CHAT_LOGS_UPDATED', sessions: cleaned }, '*');
+    if (typeof window !== 'undefined') {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'BSMR_CHAT_LOGS_UPDATED', sessions: cleaned }, '*');
+        window.parent.postMessage({ type: 'BSMR_TOP_QUESTIONS_UPDATED' }, '*');
+      }
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach((iframe) => {
+        try {
+          iframe.contentWindow?.postMessage({ type: 'BSMR_CHAT_LOGS_UPDATED', sessions: cleaned }, '*');
+          iframe.contentWindow?.postMessage({ type: 'BSMR_TOP_QUESTIONS_UPDATED' }, '*');
+        } catch (e) {}
+      });
     }
 
     // HTTP Sync POST ke Backend Express MySQL API

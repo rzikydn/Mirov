@@ -55,7 +55,7 @@ export default function SettingPromptDialog({ show, darkMode, onClose }: Setting
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <Settings className="w-5 h-5 text-blue-500" />
+            <Settings className="w-5 h-5 text-gray-900 dark:text-gray-100" />
             Setting & Prompt AI
           </DialogTitle>
           <DialogDescription>
@@ -82,7 +82,7 @@ export default function SettingPromptDialog({ show, darkMode, onClose }: Setting
           {/* WA CS Escalation */}
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-              <PhoneCall className="w-3.5 h-3.5 text-emerald-500" />
+              <PhoneCall className="w-3.5 h-3.5 text-gray-900 dark:text-gray-100" />
               Nomor WhatsApp CS BSMR (Fallback Escalation)
             </label>
             <input
@@ -98,7 +98,7 @@ export default function SettingPromptDialog({ show, darkMode, onClose }: Setting
           {/* Email CS Admin BSMR */}
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-blue-500" />
+              <Mail className="w-3.5 h-3.5 text-gray-900 dark:text-gray-100" />
               Alamat Email Admin
             </label>
             <input
@@ -115,7 +115,7 @@ export default function SettingPromptDialog({ show, darkMode, onClose }: Setting
           {/* System Prompt AI */}
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-              <Bot className="w-3.5 h-3.5 text-blue-500" />
+              <Bot className="w-3.5 h-3.5 text-gray-900 dark:text-gray-100" />
               System Prompt AI Bot
             </label>
             <textarea

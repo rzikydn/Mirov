@@ -38,7 +38,7 @@ export default function InstallationDialog({ show, darkMode, onClose }: Installa
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <Code className="w-5 h-5 text-emerald-500" />
+            <Code className="w-5 h-5 text-gray-900 dark:text-gray-100" />
             Kode Embed Script (Installation)
           </DialogTitle>
           <DialogDescription>

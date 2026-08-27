@@ -18,7 +18,7 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
   useEffect(() => {
     const handleUpdate = () => {
       const fresh = getTopQuestionsData();
-      if (Array.isArray(fresh)) {
+      if (Array.isArray(fresh) && fresh.length > 0) {
         setCategories((prev) => {
           if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
           return fresh;
@@ -28,56 +28,86 @@ export default function TopQuestionsDonutChart({ darkMode, className }: TopQuest
 
     const handleAsyncUpdate = async () => {
       handleUpdate();
-      const freshApi = await fetchTopQuestionsAsync();
-      if (Array.isArray(freshApi)) {
-        setCategories((prev) => {
-          if (JSON.stringify(prev) === JSON.stringify(freshApi)) return prev;
-          return freshApi;
-        });
-      }
+      try {
+        const freshApi = await fetchTopQuestionsAsync();
+        if (Array.isArray(freshApi) && freshApi.length > 0) {
+          setCategories((prev) => {
+            if (JSON.stringify(prev) === JSON.stringify(freshApi)) return prev;
+            return freshApi;
+          });
+        }
+      } catch (e) {}
     };
 
     handleAsyncUpdate();
 
+    // Listen to local events for immediate 0ms update
     window.addEventListener("bsmr_top_questions_updated", handleUpdate);
+    window.addEventListener("bsmr_chat_logs_updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
 
+    // Listen to iframe / parent postMessages
     const handleMessage = (e: MessageEvent) => {
-      if (e.data?.type === "BSMR_TOP_QUESTIONS_UPDATED" && Array.isArray(e.data.categories)) {
+      if (
+        (e.data?.type === "BSMR_TOP_QUESTIONS_UPDATED" || e.data?.type === "TOP_QUESTIONS_UPDATED") &&
+        Array.isArray(e.data.categories)
+      ) {
         setCategories((prev) => {
           if (JSON.stringify(prev) === JSON.stringify(e.data.categories)) return prev;
           return e.data.categories;
         });
-      } else {
-        handleAsyncUpdate();
+      } else if (
+        e.data?.type === "BSMR_CHAT_LOGS_UPDATED" ||
+        e.data?.type === "CHAT_LOGS_UPDATED" ||
+        e.data?.type === "BSMR_ADMIN_REPLIED" ||
+        e.data?.type === "BSMR_TOP_QUESTIONS_UPDATED"
+      ) {
+        handleUpdate();
       }
     };
     window.addEventListener("message", handleMessage);
 
-    let channel: BroadcastChannel | null = null;
+    // Listen to BroadcastChannels across tabs
+    let chatChannel: BroadcastChannel | null = null;
+    let topQChannel: BroadcastChannel | null = null;
     if (typeof window !== "undefined" && "BroadcastChannel" in window) {
       try {
-        channel = new BroadcastChannel("bsmr_top_questions_sync");
-        channel.onmessage = (event) => {
+        chatChannel = new BroadcastChannel("bsmr_chat_sync_channel");
+        chatChannel.onmessage = (event) => {
+          if (event.data?.type === "TOP_QUESTIONS_UPDATED" && Array.isArray(event.data.categories)) {
+            setCategories((prev) => {
+              if (JSON.stringify(prev) === JSON.stringify(event.data.categories)) return prev;
+              return event.data.categories;
+            });
+          } else if (event.data?.type === "CHAT_LOGS_UPDATED" || event.data?.type === "ADMIN_REPLIED") {
+            handleUpdate();
+          }
+        };
+
+        topQChannel = new BroadcastChannel("bsmr_top_questions_sync");
+        topQChannel.onmessage = (event) => {
           if (event.data?.type === "TOP_QUESTIONS_UPDATED" && Array.isArray(event.data.categories)) {
             setCategories((prev) => {
               if (JSON.stringify(prev) === JSON.stringify(event.data.categories)) return prev;
               return event.data.categories;
             });
           } else {
-            handleAsyncUpdate();
+            handleUpdate();
           }
         };
       } catch (e) {}
     }
 
-    const interval = setInterval(handleAsyncUpdate, 15000);
+    // Fast polling fallback for instant synchronization
+    const interval = setInterval(handleUpdate, 1000);
 
     return () => {
       window.removeEventListener("bsmr_top_questions_updated", handleUpdate);
+      window.removeEventListener("bsmr_chat_logs_updated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
       window.removeEventListener("message", handleMessage);
-      if (channel) channel.close();
+      if (chatChannel) chatChannel.close();
+      if (topQChannel) topQChannel.close();
       clearInterval(interval);
     };
   }, []);
