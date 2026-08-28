@@ -91,6 +91,21 @@ export function recordAiUsage(
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('mirov_ai_usage_updated', { detail: updated }));
+    if (typeof window !== 'undefined') {
+      window.postMessage({ type: 'BSMR_AI_USAGE_UPDATED', stats: updated }, '*');
+      if (window.parent && window.parent !== window) {
+        try {
+          window.parent.postMessage({ type: 'BSMR_AI_USAGE_UPDATED', stats: updated }, '*');
+        } catch (e) {}
+      }
+      if ('BroadcastChannel' in window) {
+        try {
+          const channel = new BroadcastChannel('bsmr_ai_usage_channel');
+          channel.postMessage({ type: 'BSMR_AI_USAGE_UPDATED', stats: updated });
+          channel.close();
+        } catch (e) {}
+      }
+    }
   } catch (e) {}
 
   return updated;

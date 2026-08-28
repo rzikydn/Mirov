@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { getAiUsageStats, AiUsageStats } from '@/services/aiUsageService';
+import { fetchAiConfigAsync } from '@/services/aiChatEngine';
 
 interface ApiIntegrationModalProps {
   show: boolean;
@@ -54,7 +55,7 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
         return {
           provider: prov,
           apiKey: parsed.apiKey || '',
-          model: parsed.model && (parsed.model.includes('llama') || parsed.model.includes('qwen')) ? parsed.model : 'llama-3.3-70b-versatile',
+          model: parsed.model || 'openai/gpt-oss-120b',
           temperature: typeof parsed.temperature === 'number' ? parsed.temperature : 0.7,
           maxTokens: parsed.maxTokens || 2048,
           status: parsed.status || 'disconnected',
@@ -66,7 +67,7 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
     return {
       provider: 'groq',
       apiKey: '',
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       temperature: 0.7,
       maxTokens: 2048,
       status: 'disconnected',
@@ -81,6 +82,22 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
   const [usageStats, setUsageStats] = useState<AiUsageStats>(getAiUsageStats);
 
   useEffect(() => {
+    // 1. Fetch live config dari server database terlebih dahulu
+    fetchAiConfigAsync().then((fresh) => {
+      if (fresh && fresh.apiKey) {
+        setConfig((prev) => ({
+          ...prev,
+          provider: 'groq',
+          apiKey: fresh.apiKey,
+          model: fresh.model || 'openai/gpt-oss-120b',
+          temperature: typeof fresh.temperature === 'number' ? fresh.temperature : prev.temperature,
+          maxTokens: fresh.maxTokens || prev.maxTokens,
+          status: fresh.status || 'connected',
+          filterWords: Array.isArray(fresh.filterWords) ? fresh.filterWords : prev.filterWords,
+        }));
+      }
+    });
+
     const saved = localStorage.getItem('mirov_ai_config');
     if (saved) {
       try {
@@ -90,7 +107,7 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
           ...prev,
           ...parsed,
           provider: prov,
-          model: parsed.model && (parsed.model.includes('llama') || parsed.model.includes('qwen')) ? parsed.model : 'llama-3.3-70b-versatile',
+          model: parsed.model || 'openai/gpt-oss-120b',
           filterWords: Array.isArray(parsed.filterWords) ? parsed.filterWords : prev.filterWords,
         }));
       } catch (e) {}
@@ -98,11 +115,36 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
     setUsageStats(getAiUsageStats());
 
     const handleUsageUpdated = (e: any) => {
-      if (e.detail) setUsageStats(e.detail);
+      if (e?.detail) setUsageStats(e.detail);
       else setUsageStats(getAiUsageStats());
     };
+
+    const handleWindowMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'BSMR_AI_USAGE_UPDATED' && event.data.stats) {
+        setUsageStats(event.data.stats);
+      }
+    };
+
     window.addEventListener('mirov_ai_usage_updated', handleUsageUpdated);
-    return () => window.removeEventListener('mirov_ai_usage_updated', handleUsageUpdated);
+    window.addEventListener('message', handleWindowMessage);
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        channel = new BroadcastChannel('bsmr_ai_usage_channel');
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'BSMR_AI_USAGE_UPDATED' && event.data.stats) {
+            setUsageStats(event.data.stats);
+          }
+        };
+      } catch (e) {}
+    }
+
+    return () => {
+      window.removeEventListener('mirov_ai_usage_updated', handleUsageUpdated);
+      window.removeEventListener('message', handleWindowMessage);
+      if (channel) channel.close();
+    };
   }, [show]);
 
   const handleAddFilterWord = () => {
@@ -142,12 +184,14 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
     setTesting(true);
 
     try {
-      const candidateModels = [
-        config.model || 'llama-3.3-70b-versatile',
+      const candidateModels = Array.from(new Set([
+        config.model || 'openai/gpt-oss-120b',
+        'openai/gpt-oss-120b',
+        'openai/gpt-oss-20b',
+        'qwen/qwen3.6-27b',
         'llama-3.3-70b-versatile',
         'llama-3.1-8b-instant',
-        'qwen/qwen3.6-27b',
-      ];
+      ]));
       let connectedModel = '';
       let lastMsg = '';
 
@@ -203,11 +247,15 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
   const broadcastConfig = (finalConfig: AiConfig) => {
     localStorage.setItem('mirov_ai_config', JSON.stringify(finalConfig));
 
-    // HTTP POST Sync to Vite Server API
+    // HTTP POST Sync to both Vite dev server AND Express production server
     const apiBase = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : '';
-    const aiConfigUrl = import.meta.env.DEV ? '/api/ai-config' : (apiBase ? `${apiBase}/api/ai-config` : '');
-    if (aiConfigUrl) {
-      fetch(aiConfigUrl, {
+    const syncUrls = [
+      import.meta.env.DEV ? '/api/ai-config' : '',
+      apiBase ? `${apiBase}/api/chatbot/ai-config` : '',
+    ].filter(Boolean);
+
+    for (const url of syncUrls) {
+      fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finalConfig),
@@ -235,21 +283,80 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanKey = (config.apiKey || '').replace(/["'\s]/g, '').trim();
-    const finalConfig: AiConfig = {
-      ...config,
-      apiKey: cleanKey,
-      status: cleanKey ? 'connected' : 'disconnected',
-    };
+    const rawKey = config.apiKey.trim();
+    if (!rawKey) {
+      toast.error('Masukkan API Key Groq terlebih dahulu!');
+      return;
+    }
+    const cleanKey = rawKey.replace(/["'\s]/g, '').trim();
 
-    broadcastConfig(finalConfig);
+    setTesting(true);
+    try {
+      const candidateModels = Array.from(new Set([
+        config.model || 'openai/gpt-oss-120b',
+        'openai/gpt-oss-120b',
+        'openai/gpt-oss-20b',
+        'qwen/qwen3.6-27b',
+        'llama-3.3-70b-versatile',
+        'llama-3.1-8b-instant',
+      ]));
+      let connectedModel = '';
+      let lastMsg = '';
 
-    toast.success(
-      `Integrasi API Groq LPU (${finalConfig.model}) berhasil disimpan & aktif!`
-    );
-    onClose();
+      for (const m of candidateModels) {
+        try {
+          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${cleanKey}`,
+            },
+            body: JSON.stringify({
+              model: m,
+              messages: [{ role: 'user', content: 'Ping' }],
+              max_tokens: 10,
+            }),
+          });
+
+          if (res.ok) {
+            connectedModel = m;
+            break;
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            lastMsg = errData?.error?.message || `HTTP ${res.status}`;
+          }
+        } catch (e: any) {
+          lastMsg = e.message || 'Fetch error';
+        }
+      }
+
+      if (!connectedModel) {
+        setConfig((prev) => ({ ...prev, status: 'disconnected' }));
+        toast.error(`Gagal Menyimpan: API Key Groq tidak valid atau terpotong! (${lastMsg})`);
+        return;
+      }
+
+      const finalConfig: AiConfig = {
+        ...config,
+        apiKey: cleanKey,
+        model: connectedModel,
+        status: 'connected',
+      };
+
+      setConfig(finalConfig);
+      broadcastConfig(finalConfig);
+
+      toast.success(
+        `Integrasi API Groq LPU (${finalConfig.model}) terverifikasi & berhasil disimpan!`
+      );
+      onClose();
+    } catch (e: any) {
+      toast.error(`Gagal menghubungi server Groq: ${e.message || 'Network error'}`);
+    } finally {
+      setTesting(false);
+    }
   };
 
   const formatTokens = (tokens: number) => {
@@ -396,9 +503,11 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
                       : 'bg-white border-gray-200 text-gray-900 focus:border-gray-400 shadow-2xs'
                   }`}
                 >
-                  <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (Cerdas & Akurat) - Groq</option>
-                  <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (Ultra Cepat) - Groq</option>
+                  <option value="openai/gpt-oss-120b">GPT OSS 120B (Sangat Cerdas & Akurat) - Groq</option>
+                  <option value="openai/gpt-oss-20b">GPT OSS 20B (Cepat & Ringan) - Groq</option>
                   <option value="qwen/qwen3.6-27b">Qwen 3.6 27B - Groq</option>
+                  <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile - Groq</option>
+                  <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant - Groq</option>
                 </select>
                 <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>

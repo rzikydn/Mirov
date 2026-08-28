@@ -270,3 +270,20 @@ export const chatbotAnalytics = mysqlTable('chatbot_analytics', {
 export type ChatbotAnalytic = typeof chatbotAnalytics.$inferSelect;
 export type NewChatbotAnalytic = typeof chatbotAnalytics.$inferInsert;
 
+// Chatbot AI Config Table (API Key, Provider, Model — Server-Persisted)
+export const chatbotAiConfig = mysqlTable('chatbot_ai_config', {
+  id: varchar('id', { length: 50 }).primaryKey().default('default'),
+  provider: varchar('provider', { length: 50 }).notNull().default('groq'),
+  apiKey: text('apiKey').notNull(),
+  model: varchar('model', { length: 255 }).notNull().default('openai/gpt-oss-120b'),
+  temperature: varchar('temperature', { length: 10 }).default('0.70'),
+  maxTokens: int('maxTokens').default(2048),
+  status: varchar('status', { length: 50 }).default('disconnected'),
+  timeZone: varchar('timeZone', { length: 100 }).default('Asia/Jakarta (WIB, GMT+7)'),
+  filterWords: json('filterWords'),
+  updatedAt: wibDatetime('updatedAt').notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+});
+
+export type ChatbotAiConfig = typeof chatbotAiConfig.$inferSelect;
+export type NewChatbotAiConfig = typeof chatbotAiConfig.$inferInsert;
+

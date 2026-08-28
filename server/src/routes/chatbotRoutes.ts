@@ -13,8 +13,14 @@ import {
   getAnalytics,
   updateAnalytics,
 } from '../controllers/chatbotController';
+import { getAiConfig, saveAiConfig } from '../controllers/aiConfigController';
 
 const router = Router();
+
+// AI Config endpoints (LLM API Key, Model, Provider)
+router.get('/ai-config', getAiConfig);
+router.post('/ai-config', saveAiConfig);
+
 
 // FAQ endpoints
 router.get('/faqs', getFaqs);

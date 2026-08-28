@@ -186,7 +186,12 @@ export async function queryRagKnowledgeBase(userQuery: string, apiKey?: string):
     const contextForLlm = contextParts.join('\n\n');
 
     // Concise fallback for offline mode (skip cover/header chunks, find real content)
-    const contentChunk = finalDocs.find(d => !d.content.includes('DATA OPERASIONAL UMUM') && d.content.length > 50) || finalDocs[0];
+    let contentChunk = finalDocs.find(d => !d.content.includes('DATA OPERASIONAL UMUM') && d.content.length > 50) || finalDocs[0];
+    const isDefQuery = /apa itu|maksud|pengertian|arti|definisi/i.test(userQuery);
+    if (isDefQuery) {
+      const defDoc = finalDocs.find(d => (d.heading && d.heading.toLowerCase().includes('profil')) || d.content.includes('LSP Badan Sertifikasi Manajemen Risiko'));
+      if (defDoc) contentChunk = defDoc;
+    }
     const conciseFallback = extractConciseSnippet(contentChunk.content, userQuery);
 
     return {

@@ -39,24 +39,22 @@ export function formatWaNumber(rawWa: string): { clean: string; display: string 
  * Fetch AI Engine config from HTTP API endpoint or localStorage
  */
 export async function fetchAiConfigAsync(): Promise<any> {
-  // 1. Cek localStorage terlebih dahulu (langsung dari sesi browser aktif, tanpa latency)
-  try {
-    const saved = localStorage.getItem('mirov_ai_config');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed && parsed.apiKey && parsed.apiKey.trim() !== '') return parsed;
-    }
-  } catch (e) {}
-
-  // 2. Fallback sinkronisasi dari server HTTP jika ada
   const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : '';
-  const AI_CONFIG_URL = import.meta.env.DEV ? '/api/ai-config' : (API_BASE ? `${API_BASE}/api/ai-config` : '');
-  if (AI_CONFIG_URL) {
+  const serverUrls = [
+    import.meta.env.DEV ? '/api/ai-config' : '',
+    API_BASE ? `${API_BASE}/api/chatbot/ai-config` : '',
+  ].filter(Boolean);
+
+  // 1. Prioritaskan konfigurasi terbaru dari Database Server (MySQL)
+  for (const url of serverUrls) {
     try {
-      const res = await fetch(AI_CONFIG_URL);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
-        if (data && data.apiKey) {
+        if (data && data.apiKey && data.apiKey.trim() !== '') {
           try {
             localStorage.setItem('mirov_ai_config', JSON.stringify(data));
           } catch (e) {}
@@ -66,12 +64,12 @@ export async function fetchAiConfigAsync(): Promise<any> {
     } catch (e) {}
   }
 
-  // 3. Fallback konfigurasi parsial di localStorage
+  // 2. Fallback ke localStorage jika server sedang offline / latency
   try {
     const saved = localStorage.getItem('mirov_ai_config');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (parsed) return parsed;
+      if (parsed && parsed.apiKey && parsed.apiKey.trim() !== '') return parsed;
     }
   } catch (e) {}
 
@@ -226,6 +224,9 @@ export function cleanAndFormatResponse(rawText: string, filterWords?: string[]):
 
   let text = rawText.trim();
 
+  // 0. Remove reasoning tags like <think>...</think> from reasoning models
+  text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
   // 1. Remove markdown horizontal dividers like ---, ___, ***
   text = text.replace(/^(?:-{3,}|_{3,}|\*{3,})\s*$/gm, '');
 
@@ -349,12 +350,13 @@ export async function generateAiChatResponse(options: AiEngineOptions): Promise<
   const effectivePrompts = (quickPrompts && quickPrompts.length > 0) ? quickPrompts : allFaqs;
 
   // Cek apakah ada exact FAQ match (misal tombol FAQ diklik langsung)
+  const queryClean = queryLower.replace(/[?!.,;:'"()\[\]{}]/g, '').trim();
   const exactFaqMatch = effectivePrompts.find(
-    (p) => p.id === customText || queryLower === p.label.toLowerCase() || (queryLower.length > 5 && p.label.toLowerCase().includes(queryLower))
+    (p) => p.id === customText || queryClean === p.label.toLowerCase().replace(/[?!.,;:'"()\[\]{}]/g, '').trim() || (queryClean.length > 5 && p.label.toLowerCase().includes(queryClean))
   );
 
   // Kumpulkan semua FAQ yang relevan dengan pertanyaan user untuk dijadikan konteks berprioritas tinggi
-  const queryTokens = queryLower.split(/\s+/).filter((t) => t.length > 2);
+  const queryTokens = queryLower.split(/\s+/).map((t) => t.replace(/[?!.,;:'"()\[\]{}]/g, '')).filter((t) => t.length > 2);
   const relevantFaqs = allFaqs.filter((faq) => {
     const combinedFaqText = `${faq.label} ${faq.answer} ${faq.category || ''}`.toLowerCase();
     return queryTokens.some((token) => combinedFaqText.includes(token));
@@ -524,12 +526,17 @@ ${settings.systemPrompt ? `\n[PANDUAN KARAKTER/SYSTEM PROMPT]:\n${settings.syste
 
       // 4B. Groq LPU Engine (Super Cepat, Akurat, Gratis)
       if (aiConfig.provider === 'groq') {
-        const groqModel = aiConfig.model || 'llama-3.3-70b-versatile';
+        let groqModel = aiConfig.model || 'openai/gpt-oss-120b';
+        // Auto-migrate model lama yang sudah tidak aktif di Groq ke model flagship terbaru
+        if (groqModel === 'llama-3.3-70b-versatile' || groqModel === 'llama-3.1-8b-instant') {
+          groqModel = 'openai/gpt-oss-120b';
+        }
         const candidateGroqModels = Array.from(new Set([
           groqModel,
-          'llama-3.3-70b-versatile',
-          'llama-3.1-8b-instant',
+          'openai/gpt-oss-120b',
+          'openai/gpt-oss-20b',
           'qwen/qwen3.6-27b',
+          'qwen/qwen3.8-27b',
         ]));
 
         console.log('[BSMR Groq LLM] Memulai panggilan API Groq dengan model:', candidateGroqModels, 'API Key:', apiKey.slice(0, 8) + '...');
@@ -592,6 +599,21 @@ ${settings.systemPrompt ? `\n[PANDUAN KARAKTER/SYSTEM PROMPT]:\n${settings.syste
   }
 
   // 5B. Aturan Faktual Resmi BSMR Terarah (Menjawab Langsung Pertanyaan Umum dengan Paragraf Rapi)
+  if (
+    queryLower.includes('apa itu sertifikasi') ||
+    queryLower.includes('apa yang di maksud dengan sertifikasi') ||
+    queryLower.includes('apa yang dimaksud dengan sertifikasi') ||
+    queryLower.includes('apa yang dimaksud sertifikasi') ||
+    queryLower.includes('pengertian sertifikasi') ||
+    queryLower.includes('arti sertifikasi') ||
+    queryLower.includes('definisi sertifikasi')
+  ) {
+    return {
+      text: 'Sertifikasi Manajemen Risiko di LSP BSMR adalah proses penilaian dan pengakuan kompetensi kerja resmi bagi praktisi dan bankir di Indonesia dalam mengelola risiko perbankan.\n\nSertifikasi ini diselenggarakan dengan mengacu pada Standar Kompetensi Kerja Nasional Indonesia (SKKNI Nomor 218 Tahun 2020), di bawah lisensi resmi Badan Nasional Sertifikasi Profesi (BNSP No: BNSP-LSP-027-ID), serta mematuhi ketentuan regulasi Otoritas Jasa Keuangan (OJK).\n\nTujuannya adalah memastikan setiap profesional perbankan memiliki kompetensi teruji, integritas, dan kualifikasi yang diakui secara nasional maupun internasional.',
+      source: 'prompt',
+    };
+  }
+
   if (
     queryLower.includes('mengapa saya harus ikut sertifikasi') ||
     queryLower.includes('kenapa harus ikut sertifikasi') ||
