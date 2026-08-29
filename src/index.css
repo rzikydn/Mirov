@@ -1,15 +1,295 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+
+  html,
   body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* 🎨 Cross-browser SVG Crisp Rendering (Chrome & Firefox pixel alignment) */
+  svg line,
+  svg path {
+    shape-rendering: geometricPrecision;
+  }
+
+  .recharts-cartesian-grid-horizontal line,
+  .recharts-reference-line line {
+    shape-rendering: crispEdges;
   }
 }
 
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
+}
+
+/* 👇 Tambahkan bagian ini */
+@keyframes pulse-slow {
+
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 6s ease-in-out infinite;
+}
+
+/* 🌙 Ubah warna ikon kalender saat dark mode aktif */
+table input[type="date"] {
+  padding-right: 0 !important;
+  padding-left: 4px !important;
+  width: 100% !important;
+}
+
+table input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0);
+  transition: filter 0.3s ease;
+  margin-left: 6px !important;
+  margin-right: 4px !important;
+  padding: 0 !important;
+  cursor: pointer;
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0;
+}
+
+/* Saat elemen root memiliki class "dark" */
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* 📜 Hide scrollbar but keep scroll functionality */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari, Opera */
+}
+
+/* 📊 Compact table spacing - remove all cell spacing */
+table {
+  border-spacing: 0;
+  border-collapse: collapse;
+}
+
+/* 🚀 Disable smooth scroll for table containers (instant scroll) */
+.overflow-x-auto {
+  scroll-behavior: auto !important;
+  -webkit-overflow-scrolling: auto !important;
+}
+
+/* 🚫 Remove all transitions and transforms from table elements (except resize handle) */
+table,
+table *:not(.resize-handle),
+.overflow-x-auto,
+.overflow-x-auto * {
+  transition: none !important;
+  animation: none !important;
+  will-change: auto !important;
+}
+
+/* 📅 Custom Datepicker Dropdown - Override table transition reset */
+.custom-datepicker-dropdown,
+.custom-datepicker-dropdown * {
+  transition: all 0.1s ease !important;
+  animation: unset !important;
+  will-change: auto !important;
+}
+
+.custom-datepicker-dropdown button:active {
+  transform: scale(0.96);
+}
+
+/* 🎨 Smooth column resize styles */
+.resize-handle {
+  transition: background-color 0.2s ease, opacity 0.2s ease, width 0.1s ease !important;
+}
+
+/* Visual feedback saat resize aktif */
+body.resizing-column {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+body.resizing-column * {
+  cursor: col-resize !important;
+  pointer-events: none;
+}
+
+body.resizing-column .resize-handle {
+  pointer-events: auto;
+}
+
+/* Smooth width transition untuk column yang di-resize - only when actively resizing */
+body.resizing-column table th,
+body.resizing-column table td {
+  transition: width 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Remove transition when not resizing for instant scroll */
+body:not(.resizing-column) table th,
+body:not(.resizing-column) table td {
+  transition: none !important;
+}
+
+/* 🎯 Optimize sticky positioning and scrolling performance */
+table thead {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+table,
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000px;
+  -webkit-perspective: 1000px;
+}
+
+/* 🎨 Modern Custom Scrollbar - Light Mode */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  /* gray-400 with opacity */
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.7);
+  /* gray-500 with opacity */
+}
+
+/* Firefox scrollbar - Light Mode */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+/* 🌙 Modern Custom Scrollbar - Dark Mode */
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.6);
+  /* gray-600 with opacity */
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.8);
+  /* gray-500 with opacity */
+}
+
+/* Firefox scrollbar - Dark Mode */
+.dark .custom-scrollbar {
+  scrollbar-color: rgba(75, 85, 99, 0.6) transparent;
+}
+
+/* 🎯 Modern Custom Checkbox - Light Mode */
+.custom-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #d1d5db;
+  /* gray-300 */
+  border-radius: 6px;
+  background-color: white;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.custom-checkbox:hover {
+  border-color: #3b82f6;
+  /* blue-500 */
+  background-color: #eff6ff;
+  /* blue-50 */
+}
+
+.custom-checkbox:checked {
+  background-color: #3b82f6;
+  /* blue-500 */
+  border-color: #3b82f6;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='white'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
+  background-size: 12px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.custom-checkbox:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+.custom-checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 🌙 Modern Custom Checkbox - Dark Mode */
+.dark .custom-checkbox {
+  border-color: #4b5563;
+  /* gray-600 */
+  background-color: #374151;
+  /* gray-700 */
+}
+
+.dark .custom-checkbox:hover {
+  border-color: #60a5fa;
+  /* blue-400 */
+  background-color: #1e3a8a;
+  /* blue-900 */
+}
+
+.dark .custom-checkbox:checked {
+  background-color: #3b82f6;
+  /* blue-500 */
+  border-color: #3b82f6;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23e5e7eb'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
+}
+
+
+/* Chrome/Safari autofill background override */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px white inset !important;
+  -webkit-text-fill-color: #1f2937 !important;
 }
