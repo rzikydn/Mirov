@@ -35,7 +35,7 @@ export function getAiUsageStats(): AiUsageStats {
       if (parsed.totalTokensUsed === 12450 && parsed.byProvider?.gemini === 8200) {
         localStorage.removeItem(STORAGE_KEY);
       } else {
-        const groqTokens = parsed.byProvider?.groq || 0;
+        const groqTokens = parsed.byProvider?.groq || parsed.totalTokensUsed || 0;
         return {
           totalTokensUsed: groqTokens,
           totalRequests: parsed.totalRequests || 0,
@@ -71,6 +71,46 @@ export function getAiUsageStats(): AiUsageStats {
   };
 }
 
+/**
+ * Fetch authoritative usage stats from MySQL database server
+ */
+export async function fetchAiUsageStatsAsync(): Promise<AiUsageStats> {
+  const local = getAiUsageStats();
+  const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:5000';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/chatbot/analytics?metricType=ai_usage`);
+    if (res.ok) {
+      const data = await res.json();
+      const record = Array.isArray(data?.data) ? data.data.find((d: any) => d.metricType === 'ai_usage') : null;
+      if (record && record.dataJson) {
+        const s = record.dataJson;
+        const serverTokens = s.totalTokensUsed || s.groqTokens || 0;
+        const maxTokens = Math.max(local.totalTokensUsed, serverTokens);
+        const maxRequests = Math.max(local.totalRequests, s.totalRequests || 0);
+
+        const merged: AiUsageStats = {
+          ...local,
+          totalTokensUsed: maxTokens,
+          totalRequests: maxRequests,
+          byProvider: {
+            ...local.byProvider,
+            groq: maxTokens,
+          },
+        };
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        return merged;
+      }
+    }
+  } catch (e) {}
+
+  return local;
+}
+
+/**
+ * Record token consumption in local storage & sync to database
+ */
 export function recordAiUsage(
   provider: 'gemini' | 'deepseek' | 'groq' | 'openai',
   tokensUsed: number
@@ -91,6 +131,7 @@ export function recordAiUsage(
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('mirov_ai_usage_updated', { detail: updated }));
+
     if (typeof window !== 'undefined') {
       window.postMessage({ type: 'BSMR_AI_USAGE_UPDATED', stats: updated }, '*');
       if (window.parent && window.parent !== window) {
@@ -102,11 +143,29 @@ export function recordAiUsage(
         try {
           const channel = new BroadcastChannel('bsmr_ai_usage_channel');
           channel.postMessage({ type: 'BSMR_AI_USAGE_UPDATED', stats: updated });
-          channel.close();
+          // Note: don't close channel immediately so browser dispatches the message reliably
+          setTimeout(() => { try { channel.close(); } catch (e) {} }, 1000);
         } catch (e) {}
       }
     }
   } catch (e) {}
+
+  // Asynchronous sync to MySQL server database
+  const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:5000';
+  fetch(`${API_BASE}/api/chatbot/analytics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: 'ai_usage_stats',
+      metricType: 'ai_usage',
+      dataJson: {
+        totalTokensUsed: updated.totalTokensUsed,
+        totalRequests: updated.totalRequests,
+        groqTokens: updated.byProvider.groq,
+        byProvider: updated.byProvider,
+      },
+    }),
+  }).catch(() => {});
 
   return updated;
 }
@@ -122,5 +181,22 @@ export function resetAiUsage(): AiUsageStats {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
     window.dispatchEvent(new CustomEvent('mirov_ai_usage_updated', { detail: fresh }));
   } catch (e) {}
+
+  const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:5000';
+  fetch(`${API_BASE}/api/chatbot/analytics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: 'ai_usage_stats',
+      metricType: 'ai_usage',
+      dataJson: {
+        totalTokensUsed: 0,
+        totalRequests: 0,
+        groqTokens: 0,
+        byProvider: { gemini: 0, deepseek: 0, groq: 0, openai: 0 },
+      },
+    }),
+  }).catch(() => {});
+
   return fresh;
 }

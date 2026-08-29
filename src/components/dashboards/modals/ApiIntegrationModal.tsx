@@ -23,7 +23,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { getAiUsageStats, AiUsageStats } from '@/services/aiUsageService';
+import { getAiUsageStats, fetchAiUsageStatsAsync, AiUsageStats } from '@/services/aiUsageService';
 import { fetchAiConfigAsync } from '@/services/aiChatEngine';
 
 interface ApiIntegrationModalProps {
@@ -112,11 +112,12 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
         }));
       } catch (e) {}
     }
-    setUsageStats(getAiUsageStats());
+    // Fetch authoritative usage stats from MySQL server
+    fetchAiUsageStatsAsync().then(setUsageStats);
 
     const handleUsageUpdated = (e: any) => {
       if (e?.detail) setUsageStats(e.detail);
-      else setUsageStats(getAiUsageStats());
+      else fetchAiUsageStatsAsync().then(setUsageStats);
     };
 
     const handleWindowMessage = (event: MessageEvent) => {
@@ -125,8 +126,15 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
       }
     };
 
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'mirov_ai_usage_stats') {
+        fetchAiUsageStatsAsync().then(setUsageStats);
+      }
+    };
+
     window.addEventListener('mirov_ai_usage_updated', handleUsageUpdated);
     window.addEventListener('message', handleWindowMessage);
+    window.addEventListener('storage', handleStorageChange);
 
     let channel: BroadcastChannel | null = null;
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -140,9 +148,16 @@ export default function ApiIntegrationModal({ show, darkMode, onClose }: ApiInte
       } catch (e) {}
     }
 
+    // Polling interval while modal is open to ensure meter updates even across separate browser tabs
+    const pollInterval = setInterval(() => {
+      fetchAiUsageStatsAsync().then(setUsageStats);
+    }, 2000);
+
     return () => {
       window.removeEventListener('mirov_ai_usage_updated', handleUsageUpdated);
       window.removeEventListener('message', handleWindowMessage);
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(pollInterval);
       if (channel) channel.close();
     };
   }, [show]);
